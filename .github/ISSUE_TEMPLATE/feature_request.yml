@@ -1,0 +1,43 @@
+name: Feature request
+description: Something that would help you run a game
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This app assumes **one trusted device in the moderator's hand**. Every player's
+        role is on that screen, and nothing is shared over a network.
+
+        Anything that needs a server, a room code, or state shared between phones is out
+        of scope by design — including letting each player see their own card on their own
+        phone. That's the one feature that would require rebuilding the privacy model, and
+        the answer is to start a separate project rather than retrofit this one. See
+        `KNOWLEDGE.md` §10.
+
+        There's also no build step, so a framework or npm dependency is unlikely to land.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's awkward at the table right now?
+      description: The problem, not the solution — the fix is often different from what you'd expect.
+      placeholder: >-
+        With 18 players the vote takes so long that people lose track of who's already
+        voted.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This works with one device, offline, with no server or shared state
+          required: true

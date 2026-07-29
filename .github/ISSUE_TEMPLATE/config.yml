@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Known limitations
+    url: https://github.com/phuongdphamap/werewolves/blob/main/KNOWLEDGE.md#10-open-questions-and-future-work
+    about: Already-known gaps and things deliberately left out. Check here first.
+  - name: Ruleset divergences
+    url: https://github.com/phuongdphamap/werewolves/blob/main/KNOWLEDGE.md#4-ruleset-divergences
+    about: Every known difference between Vietnamese play and the original box.
+  - name: Contributing
+    url: https://github.com/phuongdphamap/werewolves/blob/main/CONTRIBUTING.md
+    about: How to run the tests and open a PR.

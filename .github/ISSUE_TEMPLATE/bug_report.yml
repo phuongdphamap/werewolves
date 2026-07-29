@@ -1,0 +1,110 @@
+name: Bug report
+description: Something went wrong while running a game
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The deck and the phase matter more than anything else here — most bugs only
+        appear with a particular combination of roles.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      placeholder: The Bodyguard protected the same player two nights running and the app allowed it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to get there
+      description: From a fresh game if you can. Which players you picked matters.
+      placeholder: |
+        1. 9 players, Classic deck
+        2. Night 1 — Bodyguard shields seat 4
+        3. Night 2 — seat 4 is offered again
+    validations:
+      required: true
+
+  - type: input
+    id: deck
+    attributes:
+      label: Roles in the deck
+      description: The whole deck if you can — a role you think is unrelated often isn't.
+      placeholder: 3 wolves, Seer, Witch, Bodyguard, Hunter, 3 villagers
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase it happened in
+      options:
+        - Building the deck / dealing
+        - Sheriff election
+        - Night
+        - Dawn resolution
+        - Day discussion
+        - The vote
+        - Game end / win condition
+        - Resuming after a reload
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ruleset
+    attributes:
+      label: Ruleset
+      options:
+        - Ma Sói Việt Nam
+        - Millers Hollow (bản gốc)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: iPhone 14, iOS 18, Safari
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How was it open?
+      options:
+        - Installed to the home screen
+        - A normal browser tab
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version, if you can tell
+      description: >-
+        The app doesn't display this. In desktop DevTools it's the Cache Storage entry
+        named `mh-vX.Y.Z-shell`. On a phone it's effectively unknowable — leave it blank
+        and say when you last opened the app with a connection.
+      placeholder: mh-v0.1.1-shell, or "installed last week, opened online yesterday"
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before filing
+      options:
+        - label: I checked the known limitations and this isn't one of them
+          required: true
