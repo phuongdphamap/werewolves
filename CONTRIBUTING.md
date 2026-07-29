@@ -40,16 +40,30 @@ Releases are driven by a label on the PR. Add exactly one before merging:
 | `release:minor` | `0.X.0` | A new role, a new phase, a new moderator affordance |
 | `release:patch` | `0.0.X` | Fixes, copy edits, chores |
 
-On merge to `main`, `release.yml` runs three jobs in order:
+On merge to `main`:
 
 ```
-test  ->  release  ->  deploy
-          (tag, bump sw.js,
-           publish release)
+release.yml   test -> release              (tag, bump sw.js, publish release)
+                         |
+                         v  dispatches, on ref main
+static.yml    test -> deploy
 ```
 
 Each stage gates the next, so nothing is tagged and nothing reaches Pages unless the
-suites pass.
+suites pass. The suites therefore run twice per release, once in each workflow.
+
+**Why a dispatch and not a direct call.** Two reasons, and the second one is easy to
+miss — removing the dispatch broke the `v0.2.0` release:
+
+1. A push made with `GITHUB_TOKEN` doesn't trigger other workflows, so the version bump
+   would never ship on its own.
+2. The `github-pages` environment only permits deploys from `main`. On a labelled merge
+   `release.yml` runs on the `pull_request` event, so its ref is `refs/pull/N/merge` and
+   the environment rejects the deploy — no matter which ref the job checks out.
+   `--ref main` creates a run whose ref really is `main`, which is what satisfies it.
+
+If a release ever tags and publishes but doesn't deploy, that's the symptom: recover
+with `gh workflow run static.yml`.
 
 **No label means no release — and no deploy.** That's the right choice for docs and CI
 changes, which don't alter the app. But it also means an app change merged without a
@@ -65,8 +79,8 @@ the same `test -> deploy` pair:
 gh workflow run static.yml
 ```
 
-The Pages steps live once, in `deploy.yml`, which both callers reuse. It has no trigger
-of its own, so a deploy can only ever happen behind a test gate.
+The Pages steps live once, in `deploy.yml`. It has no trigger of its own, so a deploy
+can only ever happen behind a test gate.
 
 Versions start from `v0.0.0`, so the first release is whatever its label says:
 `release:minor` on an untagged repo produces `v0.1.0`.
