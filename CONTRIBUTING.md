@@ -121,16 +121,29 @@ If you touch typography, check a string with stacked diacritics renders in one f
 
 ## Testing
 
-There is no test suite. Test by hand, at phone width in portrait — that's how it's
-held. Before opening a PR:
+400 assertions across 19 suites, in about three seconds. No dependencies — they read
+`index.html`, `sw.js` and the manifest as text and assert against them:
+
+```bash
+tests/run-all.sh
+```
+
+CI runs this on every PR. If it reports every suite as `CRASHED`, `node` isn't on your
+`PATH` rather than anything being wrong with the code.
+
+The suites cover the deck rules, night call order, ruleset divergences, vote tallying
+and the deploy metadata. They can't drive a browser, so these still need a real device:
 
 - Run a full short game: 7 players, deal, night, dawn, vote, win condition
 - Reload mid-game and confirm Resume restores the same night and the same deck
 - Go offline after one online load and relaunch
-- Check both rulesets if you touched anything they differ on
+- Check it at phone width in portrait — that's how it's held
 
 The PR template lists these as checkboxes. They're conditional — skip the groups that
 don't apply to your change.
+
+`KNOWLEDGE.md` documents the domain rules and the bug catalogue behind these suites.
+Worth reading before changing game logic.
 
 ## Commits and PRs
 
