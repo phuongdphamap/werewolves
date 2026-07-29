@@ -1,12 +1,22 @@
-# Cuts a release when a PR carrying a release:* label is merged into main.
-# The label picks the semver bump; sw.js VERSION is synced to the new tag so the
-# service worker cache actually invalidates.
+# Cuts a release when a PR carrying a release:* label is merged into main, or on
+# demand from the Actions tab. The label (or the input) picks the semver bump;
+# sw.js VERSION is synced to the new tag so the service worker cache invalidates.
 name: Release
 
 on:
   pull_request:
     types: [closed]
     branches: ["main"]
+
+  # Cut a release without a PR — a cache refresh or a re-release needs no diff.
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        type: choice
+        required: true
+        default: patch
+        options: [patch, minor, major]
 
 # One release at a time — two merges landing together must not race on the tag.
 concurrency:
@@ -20,10 +30,11 @@ permissions:
 jobs:
   release:
     if: >-
-      github.event.pull_request.merged == true &&
-      (contains(github.event.pull_request.labels.*.name, 'release:major') ||
-       contains(github.event.pull_request.labels.*.name, 'release:minor') ||
-       contains(github.event.pull_request.labels.*.name, 'release:patch'))
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (contains(github.event.pull_request.labels.*.name, 'release:major') ||
+        contains(github.event.pull_request.labels.*.name, 'release:minor') ||
+        contains(github.event.pull_request.labels.*.name, 'release:patch')))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,10 +46,14 @@ jobs:
       - name: Work out the next version
         id: next
         env:
+          EVENT: ${{ github.event_name }}
+          INPUT_BUMP: ${{ inputs.bump }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
-          if jq -e 'index("release:major")' <<<"$LABELS" >/dev/null; then
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            bump="$INPUT_BUMP"
+          elif jq -e 'index("release:major")' <<<"$LABELS" >/dev/null; then
             bump=major
           elif jq -e 'index("release:minor")' <<<"$LABELS" >/dev/null; then
             bump=minor
