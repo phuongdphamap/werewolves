@@ -2,8 +2,8 @@
 // left half empty, and the backdrop started fully transparent so role rows and
 // the legend showed through behind them. These tests pin both fixes.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
-const js  = src.match(/<script>([\s\S]*)<\/script>/)[1];
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+const js  = fs.readFileSync('../js/app.js','utf8');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.message; }

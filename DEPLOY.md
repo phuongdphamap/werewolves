@@ -29,7 +29,7 @@ Until then: ship the file.
 
 ## What was added for deployment
 
-The app was already a single self-contained HTML file with no build step. Four gaps
+The app was already plain files with no build step. Four gaps
 mattered for real use, and all four are now closed.
 
 **1. Installable.** `manifest.webmanifest` plus icons. On Android and desktop Chrome
@@ -57,10 +57,13 @@ is wrapped in `try/catch` so an embedded viewer that forbids storage still runs.
 
 ## Deploy it
 
-Rename the app to `index.html` and put these five files in one directory:
+Copy the whole directory, keeping the layout — `css/` and `js/` are referenced by
+relative path from `index.html`:
 
 ```
-index.html              (millers-hollow-moderator.html, renamed)
+index.html
+css/app.css
+js/app.js
 sw.js
 manifest.webmanifest
 icon.svg

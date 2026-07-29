@@ -1,7 +1,7 @@
 // Every shuffle must produce a deck that would pass the app's own validation.
 // Runs the shipped shuffleDeck across every table size, many times each.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 eval(src.match(/const ROLES = \[[\s\S]*?\n\];/)[0].replace('const ROLES','globalThis.ROLES'));
 globalThis.R = {}; ROLES.forEach(r => R[r.id] = r);

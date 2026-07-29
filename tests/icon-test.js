@@ -3,7 +3,7 @@
 // This exists because I deleted the .ic rule once while removing "dead" CSS and
 // my grep-based check passed anyway.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.message; }

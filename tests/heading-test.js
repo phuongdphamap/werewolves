@@ -8,7 +8,7 @@
 // These tests read the real token values out of the stylesheet and compare the
 // computed separations, so any future change to --s3 or --s5 is caught.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.message; }

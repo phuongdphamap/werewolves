@@ -32,8 +32,10 @@ with **physical cards**.
 
 ### Hard constraints
 
-- **Single self-contained HTML file.** No build step, no dependencies, no framework.
-  The only network asset is the Google Fonts stylesheet.
+- **Plain files the browser loads directly** — `index.html`, `css/app.css`, `js/app.js`.
+  No build step, no dependencies, no framework, no module system. The only network asset
+  is the Google Fonts stylesheet. Every local file must be listed in `PRECACHE` in
+  `sw.js` or offline breaks.
 - **One device, held by one trusted person.** No player ever touches it.
 - **Offline-first.** The normal environment is a garden or cellar with no signal.
 - **The app never replaces the cards.** Players hold real cards; the app tracks what
