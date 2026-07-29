@@ -48,6 +48,13 @@ deploy are automatic.
 Versions start from `v0.0.0`, so the first release is whatever its label says:
 `release:minor` on an untagged repo produces `v0.1.0`.
 
+You can also cut one without a PR — **Actions → Release → Run workflow**, then pick the
+bump. Useful when there's no diff to merge, such as forcing a cache refresh:
+
+```bash
+gh workflow run release.yml -f bump=patch
+```
+
 ## Where things are
 
 All in `index.html`:
