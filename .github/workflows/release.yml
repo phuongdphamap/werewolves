@@ -117,9 +117,10 @@ jobs:
       # out. Only --ref main creates a run whose ref really is main. Missing this broke
       # the v0.2.0 release: it tagged and published, then failed to deploy.
       #
-      # Costs one extra suite run, because static.yml gates itself — it is dispatchable
-      # by hand and must not trust its caller.
+      # skip_tests because the suites ran against this exact tree above and this job
+      # pushes only a tag — nothing changed in between. A hand dispatch of static.yml
+      # leaves the flag off and runs them.
       - name: Deploy the new version
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run static.yml --ref main
+        run: gh workflow run static.yml --ref main -f skip_tests=true

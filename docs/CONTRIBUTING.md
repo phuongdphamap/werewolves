@@ -49,8 +49,10 @@ on your PR      test.yml    [test]    checkout -> suites
 
 on merge        release.yml [release]  checkout main -> suites -> tag -> publish
                                                           |
-                                                          v dispatches, on ref main
-                static.yml  [deploy]   checkout main -> suites -> write version -> Pages
+                                                          v dispatches, skip_tests=true
+                static.yml  [deploy]   checkout main -> write version -> Pages
+
+by hand         static.yml  [deploy]   checkout main -> suites -> write version -> Pages
 ```
 
 The suites gate by being earlier steps in the same job: if they fail, nothing after them
@@ -58,10 +60,21 @@ runs. That is why there are no separate `test` jobs any more — a reusable work
 mean a second runner, ~10s of extra startup, and a duplicate `test / test` entry in the
 checks list for no added safety.
 
-Two suite runs per release, not four. `test.yml` has no `push: main` trigger — a squash
-merge tests the same tree the PR already tested, and it used to start *concurrently* with
-the release's own run. `static.yml` still runs them because it is dispatchable by hand and
-must not trust its caller.
+**One suite run per release, down from four.** Two triggers were removed and one skip
+added:
+
+- `test.yml` has no `push: main` trigger. A squash merge tests the same tree the PR
+  already tested, and that run used to start in the same second as the release's own.
+- `release.yml` and `static.yml` no longer call a reusable workflow, so there are no
+  nested `test / test` jobs.
+- The release dispatches the deploy with `skip_tests=true`, because it ran the suites
+  against that exact tree moments earlier and pushes nothing but a tag.
+
+A **hand** dispatch of `static.yml` does run them, and that is not merely cautious: the
+required check is not strict, so if B is tested, then A merges, then B merges, `main` can
+end up a tree no PR ever tested. The release's own run covers that on the release path;
+the deploy's covers it on the manual one. Skipping is opt-in and visible in the Actions
+tab.
 
 **Nothing writes to a branch.** No workflow pushes to `main`, and none pushes to your PR
 branch either. Two things depend on that:

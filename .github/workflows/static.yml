@@ -12,6 +12,12 @@ name: Deploy static content to Pages
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: Skip the suites — only when the caller has just run them on this tree
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -39,9 +45,17 @@ jobs:
           ref: main
           fetch-depth: 0 # tags, for the version pin below
 
-      # Dispatched by a person as well as by the release, so it verifies main itself
-      # rather than trusting whoever started it. Nothing below runs if this fails.
-      - uses: ./.github/actions/run-tests
+      # Skipped only when the release dispatched us, because it ran the suites against
+      # this exact tree seconds ago and pushes nothing but a tag — so repeating them
+      # tests identical bytes twice.
+      #
+      # A hand dispatch does run them, and that is not belt-and-braces: the required
+      # check is not strict, so if B is tested, then A merges, then B merges, main ends
+      # up a tree no PR ever tested. This is what catches that. The default is therefore
+      # to run them; skipping is opt-in and visible in the Actions tab.
+      - name: Run the suites
+        if: ${{ !inputs.skip_tests }}
+        uses: ./.github/actions/run-tests
 
       # What ships must carry the released version, or the service worker cache never
       # rotates and nobody receives the update. sw.js in the repo is a placeholder;
