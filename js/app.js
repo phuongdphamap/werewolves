@@ -1663,7 +1663,24 @@ function openRoster(){
   }
   const L = $('rosLog'); L.innerHTML = '';
   for (const e of [...G.log].reverse()) L.appendChild(el('div','le','<span class="w">'+e.w+'</span><span>'+e.t+'</span>'));
+  showVersion();
   $('mRoster').classList.add('on');
+}
+
+/* Which build is this? Cache-first serving means a phone can sit several releases
+   behind, so "it's broken" is unactionable without it. Read from the live cache name
+   rather than a constant: that reports what is actually being served, and there is no
+   second value for a release to keep in step. */
+function showVersion(){
+  const out = $('rosVer');
+  if (!out) return;
+  if (!('caches' in window)){ out.textContent = 'Version unknown — no cache storage.'; return; }
+  caches.keys().then(keys => {
+    const shell = keys.find(k => /^mh-v.*-shell$/.test(k));
+    out.textContent = shell
+      ? 'Version ' + shell.replace(/^mh-/, '').replace(/-shell$/, '')
+      : 'Version unknown — not cached yet, so this is the newest build.';
+  }).catch(() => { out.textContent = 'Version unknown.'; });
 }
 // Are all werewolf-side cards accounted for? In the Vietnamese order the pack is
 // called before the Seer, so on the first night this is already true and the
