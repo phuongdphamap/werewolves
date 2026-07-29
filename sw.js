@@ -11,7 +11,7 @@
  *
  * Bump VERSION on every release or clients will keep serving the old bundle.
  */
-const VERSION = 'mh-2024-06-1';
+const VERSION = 'mh-2026-07-29';
 const SHELL   = VERSION + '-shell';
 const FONTS   = 'mh-fonts-v1';
 
