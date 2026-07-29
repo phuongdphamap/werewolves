@@ -93,11 +93,14 @@ jobs:
           # after the label, so the bump is being computed against a stale head.
           git push origin "HEAD:refs/heads/${BRANCH}"
 
-      # A push made with GITHUB_TOKEN creates no workflow run, so the commit above
-      # would carry no test check and the PR could never satisfy the required one.
+      # A push made with GITHUB_TOKEN creates no workflow run, so a bumped commit would
+      # carry no test check and the PR could never satisfy the required one.
       # workflow_dispatch is the documented exception: it always creates a run.
-      - name: Run the suites against the bumped commit
-        if: steps.sw.outputs.changed == 'true'
+      #
+      # Deliberately not conditional on having just committed. Re-labelling when the
+      # version is already correct still needs to produce the check — otherwise a
+      # re-run leaves the PR permanently unmergeable.
+      - name: Run the suites against the head of the PR branch
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.event.pull_request.head.ref }}

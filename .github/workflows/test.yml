@@ -7,6 +7,11 @@ on:
     branches: ["main"]
   push:
     branches: ["main"]
+  # bump.yml dispatches this at a PR branch after committing the version. A push made
+  # with GITHUB_TOKEN creates no run, so without this the bumped commit would carry no
+  # test check and the PR could never satisfy a required one.
+  workflow_dispatch:
+
   workflow_call:
     inputs:
       ref:
