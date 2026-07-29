@@ -99,14 +99,17 @@ install, no port to open. It is static files.
 ## Releasing an update
 
 Service workers cache aggressively — that is the point — so a new version needs a
-new cache name. Edit one line in `sw.js`:
+new cache name. That is now automatic: put a `release:patch`, `release:minor` or
+`release:major` label on the PR, and on merge the release workflow rewrites the one
+line that matters in `sw.js`:
 
 ```js
-const VERSION = 'mh-2024-06-1';   // bump this on every release
+const VERSION = 'mh-v1.2.0';   // written by .github/workflows/release.yml
 ```
 
-Users get the new version the next time they launch the app. Without this, they will
-keep the version they first loaded forever.
+Users get the new version the next time they launch the app. Without a new cache
+name they keep the version they first loaded forever — which is why an app change
+merged with no release label reaches nobody. `CONTRIBUTING.md` has the label table.
 
 ---
 
