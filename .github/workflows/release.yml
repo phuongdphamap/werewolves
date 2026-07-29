@@ -50,70 +50,52 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Work out the next version
+      # sw.js is the source of truth here, not the tag list. bump.yml already wrote
+      # the version into the PR, so main carries it before this ever runs — which is
+      # what lets main be protected: nothing below pushes to a branch.
+      - name: Read the version off main
         id: next
         env:
           EVENT: ${{ github.event_name }}
           INPUT_BUMP: ${{ inputs.bump }}
-          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            bump="$INPUT_BUMP"
-          elif jq -e 'index("release:major")' <<<"$LABELS" >/dev/null; then
-            bump='major'
-          elif jq -e 'index("release:minor")' <<<"$LABELS" >/dev/null; then
-            bump='minor'
-          else
-            bump='patch'
-          fi
-
           previous=$(git tag --list 'v*' --sort=-v:refname \
             | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
           previous=${previous:-v0.0.0}
 
-          # npm's semver is the reference implementation of the spec. It handles
-          # prerelease and build-metadata tags, and rejects a malformed version
-          # instead of doing shell arithmetic on it.
-          version="v$(npx --yes semver@7 --increment "$bump" "${previous#v}")"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            # No PR to have bumped anything, so derive it and edit in the runner only.
+            version="v$(npx --yes semver@7 --increment "$INPUT_BUMP" "${previous#v}")"
+            sed -i "s|^const VERSION = '.*';|const VERSION = 'mh-${version}';|" sw.js
+            echo "Manual release: $previous -> $version ($INPUT_BUMP)"
+          else
+            version=$(sed -n "s|^const VERSION = 'mh-\(v[0-9.]*\)';|\1|p" sw.js)
+            [ -n "$version" ] || {
+              echo "::error::no version in sw.js — was the PR labelled so bump.yml could set it?"
+              exit 1
+            }
+            echo "Releasing $version, as written into sw.js by the PR"
+          fi
+
+          if git rev-parse "$version" >/dev/null 2>&1; then
+            echo "::error::tag $version already exists. Re-label the PR so bump.yml picks the next one."
+            exit 1
+          fi
 
           {
-            echo "bump=$bump"
             echo "previous=$previous"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
-          echo "Releasing $previous -> $version ($bump)"
 
-      - name: Sync the service worker cache version
-        id: sw
+      - name: Tag it
         env:
           VERSION: ${{ steps.next.outputs.version }}
-        run: |
-          set -euo pipefail
-          sed -i "s|^const VERSION = '.*';|const VERSION = 'mh-${VERSION}';|" sw.js
-          grep -q "const VERSION = 'mh-${VERSION}';" sw.js || {
-            echo "::error::could not rewrite VERSION in sw.js — check the line format"
-            exit 1
-          }
-          if git diff --quiet sw.js; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Commit and tag
-        env:
-          VERSION: ${{ steps.next.outputs.version }}
-          CHANGED: ${{ steps.sw.outputs.changed }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ "$CHANGED" = "true" ]; then
-            git add sw.js
-            git commit -m "chore(release): ${VERSION}"
-            git push origin main
-          fi
+          # A tag, never a branch — main is protected and nothing here needs a bypass.
           git tag -a "$VERSION" -m "$VERSION"
           git push origin "$VERSION"
 

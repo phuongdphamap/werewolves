@@ -24,8 +24,8 @@ offline.
 icons and the version doesn't change, every existing user keeps the old build forever.
 You'll see your change locally in a fresh tab and assume it shipped.
 
-**Label your PR and this is handled for you** — the release workflow rewrites
-`const VERSION` in `sw.js` to match the new tag. See [Releases](#releases).
+**Label your PR and this is handled for you** — `bump.yml` writes `const VERSION` in
+`sw.js` onto your branch as soon as the label lands. See [Releases](#releases).
 
 You only need to edit it by hand if you deliberately merge an app change with no
 release label, which should be rare.
@@ -40,23 +40,40 @@ Releases are driven by a label on the PR. Add exactly one before merging:
 | `release:minor` | `0.X.0` | A new role, a new phase, a new moderator affordance |
 | `release:patch` | `0.0.X` | Fixes, copy edits, chores |
 
-On merge to `main`:
+**The label does the work immediately.** `bump.yml` writes the matching version into
+`sw.js` on your PR branch, as a `chore: set version vX.Y.Z` commit, and re-runs the
+suites against it. So the version arrives on `main` through the PR like any other
+change.
 
 ```
-release.yml   test -> release              (tag, bump sw.js, publish release)
-                         |
-                         v  dispatches, on ref main
-static.yml    test -> deploy
+label the PR      bump.yml   sets sw.js on the PR branch, re-runs tests
+merge the PR      release.yml  test -> release   (tag + publish; no push to main)
+                                          |
+                                          v  dispatches, on ref main
+                               static.yml  test -> deploy
 ```
 
 Each stage gates the next, so nothing is tagged and nothing reaches Pages unless the
-suites pass. The suites therefore run twice per release, once in each workflow.
+suites pass. The suites run twice per release, once in each workflow.
+
+**Nothing pushes to `main`.** That is deliberate, and it is what allows `main` to
+require the `test` check: a release only ever tags, and tags are not branch-protected.
+GitHub Actions cannot be granted a branch-protection bypass on a user-owned repository,
+so the alternative would have been no protection at all.
+
+If you re-label a PR with a different size, `bump.yml` recomputes and commits again.
+Labelling twice with the same size is a no-op.
+
+One sharp edge: two PRs labelled at the same time compute the same next version, and the
+second to merge fails with `tag vX.Y.Z already exists`. Re-label that PR to move it on.
 
 **Why a dispatch and not a direct call.** Two reasons, and the second one is easy to
 miss — removing the dispatch broke the `v0.2.0` release:
 
-1. A push made with `GITHUB_TOKEN` doesn't trigger other workflows, so the version bump
-   would never ship on its own.
+1. A push made with `GITHUB_TOKEN` doesn't trigger other workflows, so a deploy would
+   never start on its own. (`workflow_dispatch` is the documented exception — it always
+   creates a run. That is also how `bump.yml` gets the suites to run against the commit
+   it just pushed to your PR branch.)
 2. The `github-pages` environment only permits deploys from `main`. On a labelled merge
    `release.yml` runs on the `pull_request` event, so its ref is `refs/pull/N/merge` and
    the environment rejects the deploy — no matter which ref the job checks out.
