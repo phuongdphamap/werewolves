@@ -42,7 +42,7 @@ player must not see.
 
 Letting each player see their own role on their own phone is a different product — it
 needs a room code, a backend, and shared state. If you want that, start a new project
-rather than converting this one. See `DEPLOY.md` for why the no-framework, no-build
+rather than converting this one. See `docs/DEPLOY.md` for why the no-framework, no-build
 choice is deliberate.
 
 ## Files
@@ -53,7 +53,9 @@ css/app.css             all styling
 js/app.js               roles, game logic, rendering
 sw.js                   service worker; offline caching
 manifest.webmanifest    PWA metadata
-icon.svg  icon-192.png  icon-512.png  icon-mask-512.png
+icons/                  favicon, touch icon, PWA icons
+docs/                   contributing, deployment, engineering notes
+tests/                   run with tests/run-all.sh
 ```
 
 Everything uses relative paths, so it also works from a subdirectory — which is how it
@@ -71,7 +73,7 @@ python3 -m http.server 8000
 
 ## Contributing
 
-See `CONTRIBUTING.md`. The short version: edit `index.html`, and put a `release:patch`
+See `docs/CONTRIBUTING.md`. The short version: edit `index.html`, and put a `release:patch`
 / `release:minor` / `release:major` label on the PR — that's what cuts the release and
 rotates the service worker cache so people actually receive the change.
 
