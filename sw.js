@@ -36,7 +36,9 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const keep = new Set([SHELL, FONTS]);
-    for (const k of await caches.keys()) if (!keep.has(k)) await caches.delete(k);
+    // Cache Storage is origin-wide, and this origin serves other Pages sites too.
+    for (const k of await caches.keys())
+      if (k.startsWith('mh-') && !keep.has(k)) await caches.delete(k);
     await self.clients.claim();
   })());
 });
