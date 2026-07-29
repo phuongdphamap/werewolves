@@ -536,7 +536,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   400 assertions across 19 suites, 0 failing
+#   443 assertions across 22 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -563,7 +563,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `ruleset-test.js` | 14 | no ruleset-owned card leaks into the wrong ruleset |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**400 assertions plus 57,000 generated decks.**
+**443 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
