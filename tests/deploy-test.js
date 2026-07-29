@@ -54,8 +54,11 @@ t('the cache name carries a version', () => /const VERSION = '[^']+'/.test(sw) ?
 t('old caches are deleted on activate', () =>
   /caches\.keys\(\)/.test(sw) && /caches\.delete\(k\)/.test(sw) ? true : 'storage would grow forever');
 t('one missing file cannot abandon the whole precache', () =>
-  /c\.add\(u\)\.catch\(\(\) => \{\}\)/.test(sw)
+  /c\.add\(u\)\.catch\(/.test(sw) && !/\baddAll\(/.test(sw)
     ? true : 'addAll would fail the install and leave no offline support at all');
+t('a failed precache says which file, or a typo is invisible forever', () =>
+  /c\.add\(u\)\.catch\(\s*\w+\s*=>[^)]*console\.(warn|error)/.test(sw)
+    ? true : 'the error is discarded, so a broken path can never be diagnosed');
 t('the shell is served cache-first, so it opens offline and instantly', () =>
   /const hit = await c\.match\(req, \{ ignoreSearch: true \}\)/.test(sw) && /if \(hit\)\{ network; return hit; \}/.test(sw)
     ? true : 'not cache-first');
