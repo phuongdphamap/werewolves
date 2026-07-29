@@ -50,43 +50,42 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # sw.js is the source of truth here, not the tag list. bump.yml already wrote
-      # the version into the PR, so main carries it before this ever runs — which is
-      # what lets main be protected: nothing below pushes to a branch.
-      - name: Read the version off main
+      # Tags are the only source of truth for what has shipped. sw.js in the repo is a
+      # placeholder — deploy.yml writes the real version into the artifact from the tag,
+      # so nothing here has to edit a file or push to a branch. That is what keeps main
+      # protectable and keeps any bot off your pull request branches.
+      - name: Work out the next version
         id: next
         env:
           EVENT: ${{ github.event_name }}
           INPUT_BUMP: ${{ inputs.bump }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            bump="$INPUT_BUMP"
+          elif jq -e 'index("release:major")' <<<"$LABELS" >/dev/null; then
+            bump='major'
+          elif jq -e 'index("release:minor")' <<<"$LABELS" >/dev/null; then
+            bump='minor'
+          else
+            bump='patch'
+          fi
+
           previous=$(git tag --list 'v*' --sort=-v:refname \
             | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
           previous=${previous:-v0.0.0}
 
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            # No PR to have bumped anything, so derive it and edit in the runner only.
-            version="v$(npx --yes semver@7 --increment "$INPUT_BUMP" "${previous#v}")"
-            sed -i "s|^const VERSION = '.*';|const VERSION = 'mh-${version}';|" sw.js
-            echo "Manual release: $previous -> $version ($INPUT_BUMP)"
-          else
-            version=$(sed -n "s|^const VERSION = 'mh-\(v[0-9.]*\)';|\1|p" sw.js)
-            [ -n "$version" ] || {
-              echo "::error::no version in sw.js — was the PR labelled so bump.yml could set it?"
-              exit 1
-            }
-            echo "Releasing $version, as written into sw.js by the PR"
-          fi
-
-          if git rev-parse "$version" >/dev/null 2>&1; then
-            echo "::error::tag $version already exists. Re-label the PR so bump.yml picks the next one."
-            exit 1
-          fi
+          # npm's semver is the reference implementation of the spec. It handles
+          # prerelease and build-metadata tags, and rejects a malformed version
+          # instead of doing shell arithmetic on it.
+          version="v$(npx --yes semver@7 --increment "$bump" "${previous#v}")"
 
           {
             echo "previous=$previous"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
+          echo "Releasing $previous -> $version ($bump)"
 
       - name: Tag it
         env:
