@@ -100,5 +100,40 @@ t('it never exceeds a card count', () => {
   return withRole('wolf').length <= G.counts.wolf ? true : 'a third wolf appeared';
 });
 
+// The Roster is used mid-game, where the deck no longer describes the table: the
+// Thief swaps for one of the two spare cards, which were never counted. Deducing
+// from a stale deck would hand out a card that has left the game.
+console.log('\nIT REFUSES TO DEDUCE FROM A DECK THAT NO LONGER MATCHES');
+t('a Thief who swapped for an off-deck card blocks the deduction', () => {
+  // deck had a Thief; he took the spare Fox, which was never in G.counts
+  board({ thief:1, wolf:1, seer:1, villager:1 }, ['fox','wolf','seer',null]);
+  const r = autoFillLastCard();
+  return (r === null && G.players[3].role === null)
+    ? true : 'it assigned ' + G.players[3].role + ', a card no longer in play';
+});
+t('a swap leaves two slots looking free, which is what blocks it', () => {
+  // This is the invariant the safety rests on, so it is pinned down directly: a
+  // Thief who took a spare frees his own slot AND fills no counted one, so a
+  // drifted deck can never present the single unambiguous slot the deduction needs.
+  board({ thief:1, wolf:1, seer:1, villager:1 }, ['fox','wolf','seer',null]);
+  const short = [];
+  for (const k in G.counts) for (let i = withRole(k).length; i < G.counts[k]; i++) short.push(k);
+  return short.length === 2 ? true : 'expected 2 free slots, got ' + JSON.stringify(short);
+});
+t('a swap for a card that IS in the deck also stays ambiguous', () => {
+  // he took the spare Werewolf; wolf is now over-filled and thief unaccounted for
+  board({ thief:1, wolf:2, seer:1 }, ['wolf','wolf','wolf',null]);
+  return autoFillLastCard() === null ? true : 'deduced from an over-filled deck';
+});
+t('an over-filled card blocks the deduction', () => {
+  board({ wolf:1, seer:1, villager:1 }, ['wolf','wolf',null]);
+  return autoFillLastCard() === null ? true : 'it deduced from an impossible board';
+});
+t('a clean mid-game board still deduces', () => {
+  board({ wolf:1, seer:1, guard:1 }, ['wolf','seer',null]);
+  const r = autoFillLastCard();
+  return (r && G.players[2].role === 'guard') ? true : 'got ' + G.players[2].role;
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
