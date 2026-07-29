@@ -940,6 +940,29 @@ function houseRulesUI(){
   return wrap;
 }
 
+/* One player left and one card left means there is nothing worth asking, and a
+   moderator holding fifteen people's attention should not have to answer it.
+   Returns the deduced role, or null when the answer is not actually forced.
+
+   Requiring exactly one free slot is what makes this safe in the Roster mid-game.
+   The deck stops describing the table once a card leaves it — the Thief swaps for
+   one of the two spares, which were never counted — but such a swap always leaves
+   at least two slots looking free, because he frees his own and fills no counted
+   one. So a drifted deck can never be mistaken for a forced answer. */
+function autoFillLastCard(){
+  const left = unassigned();
+  if (left.length !== 1) return null;
+  const short = [];
+  for (const k in G.counts){
+    for (let i = withRole(k).length; i < G.counts[k]; i++) short.push(k);
+  }
+  if (short.length !== 1) return null;          // ambiguous, so leave it alone
+  left[0].role = short[0];
+  log(left[0].name + ' holds the last card, the ' +
+    (G.rules === 'vn' ? R[short[0]].vi : R[short[0]].name) + '.', 'Setup');
+  return R[short[0]];
+}
+
 /* ---- collect the deal ---- */
 function rLearn(){
   show('sLearn');
@@ -955,7 +978,8 @@ function rLearn(){
       const b = el('div','chip' + (p.role===r.id ? ' sel' : '') + (full ? ' dead' : ''),
         '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name) +
         '<span class="bd">' + placed + '/' + G.counts[r.id] + '</span>');
-      if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null; render(); };
+      if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
+        autoFillLastCard(); render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
@@ -1617,7 +1641,7 @@ function openRoster(){
         '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name) +
         '<span class="bd">' + (inDeck ? placed + '/' + G.counts[r.id] : 'off-deck') + '</span>');
       if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
-        log(p.name + ' is the ' + r.name + '.'); openRoster(); };
+        log(p.name + ' is the ' + r.name + '.'); autoFillLastCard(); openRoster(); };
       c.appendChild(b);
     }
     B.appendChild(c);
