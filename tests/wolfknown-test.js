@@ -7,7 +7,7 @@
 // The guard is now wolfSideKnown(): every card that could put somebody on the wolf
 // side has been placed.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 eval(src.match(/const ROLES = \[[\s\S]*?\n\];/)[0].replace('const ROLES','globalThis.ROLES'));
 globalThis.R = {}; ROLES.forEach(r => R[r.id] = r);

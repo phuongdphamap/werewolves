@@ -3,7 +3,7 @@
 // in the field, so they are checked here.
 const fs = require('fs');
 const D = '../';
-const src = fs.readFileSync(D + 'index.html','utf8');
+const src = ['index.html','css/app.css','js/app.js'].map(f => fs.readFileSync(D + f,'utf8')).join('\n');
 const sw  = fs.readFileSync(D + 'sw.js','utf8');
 const man = JSON.parse(fs.readFileSync(D + 'manifest.webmanifest','utf8'));
 
@@ -92,9 +92,18 @@ for (const sel of ['.veil{', '.veil.on{', '.veil .kicker{', '.veil p.dim{', '.ve
 }
 
 console.log('\nNO BUILD STEP WAS INTRODUCED');
-t('the app is still a single self-contained file', () =>
-  !/<script src=/.test(src) && !/require\(|from '/.test(src.split('<script>')[1] || '')
-    ? true : 'an external module crept in');
+// The app is three local files, not one — but still no bundler, no npm, and no
+// script it does not ship itself.
+t('every script and stylesheet is a local relative path', () => {
+  const refs = [...src.matchAll(/(?:script[^>]+src|link[^>]+href)="([^"]+)"/g)].map(m => m[1]);
+  const bad = refs.filter(u => !u.startsWith('./') && !/fonts\.(googleapis|gstatic)\.com/.test(u));
+  return bad.length === 0 ? true : 'non-local asset: ' + bad.join(', ');
+});
+t('no module system was introduced', () => {
+  const js = fs.readFileSync(D + 'js/app.js', 'utf8');
+  return !/\brequire\(|\bfrom ['"][^.\/]|\bexport\s/.test(js)
+    ? true : 'an external module crept in';
+});
 t('no framework runtime was added', () => {
   // "next" appears legitimately in button labels and infectNext, so look for the
   // things a framework actually leaves behind rather than for its name

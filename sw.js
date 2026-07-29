@@ -19,6 +19,8 @@ const FONTS   = 'mh-fonts-v1';
 const PRECACHE = [
   './',
   './index.html',
+  './css/app.css',
+  './js/app.js',
   './manifest.webmanifest',
   './icon.svg',
 ];

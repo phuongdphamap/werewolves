@@ -5,7 +5,7 @@
 //   2. the colour legend was emitted before the heading it explains, leaving it
 //      orphaned against the alert above with ~52px of dead space between.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 eval(src.match(/const ROLES = \[[\s\S]*?\n\];/)[0].replace('const ROLES','globalThis.ROLES'));
 globalThis.R = {}; ROLES.forEach(r => R[r.id] = r);

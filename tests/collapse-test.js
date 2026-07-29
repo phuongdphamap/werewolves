@@ -3,7 +3,7 @@
 // Also checks that folding the text did not orphan or duplicate any container,
 // which is the failure mode when moving code between appendChild calls.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.message; }

@@ -6,8 +6,8 @@ what — so the person running the game can watch the table instead of a ruleboo
 
 **Live:** https://phuongdphamap.github.io/werewolves/
 
-It is one self-contained HTML file. No build step, no server, no accounts, no
-`node_modules`.
+Three plain files — `index.html`, `css/app.css`, `js/app.js`. No build step, no server,
+no accounts, no `node_modules`.
 
 ## What it does
 
@@ -48,7 +48,9 @@ choice is deliberate.
 ## Files
 
 ```
-index.html              the entire app — markup, styles, roles, game logic
+index.html              markup and document head
+css/app.css             all styling
+js/app.js               roles, game logic, rendering
 sw.js                   service worker; offline caching
 manifest.webmanifest    PWA metadata
 icon.svg  icon-192.png  icon-512.png  icon-mask-512.png

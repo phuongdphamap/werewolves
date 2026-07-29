@@ -2,7 +2,7 @@
 // is tested is what ships. A moderator tool that mis-scripts a night is worse
 // than no tool at all.
 const fs = require('fs');
-const src = fs.readFileSync('../index.html','utf8');
+const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 
 function grab(name){
   const i = src.indexOf('function ' + name + '(');

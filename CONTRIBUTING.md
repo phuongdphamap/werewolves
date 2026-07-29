@@ -10,9 +10,13 @@ python3 -m http.server 8000
 
 Use a server rather than `file://` — the service worker needs `localhost` or HTTPS.
 
-Do not add a build step, a bundler, or a `package.json`. The app is 2,000 lines of
-self-contained HTML that opens instantly and works offline; a framework would make it
-bigger and slower without solving a problem it has. `DEPLOY.md` covers the reasoning.
+Do not add a build step, a bundler, or a `package.json`. The app is about 2,000 lines
+split across `index.html`, `css/app.css` and `js/app.js`, loaded directly by the browser
+with no tooling in between. A framework would make it bigger and slower without solving
+a problem it has. `DEPLOY.md` covers the reasoning.
+
+Anything you add to the app must also go in `PRECACHE` in `sw.js`, or it won't be there
+offline.
 
 ## The one rule that bites everyone
 
