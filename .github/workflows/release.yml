@@ -46,20 +46,19 @@ jobs:
             bump=patch
           fi
 
-          latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
-          latest=${latest:-v0.0.0}
-          IFS=. read -r major minor patch <<<"${latest#v}"
+          previous=$(git tag --list 'v*' --sort=-v:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
+          previous=${previous:-v0.0.0}
 
-          case "$bump" in
-            major) major=$((major + 1)); minor=0; patch=0 ;;
-            minor) minor=$((minor + 1)); patch=0 ;;
-            patch) patch=$((patch + 1)) ;;
-          esac
+          # npm's semver is the reference implementation of the spec. It handles
+          # prerelease and build-metadata tags, and rejects a malformed version
+          # instead of doing shell arithmetic on it.
+          version="v$(npx --yes semver@7 --increment "$bump" "${previous#v}")"
 
-          echo "bump=$bump"                        >> "$GITHUB_OUTPUT"
-          echo "previous=$latest"                  >> "$GITHUB_OUTPUT"
-          echo "version=v$major.$minor.$patch"     >> "$GITHUB_OUTPUT"
-          echo "Releasing $latest -> v$major.$minor.$patch ($bump)"
+          echo "bump=$bump"         >> "$GITHUB_OUTPUT"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          echo "version=$version"   >> "$GITHUB_OUTPUT"
+          echo "Releasing $previous -> $version ($bump)"
 
       - name: Sync the service worker cache version
         id: sw
