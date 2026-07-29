@@ -1,0 +1,639 @@
+# Ma Sói / Millers Hollow Moderator — engineering notes
+
+Everything learned building this app: the domain rules, the architecture, every bug
+found and its root cause, and the test suites that pin the behaviour down.
+
+Written to be committed beside the source. If you are picking this up cold, read
+sections 1, 5 and 7 first — they contain the decisions that are expensive to
+rediscover.
+
+---
+
+## Contents
+
+1. [What this is, and what it deliberately is not](#1-what-this-is)
+2. [The role table](#2-the-role-table)
+3. [Night call order](#3-night-call-order)
+4. [Vietnamese vs Millers Hollow: every divergence](#4-ruleset-divergences)
+5. [The central design rule: never guess, and know what you actually need](#5-never-guess)
+6. [Architecture](#6-architecture)
+7. [Bug catalogue](#7-bug-catalogue)
+8. [Test suites](#8-test-suites)
+9. [Process rules that came out of the mistakes](#9-process-rules)
+10. [Open questions and future work](#10-open-questions)
+
+---
+
+## 1. What this is
+
+A **moderator's assistant** (Quản Trò) for in-person Ma Sói / *Les Loups-garous de
+Thiercelieux*. One phone, in the moderator's hand, at a table of 6–24 people playing
+with **physical cards**.
+
+### Hard constraints
+
+- **Single self-contained HTML file.** No build step, no dependencies, no framework.
+  The only network asset is the Google Fonts stylesheet.
+- **One device, held by one trusted person.** No player ever touches it.
+- **Offline-first.** The normal environment is a garden or cellar with no signal.
+- **The app never replaces the cards.** Players hold real cards; the app tracks what
+  it has been told.
+
+### Deliberate non-goals
+
+- **No per-player screens.** Letting each player see their own role on their own
+  phone needs a room code, shared state and a backend. That is a different product —
+  see §10.
+- **No accounts, no history, no analytics.**
+- **No SSR, no routing.** One screen. See `DEPLOY.md` for why a framework would make
+  this worse rather than better.
+
+### Language
+
+Vietnamese-first. Every role carries `vi` (name) and `sayVi` (read-aloud script).
+Which language leads depends on the selected ruleset. Both display faces
+(**Be Vietnam Pro**, **Lora**) were chosen because they carry the full Vietnamese
+diacritic range — see bug B-07.
+
+---
+
+## 2. The role table
+
+25 roles. `ROLES` array order is *authoritative for nothing* — sorting is always
+explicit. Fields:
+
+| field | meaning |
+|---|---|
+| `id` | stable key, used in `G.counts` and `p.role` |
+| `ic` | emoji shown wherever the card appears |
+| `name` / `vi` | English / Vietnamese name |
+| `team` | `village` \| `wolf` \| `solo` — drives win conditions and dot colour |
+| `set` | `Base` \| `Characters` — which physical box, drives the Classic/Characters scope |
+| `n1` | position in the **night-one** roll call. Absent = never called |
+| `every` | position on **later** nights. Absent = called on night one only |
+| `exact` | card count is fixed (Sisters 2, Brothers 3) |
+| `max` | maximum copies |
+| `only` | ruleset that owns this card (`vn` on the Bodyguard) |
+| `d` | rules description shown in the deck builder |
+| `say` / `sayVi` | read-aloud script |
+
+```
+id          vi                      en                      team    set        n1  every  exact max only
+villager    Dân làng                Simple Villager         village Base       -   -            24
+thief       Ăn trộm                 Thief                   village Base       10  -            1
+cupid       Thần Tình Yêu           Cupid                   village Base       20  -            1
+judge       Quan Toà Nói Lắp        Stuttering Judge        village Characters 24  -            1
+wolfhound   Sói Chó                 The Wolf Hound          village Characters 30  -            1
+wildchild   Đứa Trẻ Hoang           The Wild Child          village Characters 34  -            1
+sisters     Hai Chị Em              The Two Sisters         village Characters 40  42     2     2
+brothers    Ba Anh Em               The Three Brothers      village Characters 44  46     3     3
+guard       Bảo Vệ                  Bodyguard               village Base       47  47           1   vn
+littlegirl  Bé Gái                  Little Girl             village Base       48  -            1
+fox         Cáo                     The Fox                 village Characters 50  50           1
+actor       Diễn Viên               The Actor               village Characters 52  52           1
+seer        Tiên Tri                Seer                    village Base       55  55           1
+wolf        Ma Sói                  Werewolf                wolf    Base       60  60           8
+whitewolf   Sói Trắng               White Werewolf          wolf    Characters 65  65           1
+witch       Phù Thuỷ                Witch                   village Base       70  70           1
+piper       Người Thổi Sáo          The Pied Piper          solo    Characters 80  80           1
+hunter      Thợ Săn                 Hunter                  village Base       82  -            1
+elder       Trưởng Lão              The Elder               village Characters 84  -            1
+knight      Hiệp Sĩ Kiếm Rỉ         Knight with Rusty Sword village Characters 86  -            1
+beartamer   Người Dạy Gấu           Bear Tamer              village Characters 88  -            1
+angel       Thiên Thần              The Angel               solo    Characters 90  -            1
+idiot       Thằng Ngốc              Village Idiot           village Characters 92  -            1
+scapegoat   Vật Tế Thần             Scapegoat               village Characters 94  -            1
+servant     Người Hầu Trung Thành   Devoted Servant         village Characters 96  -            1
+```
+
+### Notes on individual cards
+
+- **Bodyguard** is `only:'vn'`. It is standard in Vietnamese play and **not in the
+  original French box**. Both deck generators skip it under `mh`; you can still add
+  it by hand and get a warning. See bug B-14.
+- **Werewolf** `max:8` — the practical ceiling, not a rule.
+- **Wolf Hound** is `team:'village'` in the table but `teamOf()` returns `wolf` once
+  `G.houndSide === 'wolf'`. Same for a **Wild Child** with `p.turned`.
+- **The Sheriff / Trưởng Làng is not in this table.** It is a *title voted on by the
+  village*, not a card. Any player can hold it, including a werewolf. See §4.
+
+---
+
+## 3. Night call order
+
+`n1` and `every` are sparse integers, not indices. Gaps exist so a card can be
+inserted without renumbering.
+
+```js
+n1Of(r)    // ruleset override, else r.n1
+everyOf(r) // ruleset override, else r.every
+ord()      // all roles sorted by n1Of, ruleset-aware
+```
+
+`buildNight()` produces `G.steps` — the actual script:
+
+- **Night 1**: every card in the deck is called, in `n1Of` order. Each step does
+  *identification* (tap who opened their eyes) and *action* in one screen.
+- **Night 2+**: only living, identified, still-active roles with an `everyOf` value.
+  The White Werewolf is called on **alternate** nights only.
+
+Villagers are auto-assigned to whoever is left at the end of the night-one roll call.
+
+### Sorting: two comparators, two purposes
+
+- `byTeam` — wolves first. Used for the **picking list** in the deck builder, because
+  the wolf count is the first thing you set.
+- `byCall` — `n1Of` ascending, uncalled cards last. Used for the **"in your deck"**
+  zone, because that zone is a preview of the night you are about to run.
+
+Do not unify them. Bug B-19 was `byTeam` being applied to the deck zone, which hoisted
+Ma Sói (position 60) to the top and destroyed the preview.
+
+---
+
+## 4. Ruleset divergences
+
+`RULESETS = { vn: { over: { fox:61, seer:62 } }, mh: { over: {} } }`
+
+The `over` map only moves call positions. Everything else below is handled in code.
+**This table is the most expensive knowledge in the project.**
+
+| # | Rule | Ma Sói Việt Nam | Millers Hollow | Where |
+|---|---|---|---|---|
+| 1 | Seer's information | wolf / not-wolf only | the **exact card** | `showSeer` |
+| 2 | Seer's position | **after** the pack (62) | before it (55) | `RULESETS.over` |
+| 3 | Fox's position | **after** the pack (61) | before it (50) | `RULESETS.over` |
+| 4 | Bodyguard | in the base deck | **not in the box** | `only:'vn'` |
+| 5 | Witch self-rescue | **not allowed** | allowed | `witchMaySaveSelf()` |
+| 6 | Hunter poisoned by the Witch | **no shot** | fires anyway | `hunterFiresPoisoned()` |
+| 7 | Sheriff's vote weight | **1.5** | 2 (flat double) | `SHERIFF_WEIGHT()` |
+| 8 | Wolves win on parity | **yes**, wolves ≥ villagers | no, must kill all | `checkWin` |
+
+### Why moving the Seer and the Fox is free
+
+Both are asleep while the wolves choose, so being called before or after gives the
+*player* no extra information. Wolf membership cannot change mid-night:
+
+- The Wolf Hound picks its side at position **30**, before either.
+- The Wild Child turns only when its model **dies**, and deaths resolve at **dawn**.
+- The White Werewolf kills at 65, also resolving at dawn.
+
+So moving them after the pack is informationally neutral for players and lets the app
+answer from the screen instead of asking the moderator to lift a card. That reasoning
+is pinned by tests in `fox-test.js`.
+
+### #5 and #6 are settable
+
+Both are genuinely disputed between tables, so they are **house rules** with three
+states rather than hard-coded:
+
+```js
+G.selfHeal      // null = follow ruleset, true, false
+G.hunterPoison  // null = follow ruleset, true, false
+witchMaySaveSelf()    // null ? rules !== 'vn' : G.selfHeal
+hunterFiresPoisoned() // null ? rules !== 'vn' : G.hunterPoison
+```
+
+`null` is **distinct from `false`** and must stay that way — a test asserts it. An
+explicit ruling survives switching ruleset.
+
+### The Sheriff (Trưởng Làng / Capitaine / 警长)
+
+Not a card. Elected by the village on day 1.
+
+- Vote worth 1.5 (vn) or 2 (mh).
+- On death — **any cause, day or night** — names a successor, or destroys the badge.
+- The title is independent of the card: surviving a power loss, a reveal, a side change.
+- A werewolf can be elected and usually tries to be. When a wolf-Sheriff dies it hands
+  the badge to another wolf.
+
+The most commonly forgotten rule at real tables: **a Sheriff killed at night still
+passes the badge.** Handled by the interrupt queue (§6).
+
+### The Hunter's shot is compulsory
+
+Not optional. He *must* take a living player with him. There is a house-rule escape
+labelled as such (`"House rule: he fired wide"`), which writes that fact to the
+chronicle. See bug B-13.
+
+---
+
+## 5. Never guess
+
+The single most important rule in the codebase:
+
+> **The app never invents information it has not been told.** When it cannot know
+> something, it says so, names what is missing, and asks.
+
+Bug B-22 was the deepest violation of this — but in the *opposite* direction: the app
+refused to answer a question it demonstrably could.
+
+### `wolfSideKnown()` vs the retired `allKnown()`
+
+A wolf question is **"is any of these a wolf?"**, not **"what does each of these
+hold?"**. Those need different predicates.
+
+```js
+// Can I say for certain whether any given player is a wolf?
+// NOT "do I know everyone's card" — only "has every card that could put someone
+// on the wolf side been placed".
+function wolfSideKnown(){
+  for (const id of ['wolf','whitewolf'])
+    if ((G.counts[id] || 0) > withRole(id).length) return false;
+  if (G.counts.wolfhound){
+    if (G.houndSide == null) return false;
+    if (G.houndSide === 'wolf' && withRole('wolfhound').length < G.counts.wolfhound) return false;
+  }
+  if (G.counts.wildchild && withRole('wildchild').length < G.counts.wildchild
+      && G.players.some(p => !p.alive)) return false;
+  return true;
+}
+```
+
+Once both Werewolf cards sit on known players, **everybody else is definitively not a
+wolf, whatever they hold.** Unidentified villagers are irrelevant.
+
+**Six sites ask a wolf question and all six use this predicate:**
+
+1. The Fox's trio
+2. The Bear Tamer's growl
+3. The wolves' target list (which must exclude wolves)
+4. The Knight's rust (needs the first wolf clockwise)
+5. `checkWin` (needs to count the two sides)
+6. The Seer's Vietnamese answer
+
+`allKnown()` was deleted entirely. If you find yourself reaching for "is every card
+known", stop and ask what you actually need.
+
+`unplacedWolfCards()` names the missing cards in words, so the message tells the
+moderator *what to go and find* rather than which players it does not recognise.
+
+### The one case that still asks
+
+**Millers Hollow + discover-during-the-night + night one.** The Fox and Seer are
+called before the pack, so no wolf card is placed yet. The app names the unaccounted
+cards and takes a manual YES/NO. Under `vn`, or after "collect the deal", this never
+happens.
+
+---
+
+## 6. Architecture
+
+### Files
+
+```
+index.html              the whole app
+sw.js                   offline worker — bump VERSION on every release
+manifest.webmanifest    installable PWA
+icon.svg icon-192.png icon-512.png icon-mask-512.png
+```
+
+### State
+
+One plain object, `G`. Fully JSON-serialisable — which is what makes both Undo and
+crash recovery cheap.
+
+```
+players counts night day phase log steps si n dawn pending
+witchHeal witchPoison foxPower elderLife powersLost judgeUsed
+houndSide sheriffDone infectNext over scapegoatVoters assignTo
+knewDeal rules lastGuard selfHeal hunterPoison resume votes
+sheriffVote showAllRoles scope dawnWhy dawnSure dawnEdit
+```
+
+- `G.n` — this night's choices, cleared each night. `G.n.skipped` records skipped
+  steps so `computeDawn` can be honest about gaps.
+- `G.pending` — the interrupt queue (`hunterId`, `hunterCause`, `badge`).
+- `undoStack` — 80 JSON snapshots. `snap()` before any mutation.
+- `expOpen` — a `Set` of open collapsible keys. Deliberately **outside `G`** so Undo
+  does not slam your reference panel shut.
+
+### Phases
+
+`players → roles → deal → night → dawn → day → end`
+plus three interrupts: `hunter`, `sheriff`, `scapegoat`.
+
+Every phase is in one dispatch table. Bug B-05 was a phase missing from it, which
+crashed on Undo.
+
+### The interrupt queue
+
+A death can interrupt the flow, from **either** night or day:
+
+```js
+registerDeaths(chain)  // logs, and queues pending.hunterId / pending.badge
+proceed()              // checkWin -> hunter -> sheriff -> G.resume ('day'|'night')
+```
+
+`G.resume` records where to return. Before this existed, the Hunter's shot and the
+badge handover were only wired into the day-vote path, so a Hunter or Sheriff killed
+at **night** silently lost their ability (bug B-11).
+
+### Dawn is computed, not confirmed
+
+`computeDawn()` resolves the night from what was recorded and produces:
+
+- `G.dawn` — deaths, each toggleable
+- `G.dawnWhy` — plain-language reasoning, shown as "How that follows"
+- `G.dawnSure` / `G.dawnGaps` — whether it can be certain, and why not
+
+The moderator reads out a **statement**, not a questionnaire. It only asks when a step
+was skipped or a rule card (Elder, Knight) is unplaced. See bug B-10.
+
+### Vote counting
+
+The day vote requires **strictly more than half** the voting weight.
+
+```js
+votePower(p)      // 1, or 1.5 / 2 for the Sheriff
+eligibleVoters()  // alive, minus voteless (revealed Idiot), minus Scapegoat exclusions
+totalPower()      // sum
+// threshold = totalPower() / 2, strictly greater
+```
+
+Exactly half **fails**. The Sheriff's extra weight is applied to whichever candidate
+you mark with ⭐, not baked into the raw hand count.
+
+Rows are built once; a `refresh()` closure updates only the derived numbers. Typing in
+a vote box must never trigger `render()` or the input is destroyed mid-keystroke
+(bug B-20).
+
+### Legal targets
+
+`targetPool(roleId)` — not every role may point at everyone:
+
+| role | may target |
+|---|---|
+| `wolf` | non-wolves only — **the pack never eats its own** |
+| `whitewolf` | werewolves only, not himself — he eats *only* his own kind |
+| `seer` | not herself |
+| `piper` | not himself |
+| `wildchild` | not himself |
+| `guard` | anyone including himself, but never the same person twice running |
+| `cupid`, `fox` | anyone including themselves (the rules allow both) |
+
+An **unknown card stays in the wolves' list**, because it cannot be ruled out — with
+a warning naming the unplaced cards.
+
+### Deck generation
+
+```js
+recommend(n, chars)     // deterministic, fixed order
+shuffleDeck(n, chars)   // random but always legal
+```
+
+`shuffleDeck` guarantees: exact card count, correct wolf count, a Seer always, a
+Bodyguard under `vn` from 8 players, `exact` counts respected, nothing below its
+minimum table size, a villager floor varying 24–40% for variety.
+
+**Exclusion groups** — at most one from each, or the game becomes soup:
+
+```js
+EXCL = [['piper','angel','whitewolf'], ['sisters','brothers']]
+```
+
+**The White Werewolf takes a seat in the pack rather than adding to it** — otherwise
+the wolf count comes out one too high (bug B-02).
+
+`SHUF[id] = [weight, minimumTableSize]`. Weight controls *frequency* via an acceptance
+roll, not just draw order (bug B-03).
+
+### Spacing: one structural mechanism
+
+Any container that renders a stack of blocks carries `class="stack"`:
+
+```css
+.stack > * + *{margin-top:var(--s4)}
+.stack > *{margin-bottom:0}                 /* so gaps cannot compound */
+.stack:not(:empty) + .stack:not(:empty){margin-top:var(--s4)}
+```
+
+There are **no id-based spacing selectors**. Three separate spacing bugs came from a
+hand-maintained id list I kept forgetting to extend (B-16). `#lRoles` is deliberately
+*not* a stack — it has its own flex `gap`, and marking it would double its spacing.
+
+### Control typography: one voice
+
+```css
+--ctl-size:15.5px; --ctl-weight:600; --ctl-track:.005em;
+```
+
+The field, its placeholder and every button read from these. Only weight differs, by
+one step (placeholder 500), so an empty field still reads as empty. `.row.tall .btn`
+adjusts **layout only** — a test asserts it declares no font properties.
+
+### Bottom bar
+
+`bar(items)` distributes width: the primary action grows, a secondary sits at its
+natural width. When every option is secondary they share the row evenly, so the bar
+is never left half empty. Order-independent. `wide:true` forces full width.
+
+---
+
+## 7. Bug catalogue
+
+Every bug found, with its root cause. Grouped by class, because the classes repeat.
+
+### Rules correctness
+
+| # | Bug | Root cause |
+|---|---|---|
+| B-01 | Wolves could eat each other; the White Wolf was offered villagers | Target list was `alive()` for every role. No per-role legality. Fixed with `targetPool()`. |
+| B-02 | Shuffled decks had one wolf too many | The White Werewolf is `team:'wolf'`, so adding him *increased* the pack. He must take a seat instead. |
+| B-11 | A Hunter or Sheriff killed **at night** lost their ability entirely | Both interrupts were wired only into the day-vote path. Dawn went straight to `day`. Fixed with the `pending` queue and `proceed()`. |
+| B-12 | The Witch was offered **herself** as a poison target | Poison list was `alive()` with no self-exclusion. |
+| B-13 | The Hunter had a "shot nobody" button | The shot is **compulsory**. My UI invented a choice the rules do not offer. |
+| B-14 | Millers Hollow decks contained the Bodyguard | I marked it `set:'Base'` (true for Vietnamese play), and the Classic scope filters on `set`. Ruleset ownership is a *different axis* — added `only`. |
+| B-15 | A vote below half still eliminated someone | There was no tally at all — the moderator just tapped a name. |
+| B-17 | Parity was not a win condition | `checkWin` only fired when villagers hit zero. |
+| B-18 | **The game could never end** | `checkWin` bailed if *any* player was unidentified — including the **dead**. One player who died before you learned their card froze the result for the whole game. |
+| B-22 | The Fox was asked a question the app could answer | Guarded with `allKnown(trio)` — "do I know all three cards" — when the question is "is any of them a wolf". With both wolf cards placed, the answer is certain. Five other sites had the same error. |
+| B-23 | The Fox printed his answer **on the moderator's own screen** | Inconsistent with the Seer, and readable by anyone glancing over. Now both use `showReveal`. |
+
+### State machine
+
+| # | Bug | Root cause |
+|---|---|---|
+| B-04 | Sheriff decline looped; Idiot reveal left the day hanging | Missing terminal transitions (`sheriffDone` flag, `toNight()` call). |
+| B-05 | Undo mid-interrupt crashed | Three phases were absent from the render dispatch table. |
+| B-06 | Deal screen accumulated a duplicate "Skip" button on every visit | It was appended to `dealList`'s **parent**, which `rDeal()` never clears. Now lives in `#dealAlt`, which is emptied each render. |
+
+### UI and CSS
+
+| # | Bug | Root cause |
+|---|---|---|
+| B-07 | Vietnamese text rendered as a mix of fonts and sizes | **Cinzel has no Vietnamese subset** and renders lowercase as small caps, so every `ả ệ ườ` fell back per-glyph. Replaced with Be Vietnam Pro + Lora. |
+| B-08 | `\u266b` rendered literally in the header | It is a **JavaScript** escape placed in **HTML markup**, where it means nothing. |
+| B-09 | Role icons were unstyled and misaligned | I renamed spans `class="av"` → `class="ic"` but only in the markup, then deleted the `.av` **CSS rule** as dead code — deleting the live styling. My verification grepped the file *before* the deletion and passed. |
+| B-16 | Blocks sat flush against each other, three times | Spacing was a hand-maintained list of element ids. `#recBox`, `#advice`, `#enCard` were never on it. Replaced with `.stack`. |
+| B-21 | The first list heading was short of the others — **twice** | Its separation is its own margin **plus the list's flex gap**, and the first child receives no gap. Attempt 1 zeroed it (28px worse). Attempt 2 removed the zeroing (still 14px short). It must carry the gap itself: `calc(var(--s5) + var(--s3))`. |
+| B-24 | Two complete icon systems coexisted in the file | An `IC` map wired to the UI, plus an `ic:` field I added and never connected. Both correct, so nothing looked wrong — a silent divergence waiting to happen. |
+| B-25 | The bottom bar showed content **through** it | The gradient started fully transparent and only reached 95% at 30% height. Role rows were visible behind the buttons. |
+| B-26 | The resume overlay would throw on every reload | It appended to `#app`, which does not exist in this document, and its CSS was missing entirely. |
+
+### UX design errors
+
+| # | Bug | Root cause |
+|---|---|---|
+| B-03 | The White Wolf appeared in **every** shuffled deck | He cost nothing against the villager budget, so he was auto-accepted whenever drawn. Weights only affected draw *order*, not inclusion. Added an acceptance roll. |
+| B-10 | Dawn asked the moderator to confirm arithmetic the app had already done | Designed as a questionnaire instead of a report. |
+| B-19 | "Classic" and "Characters" appeared broken | At ≤12 players they produced **identical decks**, because `REC_CHAR` opened with the same base cards and the villager floor stopped the list before it reached an expansion role. Nothing changed on click, so it looked dead. |
+| B-20 | Counting a 17-player vote meant 11 taps per candidate | Steppers only. Added a typed input — which then must not trigger `render()`. |
+| B-27 | The two deck presets looked like actions, not a setting | Restructured: Classic/Characters is a **scope**, and both Shuffle and Suggested obey it. |
+
+---
+
+## 8. Test suites
+
+Node only, no framework. Each suite `eval`s functions **straight out of the shipped
+HTML**, so it tests the real code rather than a copy.
+
+```
+index.html              the app
+sw.js manifest.webmanifest icon*.png icon.svg
+tests/
+  run-all.sh            bash tests/run-all.sh
+  *-test.js             19 suites, no dependencies beyond node
+KNOWLEDGE.md            this file
+DEPLOY.md               hosting, updates, and why not a framework
+```
+
+```bash
+bash tests/run-all.sh
+#   400 assertions across 19 suites, 0 failing
+```
+
+The suites read `../index.html`, so they test the **deployable file** — not a copy.
+
+| suite | n | covers |
+|---|---|---|
+| `mh-test.js` | 42 | night scripting, seating, death cascades, victory, never-guess guards |
+| `deploy-test.js` | 39 | manifest, service worker semantics, crash recovery, no-framework |
+| `collapse-test.js` | 26 | collapsible blocks: default closed, state memory, styling present |
+| `tally-test.js` | 26 | typed vote input, hostile input clamping, no re-render on keystroke |
+| `wolfknown-test.js` | 24 | `wolfSideKnown()` across every route onto the wolf side |
+| `deckzone-test.js` | 23 | deck-zone partition, hover/active/focus states |
+| `type-test.js` | 23 | one typographic voice across field, placeholder and buttons |
+| `reveal-test.js` | 22 | Seer and Fox share one private reveal; no answer leaks to the step |
+| `house-test.js` | 20 | house-rule tri-state, defaults, overrides surviving a ruleset switch |
+| `spacing-test.js` | 20 | every write target has a spacing mechanism |
+| `bar-test.js` | 18 | bottom bar fills its row; backdrop opacity above the buttons |
+| `fox-test.js` | 18 | Fox ordering, and *why* moving him is safe |
+| `vote-test.js` | 18 | over-half threshold, weighted badge, parity precedence |
+| `callorder-test.js` | 17 | deck zone matches `ord()`, the real night script |
+| `heading-test.js` | 17 | heading separation computed from the CSS tokens |
+| `icon-test.js` | 17 | Nerd Font code points, fallbacks, every class has a rule |
+| `target-test.js` | 16 | legal target pools per role |
+| `ruleset-test.js` | 14 | no ruleset-owned card leaks into the wrong ruleset |
+| `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
+
+**400 assertions plus 57,000 generated decks.**
+
+### Tests worth keeping
+
+Several exist specifically because a naive check let a bug through:
+
+- **`spacing-test.js`** *discovers* every element the code writes into, then asserts
+  each has a spacing mechanism. That is what makes it catch the *next* container.
+- **`icon-test.js`** asserts **every class used in markup has a matching CSS rule** —
+  would have caught B-09 immediately.
+- **`heading-test.js`** reads `--s3` / `--s5` out of the stylesheet and *computes*
+  both separations. I got B-21 wrong twice by eye.
+- **`callorder-test.js`** compares the deck zone against `ord()` itself, so the
+  preview cannot drift from the engine.
+- **`collapse-test.js`** asserts containers appear **exactly once** — moving code
+  between `appendChild` calls is how B-06 happened.
+- **`tally-test.js`** asserts `oninput` does **not** call `render()`. That failure
+  mode makes the feature unusable but looks fine in code review.
+
+### Harness gotchas
+
+- Mock players **need an `id`** — `pending.hunterId = undefined` reads as falsy and
+  every shot silently "fails".
+- Extract functions by **brace matching**, not regex. Escaping a signature through
+  two layers of string quoting silently matches nothing.
+- When a predicate changes, suites that *define their own copy* in the harness must be
+  updated too, or they throw `X is not defined`.
+
+---
+
+## 9. Process rules
+
+Earned the hard way. Each of these prevented or would have prevented a real bug.
+
+1. **Assert every text substitution.** Editing with `replace()` and no assertion means
+   a missed target silently does nothing, and you move on believing it worked. Two
+   duplicate icon systems (B-24) accumulated exactly this way. Every patch now fails
+   loudly instead.
+
+2. **Never trust a grep taken before the edit.** B-09 verified against a stale read
+   and passed while the app was broken.
+
+3. **Verify the app before "fixing" it.** Eleven `reveal-test` failures were entirely
+   my harness. Checking the app directly first stopped me editing working code.
+
+4. **When a test goes red after an intentional change, ask which is wrong.** Several
+   assertions encoded the *old* invariant — `"only the Seer moves"` before the Fox
+   moved with her; `"the first heading has no gap"` before that was corrected. Update
+   the assertion to the new invariant; do not delete it.
+
+5. **A dead option is worse than no option.** `wide:true` was silently ignored by my
+   first bar rewrite. An option that looks meaningful but does nothing misleads later.
+
+6. **Prefer structure to enumeration.** Three spacing bugs came from a hand-maintained
+   id list. One `.stack` class ended the class of bug.
+
+7. **Reason about neutrality before moving a rule.** Moving the Fox is safe *because*
+   wolf membership cannot change mid-night — the Hound settles at 30, deaths resolve at
+   dawn. That argument is now itself under test.
+
+8. **Watch out for the reframe.** If you find yourself deciding what a predicate
+   "basically means" (`allKnown` ≈ "can I answer"), that is the signal to write down
+   the actual question instead.
+
+---
+
+## 10. Open questions and future work
+
+### Known limitations
+
+- **MH + discover-at-night + night one** still requires lifting a card for the Fox and
+  Seer. Unavoidable without changing the published French order. Mitigated by the
+  physical masking guide (rain sounds, touch several cards, walk the full circle).
+- **Fonts load from Google.** The service worker caches them after first visit, so
+  offline works — but the very first load needs a connection for correct typography.
+  Self-hosting subsetted `woff2` would remove the last external dependency (~150 KB).
+- **The Actor** is tracked but its three face-up cards are not modelled individually.
+- **The Devoted Servant** taking a dead player's role is recorded manually via the
+  roster, not as a night step.
+- **No `every` value** for Thief, Cupid, Judge, Hound, Wild Child, Hunter, Elder,
+  Knight, Bear Tamer, Angel, Idiot, Scapegoat, Servant — correct (they act once or
+  passively), but check this if adding a variant that wakes them again.
+
+### Worth considering
+
+- **Per-player role reveal.** The one feature that genuinely needs a server: room
+  code, shared state, each player sees their own card on their own phone. **Start a
+  new project.** This app's design assumes one trusted device; retrofitting would
+  compromise every privacy decision in it.
+- **Timer per day phase**, for tables that want enforced discussion limits.
+- **A post-game chronicle export** — the log is already there, needs a share sheet.
+- **More expansion boxes** (New Moon, Characters 2). The `set` field is ready; the
+  Classic/Characters scope UI would need a third option.
+- **Seat rotation between games.** Seating matters for the Bear Tamer, Fox and Knight,
+  and "same table, new game" currently preserves order.
+
+### If you add a role
+
+1. Add to `ROLES` with `id`, `ic`, `name`, `vi`, `team`, `set`, `n1`/`every`, `max`,
+   `d`, `say`, `sayVi` — and `only` if a ruleset does not have it.
+2. Pick unused `n1`/`every` values in the gaps; do not renumber.
+3. Add to `SHUF` with `[weight, minTableSize]` if it should appear in shuffled decks.
+4. Add to `EXCL` if it conflicts with an existing card.
+5. If it can join the wolf side, **extend `wolfSideKnown()`** — this is the easiest
+   thing to miss and it silently corrupts the Fox, the Bear Tamer, the Knight and the
+   win condition all at once.
+6. If it targets players, add a case to `targetPool()` and `targetNote()`.
+7. If it dies specially or interrupts the flow, extend `registerDeaths()`.
+8. Run every suite. `mh-test.js` and `wolfknown-test.js` are the ones that will catch
+   an incomplete integration.
