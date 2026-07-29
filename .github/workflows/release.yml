@@ -1,0 +1,115 @@
+# Cuts a release when a PR carrying a release:* label is merged into main.
+# The label picks the semver bump; sw.js VERSION is synced to the new tag so the
+# service worker cache actually invalidates.
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: ["main"]
+
+# One release at a time — two merges landing together must not race on the tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the version-bump commit and the tag
+  actions: write # re-dispatch the Pages deploy
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      (contains(github.event.pull_request.labels.*.name, 'release:major') ||
+       contains(github.event.pull_request.labels.*.name, 'release:minor') ||
+       contains(github.event.pull_request.labels.*.name, 'release:patch'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Work out the next version
+        id: next
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if jq -e 'index("release:major")' <<<"$LABELS" >/dev/null; then
+            bump=major
+          elif jq -e 'index("release:minor")' <<<"$LABELS" >/dev/null; then
+            bump=minor
+          else
+            bump=patch
+          fi
+
+          latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          latest=${latest:-v0.0.0}
+          IFS=. read -r major minor patch <<<"${latest#v}"
+
+          case "$bump" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+
+          echo "bump=$bump"                        >> "$GITHUB_OUTPUT"
+          echo "previous=$latest"                  >> "$GITHUB_OUTPUT"
+          echo "version=v$major.$minor.$patch"     >> "$GITHUB_OUTPUT"
+          echo "Releasing $latest -> v$major.$minor.$patch ($bump)"
+
+      - name: Sync the service worker cache version
+        id: sw
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s|^const VERSION = '.*';|const VERSION = 'mh-${VERSION}';|" sw.js
+          grep -q "const VERSION = 'mh-${VERSION}';" sw.js || {
+            echo "::error::could not rewrite VERSION in sw.js — check the line format"
+            exit 1
+          }
+          if git diff --quiet sw.js; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+          CHANGED: ${{ steps.sw.outputs.changed }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$CHANGED" = "true" ]; then
+            git add sw.js
+            git commit -m "chore(release): ${VERSION}"
+            git push origin main
+          fi
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.next.outputs.version }}
+          PREVIOUS: ${{ steps.next.outputs.previous }}
+        run: |
+          set -euo pipefail
+          notes_flag=(--generate-notes)
+          if git rev-parse "$PREVIOUS" >/dev/null 2>&1; then
+            notes_flag+=(--notes-start-tag "$PREVIOUS")
+          fi
+          gh release create "$VERSION" --title "$VERSION" --verify-tag "${notes_flag[@]}"
+
+      # A push made with GITHUB_TOKEN does not trigger other workflows, so the
+      # Pages deploy has to be asked for explicitly or the bump never ships.
+      - name: Deploy the new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run static.yml --ref main

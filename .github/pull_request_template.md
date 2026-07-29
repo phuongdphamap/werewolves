@@ -50,8 +50,9 @@ Always:
 
 If `index.html`, `sw.js`, the manifest, or the icons changed:
 
-- [ ] Bumped `VERSION` in `sw.js` — without it every existing user keeps the cached
-      build forever and will never see this change
+- [ ] Added a `release:major` / `release:minor` / `release:patch` label — the release
+      workflow bumps `VERSION` in `sw.js` for you. Without a label there's no release
+      and no bump, so existing users keep the cached build forever
 - [ ] Loaded once online, then killed the network and relaunched: app still opens
 
 If game state, the phase machine, or roles changed:
