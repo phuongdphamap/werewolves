@@ -1,0 +1,66 @@
+name: Rule or role correction
+description: The app enforces a rule differently from how your table plays it
+labels: [rules]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The app ships two traditions, and they genuinely disagree in places. A rule that
+        looks wrong may be correct for the other ruleset — the known divergences are
+        listed in `KNOWLEDGE.md` §4. Regional house rules are real and welcome here, but
+        they're tracked separately from outright errors.
+
+  - type: input
+    id: role
+    attributes:
+      label: Which role or phase
+      placeholder: Bodyguard, or the Sheriff's vote weight
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ruleset
+    attributes:
+      label: Which ruleset are you playing?
+      options:
+        - Ma Sói Việt Nam
+        - Millers Hollow (bản gốc)
+        - Both — the app is wrong either way
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: What the app does now
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should do
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Where does that come from?
+      description: >-
+        A rulebook page, a published FAQ, or "this is how it's played where I am" —
+        all useful, but they carry different weight, so say which it is.
+      placeholder: Millers Hollow rulebook p.6, or a regional convention in Hanoi
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Should this replace the current behaviour, or be a new option?
+      options:
+        - Replace it — the current behaviour is simply wrong
+        - Add it as a ruleset option — both are legitimate
+        - Not sure
+    validations:
+      required: true
