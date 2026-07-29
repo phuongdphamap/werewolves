@@ -92,9 +92,23 @@ branch either. Two things depend on that:
 
 `sw.js` carries `mh-v0.0.0-dev` in the repo. That is a placeholder, not a mistake:
 `static.yml` rewrites it from the release tag inside the runner before uploading, and
-never commits the result. **The git tags are the record of what shipped**; the value in
-the file is only what you see in local development, where the Roster will show
-`Version v0.0.0-dev`.
+never commits the result. Locally the Roster shows `Version v0.0.0-dev`.
+
+**A release tag does not contain the version it shipped.** Reading
+`sw.js` at `v0.2.8` shows `mh-v0.0.0-dev`, because the tag was cut from `main` and the
+real string is injected afterwards, in the runner. The tag *names* the release; its tree
+is the source with one line still to be filled in. To reproduce exactly what was
+deployed:
+
+```bash
+git checkout v0.2.8
+sed -i "s|^const VERSION = '.*';|const VERSION = 'mh-v0.2.8';|" sw.js
+```
+
+That is the price of nothing writing to a branch. Committing the version instead needs a
+workflow to push, which either breaks `main`'s required check or brings back the approval
+banner — B-31 and B-32 in `KNOWLEDGE.md`. If the trade ever stops being worth it, the fix
+is to attach the built artifact to the GitHub release so the bytes are recorded there.
 
 **Why a dispatch and not a direct call.** Two reasons, and the second one is easy to
 miss — removing the dispatch broke the `v0.2.0` release:

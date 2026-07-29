@@ -10,9 +10,14 @@
  *   · fonts       -> cache first and keep forever; they never change per version.
  *
  * VERSION names the cache, so it must change on every release or clients keep serving
- * the old bundle. Do not maintain it by hand: deploy.yml rewrites it from the release
- * tag before uploading, so the value below is only what you see in local development.
- * The git tags are the record of what actually shipped.
+ * the old bundle. It is not maintained here: static.yml rewrites this line from the
+ * release tag inside the runner and never commits the result.
+ *
+ * So the value below is what local development sees — and also what you see reading this
+ * file at a release tag, because the tag's tree does not contain the string that shipped.
+ * The tag names the release; to reproduce the deployed file, rewrite this line to
+ * 'mh-<tag>'. Committing it instead would need a workflow to push to a branch, which
+ * cannot coexist with main requiring the test check — see docs/KNOWLEDGE.md B-31, B-32.
  */
 const VERSION = 'mh-v0.0.0-dev';
 const SHELL   = VERSION + '-shell';
