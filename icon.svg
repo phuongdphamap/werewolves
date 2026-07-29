@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Ma Sói">
+  <rect width="512" height="512" rx="96" fill="#0C0A12"/>
+  <circle cx="256" cy="190" r="86" fill="#E8DFC8"/>
+  <circle cx="300" cy="164" r="76" fill="#0C0A12"/>
+  <path d="M138 470 L182 300 L214 342 L256 268 L298 342 L330 300 L374 470 Z"
+        fill="#1B1729" stroke="#E8DFC8" stroke-width="10" stroke-linejoin="round"/>
+  <circle cx="222" cy="392" r="11" fill="#D0554A"/>
+  <circle cx="290" cy="392" r="11" fill="#D0554A"/>
+</svg>
