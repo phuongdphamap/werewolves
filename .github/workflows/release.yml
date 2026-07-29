@@ -1,6 +1,6 @@
 # Cuts a release when a PR carrying a release:* label is merged into main, or on
-# demand from the Actions tab. The label (or the input) picks the semver bump;
-# sw.js VERSION is synced to the new tag so the service worker cache invalidates.
+# demand from the Actions tab. The label (or the input) picks the semver bump. The
+# deploy writes that version into sw.js, so nothing here edits a file.
 name: Release
 
 on:
@@ -24,34 +24,33 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write # push the version-bump commit and the tag
+  contents: write # push the tag
   actions: write # dispatch the Pages deploy — see the note on that step
 
 jobs:
-  # Nothing is tagged, released or deployed unless the suites pass.
-  test:
+  release:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.merged == true &&
        (contains(github.event.pull_request.labels.*.name, 'release:major') ||
         contains(github.event.pull_request.labels.*.name, 'release:minor') ||
         contains(github.event.pull_request.labels.*.name, 'release:patch')))
-    uses: ./.github/workflows/test.yml
-    with:
-      ref: main
-
-  release:
-    needs: test
     runs-on: ubuntu-latest
     steps:
+      # main, not the event's ref: on a labelled merge this runs on pull_request:closed,
+      # where the default ref is refs/pull/N/merge and can be gone once merged.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
 
+      # Nothing below runs if the suites fail, so the tag and the deploy are gated
+      # without needing a second job.
+      - uses: ./.github/actions/run-tests
+
       # Tags are the only source of truth for what has shipped. sw.js in the repo is a
-      # placeholder — deploy.yml writes the real version into the artifact from the tag,
+      # placeholder — static.yml writes the real version into the artifact from the tag,
       # so nothing here has to edit a file or push to a branch. That is what keeps main
       # protectable and keeps any bot off your pull request branches.
       - name: Work out the next version
@@ -111,19 +110,15 @@ jobs:
           fi
           gh release create "$VERSION" --title "$VERSION" --verify-tag "${notes_flag[@]}"
 
-      # Dispatch rather than calling deploy.yml directly. Two separate reasons, and
-      # missing the second one broke the v0.2.0 release:
+      # Dispatch static.yml rather than running the deploy steps here. The github-pages
+      # environment only permits deploys from main, and it checks the RUN's ref — on a
+      # labelled merge this workflow runs on pull_request:closed, so its ref is
+      # refs/pull/N/merge and the environment rejects it no matter what the job checks
+      # out. Only --ref main creates a run whose ref really is main. Missing this broke
+      # the v0.2.0 release: it tagged and published, then failed to deploy.
       #
-      #  1. A push made with GITHUB_TOKEN does not trigger other workflows, so the
-      #     bump above would never ship on its own.
-      #  2. The github-pages environment only permits deploys from main. On a
-      #     labelled merge this workflow runs on the pull_request event, so its ref
-      #     is refs/pull/N/merge and the environment REJECTS it — regardless of what
-      #     the deploy job checks out. Dispatching with --ref main creates a run
-      #     whose ref really is main, which is the only thing that satisfies it.
-      #
-      # This costs one extra test run, because the dispatched workflow gates itself.
-      # That is the price of a deploy that is both test-gated and permitted to run.
+      # Costs one extra suite run, because static.yml gates itself — it is dispatchable
+      # by hand and must not trust its caller.
       - name: Deploy the new version
         env:
           GH_TOKEN: ${{ github.token }}

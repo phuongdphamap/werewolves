@@ -1,24 +1,17 @@
-# Runs the assertion suites in tests/ on every PR and on main.
-# Also callable, so release and deploy can gate on it instead of duplicating the job.
+# The pull request check. This is the only workflow that runs the suites on its own
+# trigger, and the `test` job name is the context main's branch protection requires.
+#
+# Deliberately no `push: main` trigger. A squash merge tests the same tree the PR already
+# tested, and the release and deploy each run the suites themselves — a push trigger only
+# added a fourth concurrent run per release.
 name: Tests
 
 on:
   pull_request:
     branches: ["main"]
-  push:
-    branches: ["main"]
+
   # Run the suites against any ref by hand, from the Actions tab.
   workflow_dispatch:
-
-  workflow_call:
-    inputs:
-      ref:
-        description: >-
-          Ref to test. Callers on the pull_request:closed event must pass "main" —
-          the default refs/pull/N/merge can be gone once the PR is merged.
-        type: string
-        required: false
-        default: ''
 
 permissions:
   contents: read
@@ -29,15 +22,5 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          # Empty means the triggering commit, which is what the PR and push
-          # triggers want.
-          ref: ${{ inputs.ref }}
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      - name: Run the suites
-        run: tests/run-all.sh
+      - uses: ./.github/actions/run-tests

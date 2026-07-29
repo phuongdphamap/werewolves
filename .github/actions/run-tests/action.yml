@@ -1,0 +1,24 @@
+# The test suites, defined once and run as steps inside whichever job needs them.
+#
+# A composite action rather than a reusable workflow on purpose: a reusable workflow
+# becomes its own job, which means another runner, another ~10s of startup, and a second
+# "test / test" entry in the checks list. As steps, the gate is simply "the job stops if
+# they fail" — same guarantee, one job.
+#
+# The caller does its own checkout: a local action has to exist on disk before it can be
+# used, so the repo must already be present. That also keeps the ref visible at the call
+# site, where it matters.
+name: Run the test suites
+description: Runs tests/run-all.sh on a checked-out repository.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    - name: Run the suites
+      shell: bash
+      run: tests/run-all.sh

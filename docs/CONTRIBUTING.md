@@ -40,17 +40,28 @@ Releases are driven by a label on the PR. Add exactly one before merging:
 | `release:minor` | `0.X.0` | A new role, a new phase, a new moderator affordance |
 | `release:patch` | `0.0.X` | Fixes, copy edits, chores |
 
-On merge:
+Three workflows, one job each. The suites are a composite action, `.github/actions/
+run-tests`, run as steps inside whichever job needs them:
 
 ```
-release.yml   test -> release        (next version from the tags; tag + publish)
-                         |
-                         v  dispatches, on ref main
-static.yml    test -> deploy         (writes the version into sw.js, then uploads)
+on your PR      test.yml    [test]    checkout -> suites
+                                      the "test" context main's protection requires
+
+on merge        release.yml [release]  checkout main -> suites -> tag -> publish
+                                                          |
+                                                          v dispatches, on ref main
+                static.yml  [deploy]   checkout main -> suites -> write version -> Pages
 ```
 
-Each stage gates the next, so nothing is tagged and nothing reaches Pages unless the
-suites pass. The suites run twice per release, once in each workflow.
+The suites gate by being earlier steps in the same job: if they fail, nothing after them
+runs. That is why there are no separate `test` jobs any more — a reusable workflow would
+mean a second runner, ~10s of extra startup, and a duplicate `test / test` entry in the
+checks list for no added safety.
+
+Two suite runs per release, not four. `test.yml` has no `push: main` trigger — a squash
+merge tests the same tree the PR already tested, and it used to start *concurrently* with
+the release's own run. `static.yml` still runs them because it is dispatchable by hand and
+must not trust its caller.
 
 **Nothing writes to a branch.** No workflow pushes to `main`, and none pushes to your PR
 branch either. Two things depend on that:
@@ -67,7 +78,7 @@ branch either. Two things depend on that:
 ### Do not maintain VERSION by hand
 
 `sw.js` carries `mh-v0.0.0-dev` in the repo. That is a placeholder, not a mistake:
-`deploy.yml` rewrites it from the release tag inside the runner before uploading, and
+`static.yml` rewrites it from the release tag inside the runner before uploading, and
 never commits the result. **The git tags are the record of what shipped**; the value in
 the file is only what you see in local development, where the Roster will show
 `Version v0.0.0-dev`.
@@ -100,8 +111,7 @@ the same `test -> deploy` pair:
 gh workflow run static.yml
 ```
 
-The Pages steps live once, in `deploy.yml`. It has no trigger of its own, so a deploy
-can only ever happen behind a test gate.
+The Pages steps live once, in `static.yml`, behind the suites in the same job.
 
 Versions start from `v0.0.0`, so the first release is whatever its label says:
 `release:minor` on an untagged repo produces `v0.1.0`.
@@ -176,10 +186,10 @@ If you touch typography, check a string with stacked diacritics renders in one f
 tests/run-all.sh
 ```
 
-CI runs this on every PR, and both the release and the deploy gate on it — nothing is
-tagged, released or published to Pages unless the suites pass. `test.yml` is a reusable
-workflow that `release.yml` and `static.yml` each call as a `needs:` dependency, so
-there's one definition rather than three copies.
+CI runs this on every PR, and both the release and the deploy run it before doing
+anything — nothing is tagged, released or published to Pages unless the suites pass. The
+steps live once, in the `.github/actions/run-tests` composite action, so all three
+workflows share one definition of how to run them.
 
 If it reports every suite as `CRASHED`, `node` isn't on your `PATH` rather than anything
 being wrong with the code.

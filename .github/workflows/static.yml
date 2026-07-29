@@ -1,9 +1,13 @@
-# Redeploys main to Pages by hand, without cutting a release.
+# Publishes main to GitHub Pages. One job: the suites, then the deploy.
 #
-# For recovering a broken Pages build, or republishing after changing repo settings.
-# Normal releases deploy themselves — see release.yml. There is no push trigger: a
-# push-triggered deploy would publish before the release had bumped sw.js, so the new
-# app would go out under the old cache key.
+# Reachable two ways, both of which end up here:
+#   - release.yml dispatches it after tagging (see the note in that file on why it
+#     dispatches rather than calling — the github-pages environment only accepts a run
+#     whose ref is main)
+#   - by hand, to redeploy without cutting a release
+#
+# No push trigger: a push-triggered deploy would publish before the release had tagged,
+# so the new app would go out under the old cache key.
 name: Deploy static content to Pages
 
 on:
@@ -14,13 +18,54 @@ permissions:
   pages: write
   id-token: write
 
-jobs:
-  # Dispatched by a person, so it verifies main is green rather than trusting them.
-  test:
-    uses: ./.github/workflows/test.yml
-    with:
-      ref: main
+# One deployment at a time. A run in progress is never cancelled — a half-finished
+# Pages publish is worse than a queued one.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
+jobs:
   deploy:
-    needs: test
-    uses: ./.github/workflows/deploy.yml
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      # main, never the triggering ref. A dispatch from release.yml carries no useful
+      # ref of its own, and Pages always serves main.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0 # tags, for the version pin below
+
+      # Dispatched by a person as well as by the release, so it verifies main itself
+      # rather than trusting whoever started it. Nothing below runs if this fails.
+      - uses: ./.github/actions/run-tests
+
+      # What ships must carry the released version, or the service worker cache never
+      # rotates and nobody receives the update. sw.js in the repo is a placeholder;
+      # this is the only place the real version is written. Runner-only, never committed.
+      - name: Pin sw.js to the released version
+        run: |
+          set -euo pipefail
+          tag=$(git tag --list 'v*' --sort=-v:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
+          if [ -z "$tag" ]; then echo "No release tag yet, deploying as-is."; exit 0; fi
+          sed -i "s|^const VERSION = '.*';|const VERSION = 'mh-${tag}';|" sw.js
+          grep -q "const VERSION = 'mh-${tag}';" sw.js || {
+            echo "::error::could not rewrite VERSION in sw.js"; exit 1; }
+          echo "Deploying as $tag"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          # Upload entire repository
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
