@@ -23,12 +23,9 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# A called workflow can only narrow these, never widen them, so the Pages scopes
-# deploy.yml needs have to be granted here too.
 permissions:
   contents: write # push the version-bump commit and the tag
-  pages: write # for the deploy this workflow calls
-  id-token: write # for the deploy this workflow calls
+  actions: write # dispatch the Pages deploy — see the note on that step
 
 jobs:
   # Nothing is tagged, released or deployed unless the suites pass.
@@ -133,9 +130,20 @@ jobs:
           fi
           gh release create "$VERSION" --title "$VERSION" --verify-tag "${notes_flag[@]}"
 
-  # Publishes the bump this run just pushed. Calling the deploy directly avoids the
-  # old dispatch dance: a push made with GITHUB_TOKEN does not trigger other
-  # workflows, so static.yml used to have to be asked for by hand.
-  deploy:
-    needs: release
-    uses: ./.github/workflows/deploy.yml
+      # Dispatch rather than calling deploy.yml directly. Two separate reasons, and
+      # missing the second one broke the v0.2.0 release:
+      #
+      #  1. A push made with GITHUB_TOKEN does not trigger other workflows, so the
+      #     bump above would never ship on its own.
+      #  2. The github-pages environment only permits deploys from main. On a
+      #     labelled merge this workflow runs on the pull_request event, so its ref
+      #     is refs/pull/N/merge and the environment REJECTS it — regardless of what
+      #     the deploy job checks out. Dispatching with --ref main creates a run
+      #     whose ref really is main, which is the only thing that satisfies it.
+      #
+      # This costs one extra test run, because the dispatched workflow gates itself.
+      # That is the price of a deploy that is both test-gated and permitted to run.
+      - name: Deploy the new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run static.yml --ref main
