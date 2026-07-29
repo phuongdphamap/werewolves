@@ -57,8 +57,8 @@ is wrapped in `try/catch` so an embedded viewer that forbids storage still runs.
 
 ## Deploy it
 
-Copy the whole directory, keeping the layout — `css/` and `js/` are referenced by
-relative path from `index.html`:
+Copy these, keeping the layout — `css/`, `js/` and `icons/` are all referenced by
+relative path from `index.html` and the manifest:
 
 ```
 index.html
@@ -66,9 +66,11 @@ css/app.css
 js/app.js
 sw.js
 manifest.webmanifest
-icon.svg
-icon-192.png  icon-512.png  icon-mask-512.png
+icons/icon.svg
+icons/icon-192.png  icons/icon-512.png  icons/icon-mask-512.png
 ```
+
+`docs/`, `tests/` and `README.md` are not needed to run the app.
 
 Everything uses relative paths, so it works from a subdirectory too.
 

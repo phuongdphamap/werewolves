@@ -22,7 +22,7 @@ const PRECACHE = [
   './css/app.css',
   './js/app.js',
   './manifest.webmanifest',
-  './icon.svg',
+  './icons/icon.svg',
 ];
 
 self.addEventListener('install', e => {

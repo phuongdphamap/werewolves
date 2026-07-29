@@ -12,7 +12,7 @@ body:
         of scope by design — including letting each player see their own card on their own
         phone. That's the one feature that would require rebuilding the privacy model, and
         the answer is to start a separate project rather than retrofit this one. See
-        `KNOWLEDGE.md` §10.
+        `docs/KNOWLEDGE.md` §10.
 
         There's also no build step, so a framework or npm dependency is unlikely to land.
 

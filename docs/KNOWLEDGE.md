@@ -284,11 +284,16 @@ happens.
 ### Files
 
 ```
-index.html              the whole app
+index.html              markup and document head
+css/app.css             all styling
+js/app.js               roles, game logic, rendering
 sw.js                   offline worker — bump VERSION on every release
 manifest.webmanifest    installable PWA
-icon.svg icon-192.png icon-512.png icon-mask-512.png
+icons/                  icon.svg, icon-192, icon-512, icon-mask-512
 ```
+
+No build step: the browser loads those files directly. Anything added must also go in
+`PRECACHE` in `sw.js`, or it will not be there offline.
 
 ### State
 
@@ -488,16 +493,22 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 ## 8. Test suites
 
 Node only, no framework. Each suite `eval`s functions **straight out of the shipped
-HTML**, so it tests the real code rather than a copy.
+source**, so it tests the real code rather than a copy.
 
 ```
-index.html              the app
-sw.js manifest.webmanifest icon*.png icon.svg
+index.html              markup and document head
+css/app.css             all styling
+js/app.js               roles, game logic, rendering
+sw.js manifest.webmanifest
+icons/                  favicon, touch icon, PWA icons
 tests/
-  run-all.sh            bash tests/run-all.sh
-  *-test.js             19 suites, no dependencies beyond node
-KNOWLEDGE.md            this file
-DEPLOY.md               hosting, updates, and why not a framework
+  run-all.sh            tests/run-all.sh
+  *-test.js             22 suites, no dependencies beyond node
+docs/
+  KNOWLEDGE.md          this file
+  CONTRIBUTING.md       how to work on it
+  DEPLOY.md             hosting, updates, and why not a framework
+README.md  LICENSE      kept at the root: GitHub reads both from there
 ```
 
 ```bash

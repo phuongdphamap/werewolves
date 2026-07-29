@@ -7,7 +7,7 @@ body:
       value: |
         The app ships two traditions, and they genuinely disagree in places. A rule that
         looks wrong may be correct for the other ruleset — the known divergences are
-        listed in `KNOWLEDGE.md` §4. Regional house rules are real and welcome here, but
+        listed in `docs/KNOWLEDGE.md` §4. Regional house rules are real and welcome here, but
         they're tracked separately from outright errors.
 
   - type: input
