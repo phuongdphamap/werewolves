@@ -1,5 +1,5 @@
 // The Fox has the same structural problem the Seer had: he needs to know who the
-// wolves are, and under the published Millers Hollow order he is called before
+// wolves are, and under the published Miller’s Hollow order he is called before
 // them. The Vietnamese order's principle is that information roles come after the
 // pack, so the Fox now moves with the Seer.
 //
@@ -41,7 +41,7 @@ t('Vietnamese: the Witch is still last of the four', () => {
   G.rules = 'vn';
   return pos('witch') > pos('seer') && pos('witch') > pos('fox') ? true : 'witch ' + pos('witch');
 });
-t('Millers Hollow keeps its published order, Fox and Seer before the pack', () => {
+t('Miller’s Hollow keeps its published order, Fox and Seer before the pack', () => {
   G.rules = 'mh';
   return (pos('fox') < pos('wolf') && pos('seer') < pos('wolf'))
     ? true : 'fox ' + pos('fox') + ' seer ' + pos('seer') + ' pack ' + pos('wolf');
@@ -104,7 +104,7 @@ console.log('\nTHE REASON IS ON SCREEN');
 t('the Fox step explains its position under each ruleset', () =>
   /s\.role === 'fox'/.test(src) && /called after the pack here/.test(src)
     ? true : 'no explanation on the step');
-t('the Millers Hollow note warns a card may need reading', () =>
+t('the Miller’s Hollow note warns a card may need reading', () =>
   /I may not know the pack yet, and I will ask rather than guess/.test(src)
     ? true : 'no warning for the French order');
 t('the ruleset explainer names the Fox alongside the Seer', () =>

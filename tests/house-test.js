@@ -31,7 +31,7 @@ function shoots(rules, override, cause){
 const POISON = 'the Witch\u2019s poison';
 
 console.log('THE DEFAULTS STILL FOLLOW EACH TRADITION');
-t('Millers Hollow: he fires even when poisoned', () =>
+t('Miller’s Hollow: he fires even when poisoned', () =>
   shoots('mh', null, POISON).fired ? true : 'suppressed under the French rules');
 t('Ma Sói Việt Nam: poison denies him the shot', () =>
   !shoots('vn', null, POISON).fired ? true : 'fired under the Vietnamese rules');
@@ -48,7 +48,7 @@ t('the Witch default mirrors it', () => {
 console.log('\nA HOUSE RULING OVERRIDES EITHER TRADITION');
 t('Vietnamese + "yes": he fires despite the poison', () =>
   shoots('vn', true, POISON).fired ? true : 'override ignored');
-t('Millers Hollow + "no": he does not', () =>
+t('Miller’s Hollow + "no": he does not', () =>
   !shoots('mh', false, POISON).fired ? true : 'override ignored');
 t('the override survives switching ruleset', () => {
   globalThis.G = { rules:'vn', hunterPoison:true, selfHeal:null };

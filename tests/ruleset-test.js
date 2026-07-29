@@ -1,5 +1,5 @@
 // The Bodyguard is standard in Vietnamese play but is not in the original
-// Millers Hollow box. It was marked set:'Base' so the Classic scope kept it,
+// Miller’s Hollow box. It was marked set:'Base' so the Classic scope kept it,
 // which meant both the suggested deck and the shuffle dealt it under the French
 // ruleset. Cards now declare which ruleset owns them, and the generators obey.
 const fs = require('fs');
@@ -34,12 +34,12 @@ t('every `only` value names a real ruleset', () => {
   return bad.length === 0 ? true : bad.map(r => r.id + ':' + r.only).join(', ');
 });
 t('its description already warned the reader', () =>
-  /not in the original Millers Hollow box/.test(R.guard.d) ? true : 'no warning in the text');
+  /not in the original Miller’s Hollow box/.test(R.guard.d) ? true : 'no warning in the text');
 
 console.log('\nTHE SUGGESTED DECK OBEYS THE RULESET');
 for (const chars of [false, true]){
   const scope = chars ? 'Characters' : 'Classic';
-  t('Millers Hollow + ' + scope + ' never suggests a Vietnamese-only card', () => {
+  t('Miller’s Hollow + ' + scope + ' never suggests a Vietnamese-only card', () => {
     G.rules = 'mh';
     for (let n = 6; n <= 24; n++){
       const c = recommend(n, chars);
@@ -56,7 +56,7 @@ t('Vietnamese play still gets its Bodyguard', () => {
 });
 
 console.log('\nTHE SHUFFLE OBEYS THE RULESET');
-t('Millers Hollow never shuffles in a Vietnamese-only card', () => {
+t('Miller’s Hollow never shuffles in a Vietnamese-only card', () => {
   G.rules = 'mh';
   for (let n = 6; n <= 24; n++)
     for (const chars of [false, true])

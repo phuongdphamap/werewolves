@@ -62,7 +62,7 @@ t('the Vietnamese order puts the pack before the Seer', () => {
   const ids = zone(DECK).map(r => r.id);
   return ids.indexOf('wolf') < ids.indexOf('seer') ? true : ids.join(',');
 });
-t('the Millers Hollow order puts the Seer before the pack', () => {
+t('the Miller’s Hollow order puts the Seer before the pack', () => {
   G.rules = 'mh';
   const ids = zone(DECK).map(r => r.id);
   return ids.indexOf('seer') < ids.indexOf('wolf') ? true : ids.join(',');

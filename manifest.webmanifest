@@ -1,7 +1,7 @@
 {
-  "name": "Ma Sói · Millers Hollow Moderator",
+  "name": "Ma Sói · Miller’s Hollow Moderator",
   "short_name": "Ma Sói",
-  "description": "Quản Trò assistant: deck building, night call order, dawn resolution and vote counting for Ma Sói / The Werewolves of Millers Hollow.",
+  "description": "Quản Trò assistant: deck building, night call order, dawn resolution and vote counting for Ma Sói / The Werewolves of Miller’s Hollow.",
   "lang": "vi",
   "start_url": "./",
   "scope": "./",
