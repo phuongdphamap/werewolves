@@ -40,24 +40,33 @@ Releases are driven by a label on the PR. Add exactly one before merging:
 | `release:minor` | `0.X.0` | A new role, a new phase, a new moderator affordance |
 | `release:patch` | `0.0.X` | Fixes, copy edits, chores |
 
-On merge to `main` the workflow computes the next version from the latest tag, rewrites
-`VERSION` in `sw.js`, commits, tags, and publishes a GitHub release with generated
-notes. It then re-triggers the Pages deploy — a push made by `GITHUB_TOKEN` doesn't
-start other workflows on its own, so the deploy has to be asked for explicitly.
+On merge to `main`, `release.yml` runs three jobs in order:
+
+```
+test  ->  release  ->  deploy
+          (tag, bump sw.js,
+           publish release)
+```
+
+Each stage gates the next, so nothing is tagged and nothing reaches Pages unless the
+suites pass.
 
 **No label means no release — and no deploy.** That's the right choice for docs and CI
 changes, which don't alter the app. But it also means an app change merged without a
 label reaches nobody: the site isn't redeployed and the cache isn't rotated. If you
 change `index.html`, label the PR.
 
-Releasing is the only automatic path to production. `static.yml` isn't triggered by
-pushes to `main`, because a push-triggered deploy would publish the old cache version
-and then be superseded by the release's own deploy moments later. To redeploy without
-cutting a release — recovering a broken Pages build, say — run it by hand:
+Releasing is the only automatic path to production — there is no deploy on push to
+`main`, because it would publish before the version bump and send the new app out under
+the old cache key. To redeploy by hand, for a broken Pages build say, `static.yml` runs
+the same `test -> deploy` pair:
 
 ```bash
 gh workflow run static.yml
 ```
+
+The Pages steps live once, in `deploy.yml`, which both callers reuse. It has no trigger
+of its own, so a deploy can only ever happen behind a test gate.
 
 Versions start from `v0.0.0`, so the first release is whatever its label says:
 `release:minor` on an untagged repo produces `v0.1.0`.
@@ -132,8 +141,13 @@ If you touch typography, check a string with stacked diacritics renders in one f
 tests/run-all.sh
 ```
 
-CI runs this on every PR. If it reports every suite as `CRASHED`, `node` isn't on your
-`PATH` rather than anything being wrong with the code.
+CI runs this on every PR, and both the release and the deploy gate on it — nothing is
+tagged, released or published to Pages unless the suites pass. `test.yml` is a reusable
+workflow that `release.yml` and `static.yml` each call as a `needs:` dependency, so
+there's one definition rather than three copies.
+
+If it reports every suite as `CRASHED`, `node` isn't on your `PATH` rather than anything
+being wrong with the code.
 
 The suites cover the deck rules, night call order, ruleset divergences, vote tallying
 and the deploy metadata. They can't drive a browser, so these still need a real device:
