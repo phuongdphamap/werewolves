@@ -15,7 +15,9 @@ const VERSION = 'mh-v0.2.5';
 const SHELL   = VERSION + '-shell';
 const FONTS   = 'mh-fonts-v1';
 
-// Everything needed to boot with no network at all.
+// Everything needed to boot with no network at all. The PNGs are here because the
+// install prompt and the home-screen icon read them from the manifest, and a moderator
+// who first opens the app in a cellar has no connection to fetch them with.
 const PRECACHE = [
   './',
   './index.html',
@@ -23,14 +25,19 @@ const PRECACHE = [
   './js/app.js',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-mask-512.png',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(SHELL);
     // addAll fails the whole install if any single file 404s, which would leave
-    // the app with no offline support at all. Add them individually instead.
-    await Promise.all(PRECACHE.map(u => c.add(u).catch(() => {})));
+    // the app with no offline support at all. Add them individually instead —
+    // but say which one failed, or a mistyped path is invisible forever.
+    await Promise.all(PRECACHE.map(u =>
+      c.add(u).catch(err => console.warn('[sw] precache failed:', u, err.message))));
     await self.skipWaiting();
   })());
 });

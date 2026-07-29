@@ -27,6 +27,19 @@ t('every icon file the manifest names actually exists', () => {
   const missing = man.icons.map(i => i.src.replace('./','')).filter(f => !fs.existsSync(D + f));
   return missing.length === 0 ? true : 'missing: ' + missing.join(', ');
 });
+t('every icon the manifest names is precached', () => {
+  // A first-ever launch with no connection has only PRECACHE. An icon left out of it
+  // is a blank home-screen tile for the moderator who installs in a cellar.
+  const pre = (sw.match(/const PRECACHE = \[[\s\S]*?\];/) || [''])[0];
+  const absent = man.icons.map(i => i.src).filter(s => !pre.includes("'" + s + "'"));
+  return absent.length === 0 ? true : 'not in PRECACHE: ' + absent.join(', ');
+});
+t('every file PRECACHE names actually exists', () => {
+  const pre = (sw.match(/const PRECACHE = \[[\s\S]*?\];/) || [''])[0];
+  const paths = [...pre.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]).filter(Boolean);
+  const missing = paths.filter(f => !fs.existsSync(D + f));
+  return missing.length === 0 ? true : 'precached but absent: ' + missing.join(', ');
+});
 t('iOS gets its own touch icon and standalone hints', () =>
   /apple-touch-icon/.test(src) && /apple-mobile-web-app-capable/.test(src)
     ? true : 'iOS would use a screenshot and show browser chrome');
