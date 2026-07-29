@@ -41,9 +41,19 @@ On merge to `main` the workflow computes the next version from the latest tag, r
 notes. It then re-triggers the Pages deploy — a push made by `GITHUB_TOKEN` doesn't
 start other workflows on its own, so the deploy has to be asked for explicitly.
 
-**No label means no release.** That's the right choice for docs and CI changes, which
-don't need a version. If you label a PR that also changed app files, the bump and the
-deploy are automatic.
+**No label means no release — and no deploy.** That's the right choice for docs and CI
+changes, which don't alter the app. But it also means an app change merged without a
+label reaches nobody: the site isn't redeployed and the cache isn't rotated. If you
+change `index.html`, label the PR.
+
+Releasing is the only automatic path to production. `static.yml` isn't triggered by
+pushes to `main`, because a push-triggered deploy would publish the old cache version
+and then be superseded by the release's own deploy moments later. To redeploy without
+cutting a release — recovering a broken Pages build, say — run it by hand:
+
+```bash
+gh workflow run static.yml
+```
 
 Versions start from `v0.0.0`, so the first release is whatever its label says:
 `release:minor` on an untagged repo produces `v0.1.0`.
