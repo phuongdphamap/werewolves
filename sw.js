@@ -11,7 +11,7 @@
  *
  * Bump VERSION on every release or clients will keep serving the old bundle.
  */
-const VERSION = 'mh-v0.1.4';
+const VERSION = 'mh-v0.2.0';
 const SHELL   = VERSION + '-shell';
 const FONTS   = 'mh-fonts-v1';
 
