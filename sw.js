@@ -9,9 +9,12 @@
  *   · same-origin -> stale-while-revalidate, same reasoning.
  *   · fonts       -> cache first and keep forever; they never change per version.
  *
- * Bump VERSION on every release or clients will keep serving the old bundle.
+ * VERSION names the cache, so it must change on every release or clients keep serving
+ * the old bundle. Do not maintain it by hand: deploy.yml rewrites it from the release
+ * tag before uploading, so the value below is only what you see in local development.
+ * The git tags are the record of what actually shipped.
  */
-const VERSION = 'mh-v0.2.6';
+const VERSION = 'mh-v0.0.0-dev';
 const SHELL   = VERSION + '-shell';
 const FONTS   = 'mh-fonts-v1';
 

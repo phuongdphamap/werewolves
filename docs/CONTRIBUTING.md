@@ -24,11 +24,11 @@ offline.
 icons and the version doesn't change, every existing user keeps the old build forever.
 You'll see your change locally in a fresh tab and assume it shipped.
 
-**Label your PR and this is handled for you** — `bump.yml` writes `const VERSION` in
-`sw.js` onto your branch as soon as the label lands. See [Releases](#releases).
+**Label your PR and this is handled for you** — the deploy writes `const VERSION` from
+the release tag. Never edit it by hand. See [Releases](#releases).
 
-You only need to edit it by hand if you deliberately merge an app change with no
-release label, which should be rare.
+The failure mode is merging an app change with **no** release label: no tag, so no
+deploy, so the cache never rotates and nobody receives it.
 
 ## Releases
 
@@ -40,40 +40,44 @@ Releases are driven by a label on the PR. Add exactly one before merging:
 | `release:minor` | `0.X.0` | A new role, a new phase, a new moderator affordance |
 | `release:patch` | `0.0.X` | Fixes, copy edits, chores |
 
-**The label does the work immediately.** `bump.yml` writes the matching version into
-`sw.js` on your PR branch, as a `chore: set version vX.Y.Z` commit, and re-runs the
-suites against it. So the version arrives on `main` through the PR like any other
-change.
+On merge:
 
 ```
-label the PR      bump.yml   sets sw.js on the PR branch, re-runs tests
-merge the PR      release.yml  test -> release   (tag + publish; no push to main)
-                                          |
-                                          v  dispatches, on ref main
-                               static.yml  test -> deploy
+release.yml   test -> release        (next version from the tags; tag + publish)
+                         |
+                         v  dispatches, on ref main
+static.yml    test -> deploy         (writes the version into sw.js, then uploads)
 ```
 
 Each stage gates the next, so nothing is tagged and nothing reaches Pages unless the
 suites pass. The suites run twice per release, once in each workflow.
 
-**Nothing pushes to `main`.** That is deliberate, and it is what allows `main` to
-require the `test` check: a release only ever tags, and tags are not branch-protected.
-GitHub Actions cannot be granted a branch-protection bypass on a user-owned repository,
-so the alternative would have been no protection at all.
+**Nothing writes to a branch.** No workflow pushes to `main`, and none pushes to your PR
+branch either. Two things depend on that:
 
-If you re-label a PR with a different size, `bump.yml` recomputes and commits again.
-Labelling twice with the same size is a no-op.
+- `main` can require the `test` check. Required checks block direct pushes, not just
+  merges, and GitHub Actions cannot be granted a branch-protection bypass on a
+  user-owned repository — so a release that pushed to `main` could not coexist with
+  protection at all.
+- No "1 workflow awaiting approval" banner. A `pull_request` run created by a
+  `GITHUB_TOKEN` push is deliberately held for maintainer approval, so a bot committing
+  to your branch would stall every labelled PR for ~30 seconds. Nothing commits to your
+  branch, so it never happens.
 
-One sharp edge: two PRs labelled at the same time compute the same next version, and the
-second to merge fails with `tag vX.Y.Z already exists`. Re-label that PR to move it on.
+### Do not maintain VERSION by hand
+
+`sw.js` carries `mh-v0.0.0-dev` in the repo. That is a placeholder, not a mistake:
+`deploy.yml` rewrites it from the release tag inside the runner before uploading, and
+never commits the result. **The git tags are the record of what shipped**; the value in
+the file is only what you see in local development, where the Roster will show
+`Version v0.0.0-dev`.
 
 **Why a dispatch and not a direct call.** Two reasons, and the second one is easy to
 miss — removing the dispatch broke the `v0.2.0` release:
 
 1. A push made with `GITHUB_TOKEN` doesn't trigger other workflows, so a deploy would
-   never start on its own. (`workflow_dispatch` is the documented exception — it always
-   creates a run. That is also how `bump.yml` gets the suites to run against the commit
-   it just pushed to your PR branch.)
+   never start on its own. `workflow_dispatch` is the documented exception — it always
+   creates a run.
 2. The `github-pages` environment only permits deploys from `main`. On a labelled merge
    `release.yml` runs on the `pull_request` event, so its ref is `refs/pull/N/merge` and
    the environment rejects the deploy — no matter which ref the job checks out.
