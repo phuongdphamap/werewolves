@@ -488,6 +488,29 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-20 | Counting a 17-player vote meant 11 taps per candidate | Steppers only. Added a typed input — which then must not trigger `render()`. |
 | B-27 | The two deck presets looked like actions, not a setting | Restructured: Classic/Characters is a **scope**, and both Shuffle and Suggested obey it. |
 
+### Security
+
+| # | Bug | Root cause |
+|---|---|---|
+| B-28 | A player name could execute script | Names are concatenated into markup via `innerHTML` in ~70 places. Typing `<img src=x onerror=…>` as a name ran it — confirmed in a browser, not theoretical. Fixed at the **one** point names enter (`safeName`, applied in `addPlayer` and `loadSaved`) rather than at seventy output sites, because one missed site is still a hole. Low severity — one device, no server, no secrets — but real. |
+
+### Delivery pipeline
+
+These cost more than any rules bug, because the app was correct and simply did not reach
+anyone. All three share a cause: **a mechanism was removed without understanding every
+reason it existed.**
+
+| # | Bug | Root cause |
+|---|---|---|
+| B-29 | `v0.2.0` tagged, published, and never deployed | The release ran on `pull_request`, so its ref was `refs/pull/16/merge`, and the `github-pages` environment only permits deploys from `main` — the environment checks the **run's ref**, not what the job checks out. A `gh workflow run static.yml --ref main` dispatch had been removed as redundant; it was also the only thing giving the deploy a `main` ref. Verification had used `workflow_dispatch`, which runs on `main`, so it could never have caught this. |
+| B-30 | A version bump could ship under the old cache key | The deploy checked out the event's commit, which predates the bump. Fixed with an explicit `ref: main`, and `deploy.yml` now pins `sw.js` from the latest tag. |
+| B-31 | Branch protection and the release were incompatible | Required status checks block **direct pushes**, not just merges, and GitHub Actions cannot be a bypass actor on a user-owned repo. The release pushed `chore(release)` straight to `main`. Fixed by removing the need: `bump.yml` writes the version into the PR, so only tags are pushed and tags are not branch-protected. |
+
+Method note: mutation testing with `perl -0pi -e` silently failed to match in some cases,
+so a "no tests failed" result meant *the mutation never applied*, not *the code is
+unreachable*. One guard was deleted on that evidence. Mutations are now applied with
+`node` and assert the file actually changed.
+
 ---
 
 ## 8. Test suites
