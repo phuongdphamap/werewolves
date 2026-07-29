@@ -23,6 +23,23 @@ t('the theme colour matches the app background', () =>
   man.theme_color === '#0C0A12' && /content="#0C0A12"/.test(src) ? true : 'theme colour disagrees with the page');
 t('a maskable icon is supplied, or Android will letterbox it', () =>
   man.icons.some(i => i.purpose === 'maskable') ? true : 'no maskable icon');
+t('an icon of at least 192px is offered, or it is not installable', () =>
+  man.icons.some(i => /(\d+)x\1?/.test(i.sizes) && parseInt(i.sizes, 10) >= 192)
+    ? true : 'no icon >=192px, so no install prompt');
+t('no manifest icon uses sizes:any', () => {
+  // An SVG declared "any" matches every size Chrome wants, so it refetches it once per
+  // size — nine requests per load on the live site. Fixed sizes are fetched once.
+  const anyd = man.icons.filter(i => i.sizes === 'any').map(i => i.src);
+  return anyd.length === 0 ? true : 'sizes:any will be refetched per size: ' + anyd.join(', ');
+});
+t('the favicon is precached even though it is not a manifest icon', () => {
+  // It left the manifest but is still <link rel="icon">, so it must stay in PRECACHE or
+  // the tab icon breaks offline — and the manifest-icon test above no longer covers it.
+  const pre = (sw.match(/const PRECACHE = \[[\s\S]*?\];/) || [''])[0];
+  const favicon = (src.match(/<link rel="icon" href="\.\/([^"]+)"/) || [])[1];
+  if (!favicon) return 'no favicon declared';
+  return pre.includes("'./" + favicon + "'") ? true : favicon + ' is not precached';
+});
 t('every icon file the manifest names actually exists', () => {
   const missing = man.icons.map(i => i.src.replace('./','')).filter(f => !fs.existsSync(D + f));
   return missing.length === 0 ? true : 'missing: ' + missing.join(', ');

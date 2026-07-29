@@ -83,3 +83,10 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+        env:
+          # deploy-pages@v5 (latest, Mar 2026) bundles a dependency that still requires
+          # Node's removed `punycode`, so every deploy logged a DEP0040 warning. Nothing
+          # to fix on our side and no newer release. Silenced for this step only — it
+          # would also hide a genuine future deprecation from this action, which is the
+          # cost of not reading the same benign warning on every deploy.
+          NODE_OPTIONS: --no-deprecation
