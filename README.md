@@ -11,7 +11,7 @@ no accounts, no `node_modules`.
 
 ## What it does
 
-| | |
+| Task | What the app does |
 |---|---|
 | Build a deck | Recommends a deck for the table size, or shuffles a weighted random one. Wolf count scales from 1 at under 8 players to 6 at 23+. |
 | Call the night | Walks the roll call in order. Each role has a line to read aloud, in English and Vietnamese. |
@@ -55,7 +55,7 @@ sw.js                   service worker; offline caching
 manifest.webmanifest    PWA metadata
 icons/                  favicon, touch icon, PWA icons
 docs/                   contributing, deployment, engineering notes
-tests/                   run with tests/run-all.sh
+tests/                  run with tests/run-all.sh
 ```
 
 Everything uses relative paths, so it also works from a subdirectory — which is how it
