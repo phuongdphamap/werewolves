@@ -940,6 +940,18 @@ function houseRulesUI(){
   return wrap;
 }
 
+/* One player left means one card left. Asking which is busywork, and a moderator
+   holding fifteen people's attention should not have to answer it. */
+function autoFillLastCard(){
+  const left = unassigned();
+  if (left.length !== 1) return null;
+  const r = ROLES.find(x => G.counts[x.id] && withRole(x.id).length < G.counts[x.id]);
+  if (!r) return null;
+  left[0].role = r.id;
+  log(left[0].name + ' holds the last card, the ' + (G.rules === 'vn' ? r.vi : r.name) + '.', 'Setup');
+  return r;
+}
+
 /* ---- collect the deal ---- */
 function rLearn(){
   show('sLearn');
@@ -955,7 +967,8 @@ function rLearn(){
       const b = el('div','chip' + (p.role===r.id ? ' sel' : '') + (full ? ' dead' : ''),
         '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name) +
         '<span class="bd">' + placed + '/' + G.counts[r.id] + '</span>');
-      if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null; render(); };
+      if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
+        autoFillLastCard(); render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
