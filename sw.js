@@ -1,4 +1,4 @@
-/* Millers Hollow — Moderator: offline support.
+/* Miller’s Hollow — Moderator: offline support.
  *
  * A moderator runs this at a table, often in a cellar or a garden with no signal.
  * The app must open and keep working with the network gone entirely.

@@ -1,4 +1,4 @@
-# Ma Sói / Millers Hollow Moderator — engineering notes
+# Ma Sói / Miller’s Hollow Moderator — engineering notes
 
 Everything learned building this app: the domain rules, the architecture, every bug
 found and its root cause, and the test suites that pin the behaviour down.
@@ -14,7 +14,7 @@ rediscover.
 1. [What this is, and what it deliberately is not](#1-what-this-is)
 2. [The role table](#2-the-role-table)
 3. [Night call order](#3-night-call-order)
-4. [Vietnamese vs Millers Hollow: every divergence](#4-ruleset-divergences)
+4. [Vietnamese vs Miller’s Hollow: every divergence](#4-ruleset-divergences)
 5. [The central design rule: never guess, and know what you actually need](#5-never-guess)
 6. [Architecture](#6-architecture)
 7. [Bug catalogue](#7-bug-catalogue)
@@ -160,7 +160,7 @@ Ma Sói (position 60) to the top and destroyed the preview.
 The `over` map only moves call positions. Everything else below is handled in code.
 **This table is the most expensive knowledge in the project.**
 
-| # | Rule | Ma Sói Việt Nam | Millers Hollow | Where |
+| # | Rule | Ma Sói Việt Nam | Miller’s Hollow | Where |
 |---|---|---|---|---|
 | 1 | Seer's information | wolf / not-wolf only | the **exact card** | `showSeer` |
 | 2 | Seer's position | **after** the pack (62) | before it (55) | `RULESETS.over` |
@@ -272,7 +272,7 @@ moderator *what to go and find* rather than which players it does not recognise.
 
 ### The one case that still asks
 
-**Millers Hollow + discover-during-the-night + night one.** The Fox and Seer are
+**Miller’s Hollow + discover-during-the-night + night one.** The Fox and Seer are
 called before the pack, so no wolf card is placed yet. The app names the unaccounted
 cards and takes a manual YES/NO. Under `vn`, or after "collect the deal", this never
 happens.
@@ -445,7 +445,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-11 | A Hunter or Sheriff killed **at night** lost their ability entirely | Both interrupts were wired only into the day-vote path. Dawn went straight to `day`. Fixed with the `pending` queue and `proceed()`. |
 | B-12 | The Witch was offered **herself** as a poison target | Poison list was `alive()` with no self-exclusion. |
 | B-13 | The Hunter had a "shot nobody" button | The shot is **compulsory**. My UI invented a choice the rules do not offer. |
-| B-14 | Millers Hollow decks contained the Bodyguard | I marked it `set:'Base'` (true for Vietnamese play), and the Classic scope filters on `set`. Ruleset ownership is a *different axis* — added `only`. |
+| B-14 | Miller’s Hollow decks contained the Bodyguard | I marked it `set:'Base'` (true for Vietnamese play), and the Classic scope filters on `set`. Ruleset ownership is a *different axis* — added `only`. |
 | B-15 | A vote below half still eliminated someone | There was no tally at all — the moderator just tapped a name. |
 | B-17 | Parity was not a win condition | `checkWin` only fired when villagers hit zero. |
 | B-18 | **The game could never end** | `checkWin` bailed if *any* player was unidentified — including the **dead**. One player who died before you learned their card froze the result for the whole game. |

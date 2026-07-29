@@ -38,7 +38,7 @@ const ROLES = [
   say:'Three Brothers, wake up and look at one another.',
   sayVi:'Ba Anh Em thức dậy và nhìn mặt nhau.'},
  {id:'guard',ic:'🛡️',name:'Bodyguard',vi:'Bảo Vệ',team:'village',set:'Base',only:'vn',max:1,n1:47,every:47,
-  d:'Each night protects one player. If the werewolves attack that player, nobody dies. He may not protect the same person on two nights in a row. Standard in Vietnamese play; not in the original Millers Hollow box.',
+  d:'Each night protects one player. If the werewolves attack that player, nobody dies. He may not protect the same person on two nights in a row. Standard in Vietnamese play; not in the original Miller’s Hollow box.',
   say:'Bodyguard, wake up and choose one person to shield tonight.',
   sayVi:'Bảo Vệ thức dậy và chọn một người để che chở đêm nay.',pick:1,special:'guard'},
  {id:'littlegirl',ic:'👀',name:'Little Girl',vi:'Bé Gái',team:'village',set:'Base',max:1,n1:48,
@@ -74,7 +74,7 @@ const ROLES = [
   say:'Pied Piper, wake up and charm two players.',
   sayVi:'Người Thổi Sáo thức dậy và mê hoặc hai người.',pick:2,special:'charm'},
  {id:'hunter',ic:'🏹',name:'Hunter',vi:'Thợ Săn',team:'village',set:'Base',max:1,n1:82,
-  d:'When he dies he must immediately shoot one living player — the shot is compulsory, not a choice. Vietnamese play denies him the shot if the Witch poisoned him; Millers Hollow lets him fire whatever killed him.',
+  d:'When he dies he must immediately shoot one living player — the shot is compulsory, not a choice. Vietnamese play denies him the shot if the Witch poisoned him; Miller’s Hollow lets him fire whatever killed him.',
   say:'Hunter, show yourself to me only, then close your eyes.',
   sayVi:'Thợ Săn cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'elder',ic:'⏳',name:'The Elder',vi:'Trưởng Lão',team:'village',set:'Characters',max:1,n1:84,
@@ -125,7 +125,7 @@ const pIcon = p => p.role ? icOf(p.role) : '<i>?</i>';
    picks at 30, and every death resolves at dawn), so moving them is neutral for the
    players and means the moderator already knows the pack when they must answer. */
 const RULESETS = { vn:{ label:'Ma Sói Việt Nam', over:{ fox:61, seer:62 } },
-                  mh:{ label:'Millers Hollow (bản gốc)', over:{} } };
+                  mh:{ label:'Miller’s Hollow (bản gốc)', over:{} } };
 const over = id => RULESETS[G && G.rules ? G.rules : 'vn'].over[id];
 const n1Of    = r => over(r.id) != null ? over(r.id) : r.n1;
 const everyOf = r => r.every == null ? null : (over(r.id) != null ? over(r.id) : r.every);
@@ -162,7 +162,7 @@ function shuffleDeck(n, chars){
   for (const id in SHUF){
     if (c[id]) continue;
     if (!chars && R[id].set !== 'Base') continue;   // Classic draws from the base box only
-    if (R[id].only && R[id].only !== G.rules) continue;   // e.g. no Bodyguard under Millers Hollow
+    if (R[id].only && R[id].only !== G.rules) continue;   // e.g. no Bodyguard under Miller’s Hollow
     const [w, min] = SHUF[id];
     if (n < min) continue;
     for (let k = 0; k < w; k++) bag.push(id);
@@ -262,7 +262,7 @@ function teamOf(p){
 const isWolf = p => teamOf(p) === 'wolf';
 // The app must never infer a role it has not been told. Anything it computes
 // from cards has to check this first, or it will answer confidently and wrongly.
-// The badge is a title, not a card. Millers Hollow weights it at a flat double;
+// The badge is a title, not a card. Miller’s Hollow weights it at a flat double;
 // Vietnamese and 狼人杀 tables usually use 1.5 so it cannot outvote two people alone.
 const SHERIFF_WEIGHT = () => G.rules === 'vn' ? '1.5 votes' : '2 votes';
 
@@ -386,7 +386,7 @@ function setCount(id, v){
 }
 function checks(){
   const seats = G.players.length, cards = totalCards(), out = [];
-  if (seats < 6) out.push(['warn','Millers Hollow needs at least 6 players. Eight or more plays much better.']);
+  if (seats < 6) out.push(['warn','Miller’s Hollow needs at least 6 players. Eight or more plays much better.']);
   if (cards !== seats) out.push(['no', cards < seats
     ? (seats-cards) + ' more card' + (seats-cards>1?'s':'') + ' needed to cover every seat.'
     : (cards-seats) + ' card' + (cards-seats>1?'s':'') + ' too many for this table.']);
@@ -511,7 +511,7 @@ function registerDeaths(chain){
     if (c.p.role === 'hunter' && !G.pending.hunterId){
       // Vietnamese play (and 狼人杀 before it) holds that poison leaves no time to
       // aim: the Hunter fires when eaten or hanged, but not when poisoned.
-      // Millers Hollow says he fires whatever the cause.
+      // Miller’s Hollow says he fires whatever the cause.
       if (!hunterFiresPoisoned() && /poison/.test(c.cause)){
         log(c.p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
             'Change that under House rules if your table plays otherwise.');
@@ -559,7 +559,7 @@ function applyDawn(){
 }
 function checkWin(){
   const a = alive();
-  if (!a.length) return { who:'Nobody', why:'Every soul in Millers Hollow is dead.' };
+  if (!a.length) return { who:'Nobody', why:'Every soul in Miller’s Hollow is dead.' };
   // Counting the two sides needs only the wolf cards placed — not every villager
   // identified. Demanding the latter froze results for whole games.
   if (!wolfSideKnown()) return null;
@@ -575,7 +575,7 @@ function checkWin(){
   if (!wolves.length) return { who:'The Village', why:'Not one werewolf is left breathing.' };
   // Once the pack matches the village it can no longer be outvoted, so the game
   // is already decided and there is no point grinding out the last few nights.
-  // Vietnamese play ends it there; Millers Hollow makes them finish the job.
+  // Vietnamese play ends it there; Miller’s Hollow makes them finish the job.
   const parity = G.rules === 'vn' && wolves.length >= others.length;
   if (!others.length || parity){
     if (ww && wolves.length > 1) return null;      // the White Werewolf still wants to be alone
@@ -701,7 +701,7 @@ function render(){
   saveSoon();
   $('bUndo').disabled = !undoStack.length;
   ambience(soundOn && G.phase === 'night');
-  $('hTtl').textContent = G.over ? 'Game over' : 'Millers Hollow';
+  $('hTtl').textContent = G.over ? 'Game over' : 'Miller’s Hollow';
   $('hPh').textContent = { players:'Seats', roles:'Deck', deal:'Deal the cards', learn:'Collect the deal',
     night: G.night === 1 ? 'First night \u00b7 roll call' : 'Night ' + G.night,
     dawn:'Dawn ' + G.night, day:'Day ' + G.day, hunter:'Day ' + G.day,
@@ -888,7 +888,7 @@ function rDeal(){
   const A = $('dealAlt'); A.innerHTML = '';
   A.appendChild(collapsible('deal', 'Which route should I take?',
     (mh
-      ? '<p><b>You are on the Millers Hollow order, so the Seer sees the exact card.</b> ' +
+      ? '<p><b>You are on the Miller’s Hollow order, so the Seer sees the exact card.</b> ' +
         'Every look needs a specific card read out. Collect the deal now and the app can show her any ' +
         'card on screen; skip it and you will be reading cards at the table all game.</p>'
       : '<p><b>Vietnamese order.</b> The Seer only needs to know werewolf or not, and the pack is called ' +
@@ -904,7 +904,7 @@ function rDeal(){
     'seat there is nothing for anyone to feel being lifted.</p>'));
   const extra = el('button','btn sec wide','Bỏ qua — tìm ra trong đêm · Skip');
   extra.onclick = () => { snap(); G.knewDeal = false; G.night=1; G.phase='night';
-    buildNight(); log('Night falls on Millers Hollow.','Night 1'); render(); };
+    buildNight(); log('Night falls on Miller’s Hollow.','Night 1'); render(); };
   A.appendChild(extra);
 }
 
@@ -916,11 +916,11 @@ function houseRulesUI(){
     { key:'selfHeal', q:'Phù Thuỷ tự cứu mình?',
       en:'May the Witch use her cure on herself?',
       now:witchMaySaveSelf(),
-      note:'Millers Hollow cho phép. Ma Sói Việt Nam thì không.' },
+      note:'Miller’s Hollow cho phép. Ma Sói Việt Nam thì không.' },
     { key:'hunterPoison', q:'Thợ Săn bị thuốc độc có bắn được?',
       en:'Does the Hunter still fire when the Witch poisons him?',
       now:hunterFiresPoisoned(),
-      note:'Millers Hollow: bắn, vì luật nói \u201cchết vì bất cứ lý do gì\u201d. Ma Sói Việt Nam theo 狼人杀: thuốc độc thì không kịp giương súng.' },
+      note:'Miller’s Hollow: bắn, vì luật nói \u201cchết vì bất cứ lý do gì\u201d. Ma Sói Việt Nam theo 狼人杀: thuốc độc thì không kịp giương súng.' },
   ];
   for (const r of rows){
     wrap.appendChild(el('div','grp', r.q + ' \u00b7 ' + r.en));
@@ -972,7 +972,7 @@ function rLearn(){
          off: known !== total,
          on:() => { snap(); G.knewDeal = true; G.night=1; G.phase='night'; buildNight();
            log('The deal was collected before play, so the table is fully known.','Setup');
-           log('Night falls on Millers Hollow.','Night 1'); render(); } }]);
+           log('Night falls on Miller’s Hollow.','Night 1'); render(); } }]);
 }
 
 /* ---- night ---- */
@@ -1036,12 +1036,12 @@ function rNight(){
     const she = holders[0] || null;                    // the Witch herself
     const selfVictim = !!(she && v && v.id === she.id);
     if (G.witchHeal && v){
-      // Self-rescue is the one place the two traditions disagree. Millers Hollow
+      // Self-rescue is the one place the two traditions disagree. Miller’s Hollow
       // lets her drink her own cure; Vietnamese play does not.
       const blockSelf = selfVictim && !witchMaySaveSelf();
       if (selfVictim) B.appendChild(el('div','alert' + (blockSelf ? ' no' : ''), blockSelf
         ? 'The victim is the Witch herself. Vietnamese rules do not let her drink her own cure \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.'
-        : 'The victim is the Witch herself. Millers Hollow allows her to save herself.'));
+        : 'The victim is the Witch herself. Miller’s Hollow allows her to save herself.'));
       const b = el('button','btn sm sec', (G.n.witchSave ? '\u2713 Saving ' : 'Save ') + v.name);
       b.disabled = blockSelf;
       b.onclick = () => { G.n.witchSave = !G.n.witchSave; render(); };
@@ -1145,7 +1145,7 @@ function rNight(){
   if (s.role === 'fox'){
     B.appendChild(el('p','note', G.rules === 'vn'
       ? 'He is called after the pack here, so I already know every wolf and can answer without you touching a card.'
-      : 'Millers Hollow calls him before the pack. He is asleep while the wolves choose, so it costs him nothing \u2014 but on the first night I may not know the pack yet, and I will ask rather than guess.'));
+      : 'Miller’s Hollow calls him before the pack. He is asleep while the wolves choose, so it costs him nothing \u2014 but on the first night I may not know the pack yet, and I will ask rather than guess.'));
   }
   // The Seer's look is how a moderator reads a card mid-night. If the app has
   // never seen that card, it asks, and remembers it from then on.
@@ -1359,8 +1359,8 @@ function rDay(){
       '\u2014 or destroy the badge so nobody carries it.<br>' +
       '\u00b7 The title survives everything else: losing a power, being revealed, changing side.</p>' +
       '<p>' + (vn
-        ? 'Vietnamese tables usually weight the badge at 1.5 so it cannot outvote two villagers on its own. Millers Hollow uses a flat double.'
-        : 'Millers Hollow gives a flat double vote. Vietnamese and 狼人杀 tables usually use 1.5 instead.') + '</p>'));
+        ? 'Vietnamese tables usually weight the badge at 1.5 so it cannot outvote two villagers on its own. Miller’s Hollow uses a flat double.'
+        : 'Miller’s Hollow gives a flat double vote. Vietnamese and 狼人杀 tables usually use 1.5 instead.') + '</p>'));
     B.appendChild(el('div','grp','Who was elected?'));
     const c = el('div','chips');
     for (const p of A) c.appendChild(chip(p, { on:() => { snap(); p.sheriff = true; G.sheriffDone = true;

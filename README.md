@@ -1,6 +1,6 @@
 # Ma Sói — Moderator
 
-A Quản Trò (moderator) assistant for **Ma Sói** / *The Werewolves of Millers Hollow*.
+A Quản Trò (moderator) assistant for **Ma Sói** / *The Werewolves of Miller’s Hollow*.
 It runs the night call order, resolves the dawn, counts votes, and remembers who is
 what — so the person running the game can watch the table instead of a rulebook.
 
@@ -20,7 +20,7 @@ no accounts, no `node_modules`.
 | Survive a reload | A locked phone or an evicted tab no longer ends the game. Resume is offered for 12 hours. |
 
 25 roles from the base game and the Characters expansion. Two rulesets: **Ma Sói Việt
-Nam** (default) and **Millers Hollow (bản gốc)** — they differ in Seer/Fox call order,
+Nam** (default) and **Miller’s Hollow (bản gốc)** — they differ in Seer/Fox call order,
 Sheriff vote weight, whether the Witch may heal herself, and whether a poisoned Hunter
 still fires.
 
@@ -79,6 +79,6 @@ rotates the service worker cache so people actually receive the change.
 
 MIT — see `LICENSE`.
 
-That covers this software. *The Werewolves of Millers Hollow* is a game by Philippe des
+That covers this software. *The Werewolves of Miller’s Hollow* is a game by Philippe des
 Pallières and Hervé Marly, published by Lui-même; Ma Sói is its Vietnamese form. This is
 an unaffiliated tool for running a game you already own.

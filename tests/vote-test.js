@@ -102,7 +102,7 @@ t('3 wolves against 3 villagers is a wolf win under Vietnamese rules', () => {
   const w = checkWin();
   return (w && w.who === 'The Werewolves') ? true : JSON.stringify(w);
 });
-t('the same board is not yet over under Millers Hollow', () => {
+t('the same board is not yet over under Miller’s Hollow', () => {
   table(['wolf','wolf','wolf','villager','seer','witch'], { rules:'mh' });
   return checkWin() === null ? true : JSON.stringify(checkWin());
 });

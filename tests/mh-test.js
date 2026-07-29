@@ -152,7 +152,7 @@ t('Vietnamese order: pack before Seer, Witch last', () => {
       && n.indexOf('Werewolf') < n.indexOf('Seer')
       && n.indexOf('Seer') < n.indexOf('Witch') ? true : n.join(' | ');
 });
-t('Millers Hollow order: Seer before pack, Witch last', () => {
+t('Miller’s Hollow order: Seer before pack, Witch last', () => {
   mk(['guard','seer','wolf','wolf','witch','villager']);
   G.rules = 'mh'; G.night = 3; buildNight();
   const n = names();
@@ -165,7 +165,7 @@ t('switching ruleset moves the two information roles and nothing else', () => {
   G.rules = 'vn'; buildNight(); const a = names();
   G.rules = 'mh'; buildNight(); const b = names();
   // the Fox travels with the Seer: both are called after the pack under the
-  // Vietnamese order, and before it under Millers Hollow
+  // Vietnamese order, and before it under Miller’s Hollow
   const strip = x => x.filter(y => y !== 'Seer' && y !== 'The Fox').join(',');
   return strip(a) === strip(b) && a.join() !== b.join() ? true : a.join(' | ') + '   vs   ' + b.join(' | ');
 });
