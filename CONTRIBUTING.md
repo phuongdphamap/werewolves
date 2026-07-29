@@ -17,14 +17,36 @@ bigger and slower without solving a problem it has. `DEPLOY.md` covers the reaso
 ## The one rule that bites everyone
 
 `sw.js` serves cache-first. If you change `index.html`, `sw.js`, the manifest, or the
-icons and **don't** bump the version, every existing user keeps the old build forever:
+icons and the version doesn't change, every existing user keeps the old build forever.
+You'll see your change locally in a fresh tab and assume it shipped.
 
-```js
-const VERSION = 'mh-2026-07-29';   // bump this
-```
+**Label your PR and this is handled for you** — the release workflow rewrites
+`const VERSION` in `sw.js` to match the new tag. See [Releases](#releases).
 
-Nothing in CI catches it. You will see your change locally in a fresh tab and assume it
-shipped.
+You only need to edit it by hand if you deliberately merge an app change with no
+release label, which should be rare.
+
+## Releases
+
+Releases are driven by a label on the PR. Add exactly one before merging:
+
+| Label | Bump | Use for |
+|---|---|---|
+| `release:major` | `X.0.0` | A change that breaks saved games, or a rules change that would surprise a moderator mid-campaign |
+| `release:minor` | `0.X.0` | A new role, a new phase, a new moderator affordance |
+| `release:patch` | `0.0.X` | Fixes, copy edits, chores |
+
+On merge to `main` the workflow computes the next version from the latest tag, rewrites
+`VERSION` in `sw.js`, commits, tags, and publishes a GitHub release with generated
+notes. It then re-triggers the Pages deploy — a push made by `GITHUB_TOKEN` doesn't
+start other workflows on its own, so the deploy has to be asked for explicitly.
+
+**No label means no release.** That's the right choice for docs and CI changes, which
+don't need a version. If you label a PR that also changed app files, the bump and the
+deploy are automatic.
+
+Versions start from `v0.0.0`, so the first release is whatever its label says:
+`release:minor` on an untagged repo produces `v0.1.0`.
 
 ## Where things are
 

@@ -69,5 +69,6 @@ python3 -m http.server 8000
 
 ## Contributing
 
-See `CONTRIBUTING.md`. The short version: edit `index.html`, and bump `VERSION` in
-`sw.js` or nobody will ever receive your change.
+See `CONTRIBUTING.md`. The short version: edit `index.html`, and put a `release:patch`
+/ `release:minor` / `release:major` label on the PR — that's what cuts the release and
+rotates the service worker cache so people actually receive the change.
