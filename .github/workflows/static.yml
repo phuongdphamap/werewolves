@@ -1,48 +1,26 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Redeploys main to Pages by hand, without cutting a release.
+#
+# For recovering a broken Pages build, or republishing after changing repo settings.
+# Normal releases deploy themselves — see release.yml. There is no push trigger: a
+# push-triggered deploy would publish before the release had bumped sw.js, so the new
+# app would go out under the old cache key.
 name: Deploy static content to Pages
 
 on:
-  # Deliberately not triggered by pushes to main. The release workflow dispatches
-  # this after it has bumped sw.js; a push-triggered deploy would publish the old
-  # cache version first and be superseded seconds later.
-  #
-  # Run it by hand from the Actions tab to redeploy without cutting a release.
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  # A deploy is reachable by hand, so it gates on the suites itself rather than
-  # trusting whoever dispatched it.
+  # Dispatched by a person, so it verifies main is green rather than trusting them.
   test:
     uses: ./.github/workflows/test.yml
+    with:
+      ref: main
 
   deploy:
     needs: test
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+    uses: ./.github/workflows/deploy.yml
