@@ -243,6 +243,9 @@ function loadSaved(){
     if (!raw) return null;
     const box = JSON.parse(raw);
     if (!box || !box.g || !box.g.players || !box.g.players.length) return null;
+    // A save written before names were sanitised would put a payload straight back
+    // into the DOM on resume, so they are cleaned on the way out of storage too.
+    for (const p of box.g.players) p.name = safeName(p.name);
     if (Date.now() - box.at > 12 * 3600 * 1000) return null;   // yesterday's game is not a resume
     return box;
   } catch (e){ return null; }
@@ -360,8 +363,14 @@ function clockwiseWolfFrom(p){
 }
 
 /* ========================== setup ========================== */
+/* Names reach the DOM through string concatenation in about seventy places, so they
+   are made inert here, where they enter, rather than escaped at every use — one
+   missed call site would still be a hole. Angle brackets are the only characters
+   that can open a tag, and no name is ever placed inside an attribute. */
+const safeName = s => (s || '').replace(/[<>]/g, '').trim().replace(/\s+/g, ' ');
+
 function addPlayer(name){
-  name = (name || '').trim().replace(/\s+/g, ' ');
+  name = safeName(name);
   if (!name) return;
   if (G.players.some(p => p.name.toLowerCase() === name.toLowerCase())){
     let n = 2;
