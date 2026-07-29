@@ -72,3 +72,11 @@ python3 -m http.server 8000
 See `CONTRIBUTING.md`. The short version: edit `index.html`, and put a `release:patch`
 / `release:minor` / `release:major` label on the PR — that's what cuts the release and
 rotates the service worker cache so people actually receive the change.
+
+## License
+
+MIT — see `LICENSE`.
+
+That covers this software. *The Werewolves of Millers Hollow* is a game by Philippe des
+Pallières and Hervé Marly, published by Lui-même; Ma Sói is its Vietnamese form. This is
+an unaffiliated tool for running a game you already own.
