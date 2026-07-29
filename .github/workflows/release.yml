@@ -28,13 +28,18 @@ permissions:
   actions: write # re-dispatch the Pages deploy
 
 jobs:
-  release:
+  # Nothing is tagged, released or deployed unless the suites pass.
+  test:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.merged == true &&
        (contains(github.event.pull_request.labels.*.name, 'release:major') ||
         contains(github.event.pull_request.labels.*.name, 'release:minor') ||
         contains(github.event.pull_request.labels.*.name, 'release:patch')))
+    uses: ./.github/workflows/test.yml
+
+  release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,11 +59,11 @@ jobs:
           if [ "$EVENT" = "workflow_dispatch" ]; then
             bump="$INPUT_BUMP"
           elif jq -e 'index("release:major")' <<<"$LABELS" >/dev/null; then
-            bump=major
+            bump='major'
           elif jq -e 'index("release:minor")' <<<"$LABELS" >/dev/null; then
-            bump=minor
+            bump='minor'
           else
-            bump=patch
+            bump='patch'
           fi
 
           previous=$(git tag --list 'v*' --sort=-v:refname \
@@ -70,9 +75,11 @@ jobs:
           # instead of doing shell arithmetic on it.
           version="v$(npx --yes semver@7 --increment "$bump" "${previous#v}")"
 
-          echo "bump=$bump"         >> "$GITHUB_OUTPUT"
-          echo "previous=$previous" >> "$GITHUB_OUTPUT"
-          echo "version=$version"   >> "$GITHUB_OUTPUT"
+          {
+            echo "bump=$bump"
+            echo "previous=$previous"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
           echo "Releasing $previous -> $version ($bump)"
 
       - name: Sync the service worker cache version

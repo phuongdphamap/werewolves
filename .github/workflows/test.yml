@@ -1,4 +1,5 @@
 # Runs the assertion suites in tests/ on every PR and on main.
+# Also callable, so release and deploy can gate on it instead of duplicating the job.
 name: Tests
 
 on:
@@ -6,6 +7,7 @@ on:
     branches: ["main"]
   push:
     branches: ["main"]
+  workflow_call:
 
 permissions:
   contents: read

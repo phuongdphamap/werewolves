@@ -132,8 +132,13 @@ If you touch typography, check a string with stacked diacritics renders in one f
 tests/run-all.sh
 ```
 
-CI runs this on every PR. If it reports every suite as `CRASHED`, `node` isn't on your
-`PATH` rather than anything being wrong with the code.
+CI runs this on every PR, and both the release and the deploy gate on it — nothing is
+tagged, released or published to Pages unless the suites pass. `test.yml` is a reusable
+workflow that `release.yml` and `static.yml` each call as a `needs:` dependency, so
+there's one definition rather than three copies.
+
+If it reports every suite as `CRASHED`, `node` isn't on your `PATH` rather than anything
+being wrong with the code.
 
 The suites cover the deck rules, night call order, ruleset divergences, vote tallying
 and the deploy metadata. They can't drive a browser, so these still need a real device:

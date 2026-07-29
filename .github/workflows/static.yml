@@ -22,8 +22,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
+  # A deploy is reachable by hand, so it gates on the suites itself rather than
+  # trusting whoever dispatched it.
+  test:
+    uses: ./.github/workflows/test.yml
+
   deploy:
+    needs: test
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
