@@ -27,6 +27,19 @@ t('every icon file the manifest names actually exists', () => {
   const missing = man.icons.map(i => i.src.replace('./','')).filter(f => !fs.existsSync(D + f));
   return missing.length === 0 ? true : 'missing: ' + missing.join(', ');
 });
+t('every icon the manifest names is precached', () => {
+  // A first-ever launch with no connection has only PRECACHE. An icon left out of it
+  // is a blank home-screen tile for the moderator who installs in a cellar.
+  const pre = (sw.match(/const PRECACHE = \[[\s\S]*?\];/) || [''])[0];
+  const absent = man.icons.map(i => i.src).filter(s => !pre.includes("'" + s + "'"));
+  return absent.length === 0 ? true : 'not in PRECACHE: ' + absent.join(', ');
+});
+t('every file PRECACHE names actually exists', () => {
+  const pre = (sw.match(/const PRECACHE = \[[\s\S]*?\];/) || [''])[0];
+  const paths = [...pre.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]).filter(Boolean);
+  const missing = paths.filter(f => !fs.existsSync(D + f));
+  return missing.length === 0 ? true : 'precached but absent: ' + missing.join(', ');
+});
 t('iOS gets its own touch icon and standalone hints', () =>
   /apple-touch-icon/.test(src) && /apple-mobile-web-app-capable/.test(src)
     ? true : 'iOS would use a screenshot and show browser chrome');
@@ -41,8 +54,11 @@ t('the cache name carries a version', () => /const VERSION = '[^']+'/.test(sw) ?
 t('old caches are deleted on activate', () =>
   /caches\.keys\(\)/.test(sw) && /caches\.delete\(k\)/.test(sw) ? true : 'storage would grow forever');
 t('one missing file cannot abandon the whole precache', () =>
-  /c\.add\(u\)\.catch\(\(\) => \{\}\)/.test(sw)
+  /c\.add\(u\)\.catch\(/.test(sw) && !/\baddAll\(/.test(sw)
     ? true : 'addAll would fail the install and leave no offline support at all');
+t('a failed precache says which file, or a typo is invisible forever', () =>
+  /c\.add\(u\)\.catch\(\s*\w+\s*=>[^)]*console\.(warn|error)/.test(sw)
+    ? true : 'the error is discarded, so a broken path can never be diagnosed');
 t('the shell is served cache-first, so it opens offline and instantly', () =>
   /const hit = await c\.match\(req, \{ ignoreSearch: true \}\)/.test(sw) && /if \(hit\)\{ network; return hit; \}/.test(sw)
     ? true : 'not cache-first');
