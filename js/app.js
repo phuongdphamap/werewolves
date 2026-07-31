@@ -113,8 +113,24 @@ const TEAM_NAME = { village:'Village', wolf:'Werewolves', solo:'Alone' };
 // One icon per role, read straight off the role table so there is a single
 // source of truth. It follows the CARD: assign a role and the icon appears,
 // correct a role and the icon changes with it.
-/* Which physical box a card came from, in the language the table is playing in. */
-const provLabel = set => G && G.rules === 'vn'
+/* ==========================================================================
+   INTERFACE LANGUAGE.  Separate from the ruleset, which it used to ride on: G.rules
+   === 'vn' meant both "Vietnamese call order" and "Vietnamese labels", so a table that
+   wanted the Miller's Hollow rules got an English interface as a side effect of a
+   decision about the rules. They are two different questions and now have two switches.
+
+   Every label that reads "Xáo bộ mới · Shuffle" says everything twice, and a moderator
+   only ever reads one side of the middot. One language, chosen once. Both survive only
+   where the second language IS the content: the read-aloud line, and role names, which a
+   table argues about in both.
+========================================================================== */
+const vnUI = () => !G || G.lang !== 'en';
+const T = (vi, en) => vnUI() ? vi : en;
+/* A role's name in the interface language. This was an inline ruleset test in nine
+   places, which is what made choosing Miller's Hollow rename every card in the app. */
+const rName = r => T(r.vi, r.name);
+/* Which physical box a card came from, in the interface language. */
+const provLabel = set => vnUI()
   ? (set === 'Characters' ? 'Mở rộng' : 'Cơ bản')
   : (set === 'Characters' ? 'Expansion' : 'Base');
 /* One monochrome glyph per role, tinted by the team it is on. The tint is the reason
@@ -229,6 +245,10 @@ function blank(){
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
     infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
+    /* Set from the browser, then it is the moderator's choice. A table keeps its language
+       across a reload, so this lives in G rather than beside altLang. tips: null = decide
+       from how many games this device has finished, true/false = overruled. */
+    lang: (/^vi\b/i.test(navigator.language || '') ? 'vi' : 'en'), tips:null,
     selfHeal:null, hunterPoison:null, hunterElder:null, showCards:null, hunterNight:null, nightShotTaken:false, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
     dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
@@ -276,6 +296,30 @@ function loadSaved(){
   } catch (e){ return null; }
 }
 function dropSaved(){ try { localStorage.removeItem(SAVE_KEY); } catch (e){} }
+
+/* ==========================================================================
+   HOW MANY GAMES THIS DEVICE HAS FINISHED.  The teaching layer is the best writing in
+   the app and there is far too much of it in a running game: a Seer step whose card is
+   unknown carried a sub-heading, a target note, a ruleset note, an alert and a
+   four-bullet masking card. All of it earned its place the first time somebody
+   moderated. By the third game it is scenery, and the moderator scrolls past it while
+   nine people wait — but nothing was counting, so it stayed at full volume forever.
+
+   The collapsibles were the right instinct and they only solve it once: expOpen
+   remembers what you opened, and nothing remembered that you no longer need any of it.
+   Its own key, because experience outlives any single game and must survive the save
+   being cleared at the end of one.
+========================================================================== */
+const GAMES_KEY = 'mh.games';
+let gamesPlayed = 0;
+try { gamesPlayed = parseInt(localStorage.getItem(GAMES_KEY), 10) || 0; } catch (e){}
+function countGame(){
+  gamesPlayed++;
+  try { localStorage.setItem(GAMES_KEY, String(gamesPlayed)); } catch (e){}
+}
+/* Nothing is ever deleted — it stops being the default. Two games, because the first one
+   teaches the flow and the second confirms it. */
+const teaching = () => G.tips == null ? gamesPlayed < 2 : G.tips;
 function undo(){
   if (!undoStack.length) return;
   const s = undoStack.pop(); undoBytes -= s.length;
@@ -707,6 +751,7 @@ function hunterWouldFire(p, cause){
   return { fires:true };
 }
 function registerDeaths(chain){
+  if (chain.length) buzz('death');
   for (const c of chain){
     log(c.p.name + ' died \u2014 ' + (c.cause === 'grief' ? 'of grief' : causeLabel(c.cause)) + '.');
     // a shot already taken privately in the night is not owed a second time at dawn
@@ -809,7 +854,13 @@ function checkWin(){
   }
   return null;
 }
-function finish(w){ G.over = w; G.phase = 'end'; log(w.who + ' win. ' + w.why); render(); }
+function finish(w){
+  G.over = w; G.phase = 'end';
+  log(w.who + ' win. ' + w.why);
+  countGame();                 // one more game this device does not need taught through
+  buzz('death');
+  render();
+}
 
 /* ==========================================================================
    Night ambience. A moderator who must read a card at the table leaks three
@@ -853,6 +904,26 @@ function ambience(want){
   amGain.gain.linearRampToValueAtTime(want ? 0.11 : 0, AC.currentTime + (want ? 1.1 : 0.6));
 }
 
+/* ==========================================================================
+   HAPTICS.  The moderator holds one phone, one-handed, in a dark room, while watching
+   nine people. Half the design exists to avoid giving anything away by sound or
+   movement — the rain, the masking tips, the hushed call — and every confirmation was
+   delivered visually, to someone whose eyes should be on the table. This is the one
+   channel the app was missing entirely rather than misusing.
+
+   Two tiers and no more: a tick acknowledges a tap, a pattern marks a committed
+   outcome. iOS Safari does not implement the Vibration API at all, so this lands on
+   Android today; it degrades by doing nothing, and the control is hidden rather than
+   offered dead, which is the difference between silent and dishonest.
+========================================================================== */
+const canBuzz = () => typeof navigator.vibrate === 'function';
+let hapticOn = true;
+const BUZZ = { tap:10, commit:[16,44,16], death:[30,60,30,60,30] };
+function buzz(kind){
+  if (!hapticOn || !canBuzz()) return;
+  try { navigator.vibrate(BUZZ[kind] || BUZZ.tap); } catch (e){ /* not our problem */ }
+}
+
 /* ========================== render helpers ========================== */
 const $ = id => document.getElementById(id);
 const el = (t, c, h) => { const e = document.createElement(t);
@@ -871,7 +942,7 @@ function chip(p, o){
      class is only ever seen while the rebuild is in flight — which is exactly the wait it
      exists to cover. It is also the only way .chip's 150ms transition has ever run: the
      replacement node mounts already carrying .sel, so there is nothing to interpolate. */
-  if (!o.dead && o.on) c.onclick = () => { c.classList.toggle('sel'); o.on(); };
+  if (!o.dead && o.on) c.onclick = () => { c.classList.toggle('sel'); buzz('tap'); o.on(); };
   return c;
 }
 function playerRow(p, i, onTap){
@@ -879,7 +950,7 @@ function playerRow(p, i, onTap){
   d.innerHTML = (i != null ? '<span class="seat">' + (i+1) + '</span>' : '') +
     pIcon(p) +
     '<span class="nm">' + p.name + '</span>' +
-    '<span class="rl">' + (p.role ? R[p.role].name : 'unknown') + '</span>';
+    '<span class="rl">' + (p.role ? rName(R[p.role]) : T('ch\u01b0a bi\u1ebft','unknown')) + '</span>';
   const tags = [];
   if (p.sheriff) tags.push('<span class="tag s">Sheriff</span>');
   if (p.lover) tags.push('<span class="tag l">Lover</span>');
@@ -898,11 +969,15 @@ function playerRow(p, i, onTap){
    fold away by default and remember whether you opened them, so a moderator who
    already knows the routine never scrolls past an essay. */
 const logRow = e => el('div','le','<span class="w">' + e.w + '</span><span>' + e.t + '</span>');
-const expOpen = new Set();
+/* Opened by hand, and shut by hand. Two sets rather than one, because "never touched"
+   and "deliberately closed" are different states once teaching() gets a vote: while the
+   device is still learning the routine these open themselves, and only an explicit close
+   should override that. */
+const expOpen = new Set(), expShut = new Set();
 function collapsible(key, title, body){
   const d = document.createElement('details');
   d.className = 'exp';
-  d.open = expOpen.has(key);
+  d.open = expOpen.has(key) || (teaching() && !expShut.has(key));
   const s = document.createElement('summary');
   s.innerHTML = title;
   d.appendChild(s);
@@ -911,8 +986,24 @@ function collapsible(key, title, body){
   if (typeof body === 'string') b.innerHTML = body;
   else if (body) b.appendChild(body);
   d.appendChild(b);
-  d.addEventListener('toggle', () => { d.open ? expOpen.add(key) : expOpen.delete(key); });
+  d.addEventListener('toggle', () => {
+    if (d.open){ expOpen.add(key); expShut.delete(key); }
+    else { expOpen.delete(key); expShut.add(key); }
+  });
   return d;
+}
+/* Teaching prose, gathered per screen and emitted as ONE affordance. Six separate
+   collapsibles was already better than six essays, but it is still six 50px rows to
+   scroll past, and a moderator who needs none of it wants one line rather than six.
+   While teaching() holds, collapsible() opens it, so nothing is hidden from a first
+   game — it just stops being the default afterwards. */
+let tipBuf = [];
+const tip = html => { tipBuf.push(html); };
+function flushTips(target, key){
+  const items = tipBuf; tipBuf = [];
+  if (!items.length) return;
+  target.appendChild(collapsible(key, T('Luật &amp; mẹo', 'Rules &amp; tips'),
+    items.map(h => '<p>' + h + '</p>').join('')));
 }
 
 /* Buttons used to size to their text, leaving dead space at the end of the bar.
@@ -994,26 +1085,31 @@ function bar(items){
 }
 function render(){
   saveSoon();
+  tipBuf = [];                       // an unflushed tip belongs to the screen that made it
   $('bUndo').disabled = !undoStack.length;
   ambience(soundOn && G.phase === 'night');
   /* The header carries position, not a wordmark. It used to spend the most valuable
      band on the screen on a fixed title plus a caption the h2 repeated word for word
      ("SEATS" over "Who is at the table?"). It now answers "where am I in the game",
      which is the one thing nothing else on the screen says. */
-  const pos = G.over ? 'Game over' : {
-    players:'Setup', roles:'Setup', deal:'Setup', learn:'Setup',
-    night: G.night === 1 ? 'First night' : 'Night ' + G.night,
-    dawn:'Dawn ' + G.night, day:'Day ' + G.day, hunter:'Day ' + G.day,
-    sheriff:'Day ' + G.day, scapegoat:'Day ' + G.day, end:'Result' }[G.phase] || 'Setup';
+  const setup = T('Chu\u1ea9n b\u1ecb', 'Setup');
+  const pos = G.over ? T('K\u1ebft th\u00fac', 'Game over') : {
+    players:setup, roles:setup, deal:setup, learn:setup,
+    night: G.night === 1 ? T('\u0110\u00eam \u0111\u1ea7u ti\u00ean', 'First night') : T('\u0110\u00eam ', 'Night ') + G.night,
+    dawn:T('R\u1ea1ng s\u00e1ng ', 'Dawn ') + G.night, day:T('Ng\u00e0y ', 'Day ') + G.day,
+    hunter:T('Ng\u00e0y ', 'Day ') + G.day, sheriff:T('Ng\u00e0y ', 'Day ') + G.day,
+    scapegoat:T('Ng\u00e0y ', 'Day ') + G.day, end:T('K\u1ebft qu\u1ea3', 'Result') }[G.phase] || setup;
   const prog = G.over ? '' : {
-    players:'Who is playing', roles:'Building the deck', deal:'Dealing the cards',
-    learn:'Collecting the deal',
+    players:T('Ai \u0111ang ch\u01a1i', 'Who is playing'), roles:T('Ch\u1ecdn b\u1ed9 b\u00e0i', 'Building the deck'),
+    deal:T('Chia b\u00e0i', 'Dealing the cards'), learn:T('Ghi l\u1ea1i b\u1ed9 b\u00e0i', 'Collecting the deal'),
     // "Roll call" is the night-one ritual of learning who holds what; later nights are
     // just the call order, so the label must not claim otherwise.
     night: (G.steps && G.steps.length)
-      ? (G.night === 1 ? 'Roll call \u00b7 ' : 'Call \u00b7 ') + (G.si+1) + ' of ' + G.steps.length : '',
-    day:'The vote', sheriff:'Electing the badge', hunter:'The Hunter fires',
-    scapegoat:'The Scapegoat chooses' }[G.phase] || '';
+      ? (G.night === 1 ? T('\u0110i\u1ec3m danh \u00b7 ', 'Roll call \u00b7 ') : T('G\u1ecdi \u00b7 ', 'Call \u00b7 '))
+        + (G.si+1) + T(' / ', ' of ') + G.steps.length : '',
+    day:T('B\u1ecf phi\u1ebfu', 'The vote'), sheriff:T('B\u1ea7u Tr\u01b0\u1edfng L\u00e0ng', 'Electing the badge'),
+    hunter:T('Th\u1ee3 S\u0103n b\u1eafn', 'The Hunter fires'),
+    scapegoat:T('V\u1eadt T\u1ebf Th\u1ea7n ch\u1ecdn', 'The Scapegoat chooses') }[G.phase] || '';
   $('hTtl').textContent = pos;
   $('hPh').textContent = prog;
   $('hPh').hidden = !prog;
@@ -1025,19 +1121,28 @@ function render(){
 /* ---- seats ---- */
 function rPlayers(){
   show('sPlayers');
+  $('pTtl').textContent = T('Ai ng\u1ed3i b\u00e0n n\u00e0y?', 'Who is at the table?');
+  $('pSub').textContent = T(
+    'Th\u00eam t\u1eebng ng\u01b0\u1eddi theo th\u1ee9 t\u1ef1 ch\u1ed7 ng\u1ed3i, chi\u1ec1u kim \u0111\u1ed3ng h\u1ed3. Ng\u01b0\u1eddi D\u1ea1y G\u1ea5u, ' +
+    'C\u00e1o v\u00e0 Hi\u1ec7p S\u0129 \u0111\u1ec1u d\u1ef1a v\u00e0o ch\u1ed7 ng\u1ed3i, n\u00ean nh\u1eadp \u0111\u00fang th\u1ee9 t\u1ef1.',
+    'Add everyone in seating order, going clockwise. Seating is used by the Bear Tamer, ' +
+    'the Fox and the Knight, so get the order right.');
   const n = G.players.length;
   $('pCount').innerHTML = n
-    ? '<b>' + n + '</b> seated. The usual balance is <b>' + recWolves(n) + '</b> ' + (recWolves(n) > 1 ? 'werewolves' : 'werewolf') + '.'
-    : 'Nobody yet. Six is the minimum; eight or more plays best.';
+    ? T('<b>' + n + '</b> ng\u01b0\u1eddi. C\u00e2n b\u1eb1ng th\u01b0\u1eddng l\u00e0 <b>' + recWolves(n) + '</b> S\u00f3i.',
+        '<b>' + n + '</b> seated. The usual balance is <b>' + recWolves(n) + '</b> ' +
+        (recWolves(n) > 1 ? 'werewolves' : 'werewolf') + '.')
+    : T('Ch\u01b0a c\u00f3 ai. T\u1ed1i thi\u1ec3u 6 ng\u01b0\u1eddi; t\u1eeb 8 tr\u1edf l\u00ean ch\u01a1i hay nh\u1ea5t.',
+        'Nobody yet. Six is the minimum; eight or more plays best.');
   const L = $('lPlayers'); L.innerHTML = '';
   G.players.forEach((p, i) => {
     const row = el('div','p');
     row.innerHTML = '<span class="seat">' + (i+1) + '</span><span class="nm">' + p.name + '</span>';
-    const x = el('button','ico quiet','Remove');
+    const x = el('button','ico quiet', T('Xo\u00e1','Remove'));
     x.onclick = () => { snap(); G.players.splice(i,1); render(); };
     row.appendChild(x); L.appendChild(row);
   });
-  bar([{ t:'Build the deck \u2192', off:n < 4, wide:true, on:() => { snap();
+  bar([{ t: T('Ch\u1ecdn b\u1ed9 b\u00e0i \u2192','Build the deck \u2192'), off:n < 4, wide:true, on:() => { snap();
     if (!totalCards()) G.counts = recommend(n, true);
     G.phase='roles'; render(); } }]);
 }
@@ -1045,6 +1150,10 @@ function rPlayers(){
 /* ---- deck ---- */
 function rRoles(){
   show('sRoles');
+  $('rTtl').textContent = T('X\u00e2y b\u1ed9 b\u00e0i', 'Build the deck');
+  $('rSub').textContent = T(
+    'Ch\u1ecdn nh\u1eefng l\u00e1 b\u1ea1n s\u1ebd th\u1eadt s\u1ef1 cho v\u00e0o b\u1ed9 x\u00e1o. B\u1eaft \u0111\u1ea7u t\u1eeb b\u1ed9 \u0111\u1ec1 xu\u1ea5t r\u1ed3i ch\u1ec9nh l\u1ea1i.',
+    'Choose the cards you will physically put in the shuffle. Start from a recommendation, then adjust.');
   const n = G.players.length;
   $('tCards').textContent = totalCards();
   $('tSeats').textContent = n;
@@ -1052,7 +1161,17 @@ function rRoles(){
 
   const RB = $('recBox'); RB.innerHTML = '';
   const pc = el('div','card');
-  pc.appendChild(el('div','grp','Thứ tự luật \u00b7 Rules order'));
+  /* Language first, on the first screen with room for it. It decides how every label
+     below reads, and it is not a decision about the game. */
+  pc.appendChild(el('div','grp', T('Ng\u00f4n ng\u1eef', 'Language')));
+  const lc = el('div','chips');
+  for (const [k, lab] of [['vi','Ti\u1ebfng Vi\u1ec7t'], ['en','English']]){
+    const b = el('div','chip' + ((G.lang === 'en' ? 'en' : 'vi') === k ? ' sel' : ''), lab);
+    b.onclick = () => { snap(); G.lang = k; render(); };
+    lc.appendChild(b);
+  }
+  pc.appendChild(lc);
+  pc.appendChild(el('div','grp', T('Th\u1ee9 t\u1ef1 lu\u1eadt', 'Rules order')));
   const pr = el('div','chips');
   for (const k of ['vn','mh']){
     const b = el('div','chip' + (G.rules===k ? ' sel' : ''), RULESETS[k].label);
@@ -1062,13 +1181,14 @@ function rRoles(){
   pc.appendChild(pr);
   const rec2 = ord().filter(r => everyOf(r) != null && G.counts[r.id]);
   const one  = ord().filter(r => G.counts[r.id] && r.id !== 'villager');
+  const chain = list => list.length ? list.map(rName).join(' \u2192 ') : '\u2014';
   pc.appendChild(el('p','note',
-    '<b>Đêm đầu tiên:</b> ' + (one.length ? one.map(r => r.vi).join(' \u2192 ') : '\u2014') +
-    '<br><b>Các đêm sau:</b> ' + (rec2.length ? rec2.map(r => r.vi).join(' \u2192 ') : '\u2014')));
+    '<b>' + T('\u0110\u00eam \u0111\u1ea7u ti\u00ean:','First night:') + '</b> ' + chain(one) +
+    '<br><b>' + T('C\u00e1c \u0111\u00eam sau:','Every night after:') + '</b> ' + chain(rec2)));
   RB.appendChild(pc);
-  RB.appendChild(collapsible('house', 'Luật nhà \u00b7 house rules',
+  RB.appendChild(collapsible('house', T('Lu\u1eadt nh\u00e0', 'House rules'),
     houseRulesUI()));
-  RB.appendChild(collapsible('order', 'Hai bộ luật khác nhau ở đâu?',
+  RB.appendChild(collapsible('order', T('Hai bộ luật khác nhau ở đâu?', 'How do the two rulesets differ?'),
     (G.rules === 'vn'
       ? '<p>Tiên Tri và Cáo được gọi <b>sau</b> Ma Sói, nên app đã biết cả bầy Sói và trả lời được ngay trên màn hình.</p>' +
         '<p>Bảo Vệ có trong bộ cơ bản. Phù Thuỷ không được tự cứu. Thợ Săn bị thuốc độc thì không bắn được. ' +
@@ -1080,10 +1200,10 @@ function rRoles(){
   const rec = el('div','card');
   // Classic / Characters is a SCOPE, not an action. Both buttons below obey it,
   // which is why tapping the words themselves never dealt a new deck.
-  rec.appendChild(el('div','grp','Phạm vi bài \u00b7 which box'));
+  rec.appendChild(el('div','grp', T('Phạm vi bài', 'Which box')));
   const chars = G.scope !== 'base';
   const sc2 = el('div','chips');
-  for (const [k, lab] of [['base','Cơ bản \u00b7 Classic'], ['chars','Mở rộng \u00b7 Characters']]){
+  for (const [k, lab] of [['base', T('Cơ bản','Classic')], ['chars', T('Mở rộng','Characters')]]){
     const b = el('div','chip' + ((k === 'chars') === chars ? ' sel' : ''), lab);
     b.onclick = () => { snap(); G.scope = k; render(); };
     sc2.appendChild(b);
@@ -1091,21 +1211,21 @@ function rRoles(){
   rec.appendChild(sc2);
   const reach = chars ? Object.keys(SHUF).filter(id =>
     R[id].set === 'Characters' && n >= SHUF[id][1]).map(id => R[id].vi) : [];
-  rec.appendChild(el('div','grp','Bộ bài cho ' + n + ' người'));
+  rec.appendChild(el('div','grp', T('Bộ bài cho ' + n + ' người', 'A deck for ' + n)));
   const rr = el('div','row'); rr.style.flexWrap = 'wrap';
-  const bS = el('button','btn sm', icon('shuffle') + 'Xáo bộ mới \u00b7 Shuffle');
+  const bS = el('button','btn sm', icon('shuffle') + T('Xáo bộ mới','Shuffle'));
   bS.onclick = () => { snap(); G.counts = shuffleDeck(n, chars); render(); };
-  const bR = el('button','btn sm sec','Bộ đề xuất \u00b7 Suggested');
+  const bR = el('button','btn sm sec', T('Bộ đề xuất','Suggested'));
   bR.onclick = () => { snap(); G.counts = recommend(n, chars); render(); };
   rr.append(bS, bR); rec.appendChild(rr);
   const specials = Object.keys(G.counts).filter(k => k !== 'villager' && k !== 'wolf');
   rec.appendChild(el('p','note', specials.length
-    ? '<b>Bộ hiện tại:</b> ' + R.wolf.vi + ' \u00d7' + (G.counts.wolf||0) + ', ' +
-      specials.map(k => (G.rules==='vn' ? R[k].vi : R[k].name) + (G.counts[k] > 1 ? ' \u00d7' + G.counts[k] : '')).join(', ') +
-      (G.counts.villager ? ', ' + R.villager.vi + ' \u00d7' + G.counts.villager : '')
-    : 'Chưa chọn lá nào.'));
+    ? '<b>' + T('B\u1ed9 hi\u1ec7n t\u1ea1i:','This deck:') + '</b> ' + rName(R.wolf) + ' \u00d7' + (G.counts.wolf||0) + ', ' +
+      specials.map(k => rName(R[k]) + (G.counts[k] > 1 ? ' \u00d7' + G.counts[k] : '')).join(', ') +
+      (G.counts.villager ? ', ' + rName(R.villager) + ' \u00d7' + G.counts.villager : '')
+    : T('Ch\u01b0a ch\u1ecdn l\u00e1 n\u00e0o.','No cards chosen yet.')));
   RB.appendChild(rec);
-  RB.appendChild(collapsible('deckhow', 'Hai nút này khác nhau thế nào?',
+  RB.appendChild(collapsible('deckhow', T('Hai nút này khác nhau thế nào?','What is the difference between these two buttons?'),
     '<p><b>Xáo bộ mới</b> cho một bộ khác mỗi lần bấm. <b>Bộ đề xuất</b> luôn cho cùng một bộ. ' +
     'Cả hai đều lấy trong phạm vi bạn chọn ở trên.</p>' +
     (chars ? (reach.length
@@ -1115,7 +1235,11 @@ function rRoles(){
 
   const A = $('advice'); A.innerHTML = '';
   const cs = checks();
-  for (const [k, t] of cs) A.appendChild(el('div','alert' + (k==='ok'?' ok':k==='no'?' no':''), t));
+  /* Only a deck that cannot be dealt stops anyone. A warning about the usual wolf count,
+     and "deck is ready", are information — they are read once and acted on or not. */
+  for (const [k, t] of cs)
+    A.appendChild(k === 'no' ? el('div','alert no', t)
+                             : el('div','tell' + (k === 'ok' ? ' ok' : ''), t));
 
   const L = $('lRoles'); L.innerHTML = '';
   // Two sections, always. Build them by filtering the set, never by watching for
@@ -1131,20 +1255,29 @@ function rRoles(){
   const inDeck = ROLES.filter(r => G.counts[r.id]).sort(byCall);
   const spare  = ROLES.filter(r => !G.counts[r.id]);
 
-  L.appendChild(el('div','grp', 'Trong bộ \u00b7 in your deck \u00b7 ' +
-    totalCards() + ' of ' + n + ' cards \u00b7 thứ tự gọi'));
+  L.appendChild(el('div','grp', T('Trong bộ \u00b7 ' + totalCards() + '/' + n + ' l\u00e1 \u00b7 thứ tự gọi',
+    'In your deck \u00b7 ' + totalCards() + ' of ' + n + ' \u00b7 call order')));
   // No legend: the rows say "Cơ bản" / "Mở rộng" in words now, so a colour key would
   // be explaining a code that no longer exists.
-  if (inDeck.length) for (const r of inDeck) L.appendChild(roleRow(r, true));
-  else L.appendChild(el('div','card tight',
-    'Chưa chọn lá nào. Bấm <b>+</b> ở danh sách bên dưới, hoặc dùng <b>Xáo bộ mới</b>.'));
+  /* One container per section, hairlines inside it. Twenty-five rows each drawing their
+     own border and radius was twenty-five boxes of equal weight down a scrolling page. */
+  if (inDeck.length){
+    const g = el('div','group');
+    for (const r of inDeck) g.appendChild(roleRow(r, true));
+    L.appendChild(g);
+  } else L.appendChild(el('p','tell', T('Chưa chọn lá nào. Bấm <b>+</b> ở danh sách bên dưới, hoặc dùng <b>Xáo bộ mới</b>.',
+    'No cards chosen yet. Tap <b>+</b> in the list below, or use <b>Shuffle</b>.')));
 
-  const SETS = [['Base','Base game'], ['Characters','Characters expansion']];
+  const SETS = [['Base', T('H\u1ed9p c\u01a1 b\u1ea3n','Base game')],
+                ['Characters', T('B\u1ea3n m\u1edf r\u1ed9ng','Characters expansion')]];
   for (const [setKey, setLabel] of SETS){
     const list = spare.filter(r => r.set === setKey).sort(byTeam);
     if (!list.length) continue;                 // every card from this box is in the deck
-    L.appendChild(el('div','grp', setLabel + ' \u00b7 ' + list.length + ' còn lại'));
-    for (const r of list) L.appendChild(roleRow(r));
+    L.appendChild(el('div','grp', T(setLabel + ' \u00b7 ' + list.length + ' còn lại',
+      setLabel + ' \u00b7 ' + list.length + ' left')));
+    const g = el('div','group');
+    for (const r of list) g.appendChild(roleRow(r));
+    L.appendChild(g);
   }
   function roleRow(r, chosen){
     const c = G.counts[r.id] || 0;
@@ -1153,9 +1286,9 @@ function rRoles(){
       (chosen ? ' picked' : ''));
     const info = el('div','info',
       '<div class="rn">' + icOf(r.id) +
-        (G.rules==='vn' ? r.vi : r.name) +
-        '<span class="vi">' + (G.rules==='vn' ? r.name : r.vi) + '</span>' +
-        (off ? '<span class="tag">not in this box</span>' : '') +
+        rName(r) +
+        '<span class="vi">' + T(r.name, r.vi) + '</span>' +
+        (off ? '<span class="tag">' + T('kh\u00f4ng c\u00f3 trong h\u1ed9p','not in this box') + '</span>' : '') +
         '<span class="prov">' + provLabel(r.set) + '</span></div>' +
       '<div class="rd">' + r.d + '</div>');
     info.onclick = () => row.classList.toggle('open');
@@ -1169,19 +1302,25 @@ function rRoles(){
     return row;
   }
   const ready = totalCards() === n && wolfCards() > 0 && !cs.some(o => o[0]==='no');
-  bar([{ t:'Back', sec:true, on:() => { snap(); G.phase='players'; render(); } },
-       { t:'Deal the cards \u2192', off:!ready, on:() => { snap(); G.phase='deal'; render(); } }]);
+  bar([{ t: T('Quay l\u1ea1i','Back'), sec:true, on:() => { snap(); G.phase='players'; render(); } },
+       { t: T('Chia b\u00e0i \u2192','Deal the cards \u2192'), off:!ready, on:() => { snap(); G.phase='deal'; render(); } }]);
 }
 
 /* ---- physical deal ---- */
 function rDeal(){
   show('sDeal');
+  $('dTtl').textContent = T('Chia b\u00e0i th\u1eadt', 'Deal the real cards');
+  $('dSub').textContent = T(
+    'L\u1ea5y \u0111\u00fang nh\u1eefng l\u00e1 n\u00e0y ra kh\u1ecfi h\u1ed9p. X\u00e1o \u00fap v\u00e0 chia m\u1ed7i ng\u01b0\u1eddi m\u1ed9t l\u00e1. ' +
+    'B\u1ea1n kh\u00f4ng \u0111\u01b0\u1ee3c bi\u1ebft ai c\u1ea7m g\u00ec \u2014 \u0111\u00eam \u0111\u1ea7u ti\u00ean s\u1ebd r\u00f5.',
+    'Pull exactly these from the box. Shuffle them face down and give one to each player. ' +
+    'You are not meant to know who got what \u2014 you will find out during the first night.');
   const L = $('dealList'); L.innerHTML = '';
   for (const r of ROLES){
     const c = G.counts[r.id]; if (!c) continue;
     const row = el('div','dl set-' + r.set);
     row.innerHTML = '<span class="q">' + c + '</span>' + icOf(r.id) +
-      '<span class="nn">' + (G.rules==='vn' ? r.vi + ' \u00b7 ' + r.name : r.name) + '</span>';
+      '<span class="nn">' + rName(r) + '</span>';
     L.appendChild(row);
   }
   const mh = G.rules === 'mh';
@@ -1191,8 +1330,8 @@ function rDeal(){
     G.players.length + '</b> players.' +
     (G.counts.thief ? ' Keep the <b>two extra cards</b> for the Thief aside.' : '') +
     '<br><br>Then choose whether to learn the deal now, or stay blind and find out during the night.';
-  bar([{ t:'Back', sec:true, on:() => { snap(); G.phase='roles'; render(); } },
-       { t:'Collect the deal \u2192', on:() => { snap(); G.phase='learn'; render(); } }]);
+  bar([{ t: T('Quay l\u1ea1i','Back'), sec:true, on:() => { snap(); G.phase='roles'; render(); } },
+       { t: T('Ghi l\u1ea1i b\u1ed9 b\u00e0i \u2192','Collect the deal \u2192'), on:() => { snap(); G.phase='learn'; render(); } }]);
   // must live in a container that gets cleared, or every visit appends another
   const A = $('dealAlt'); A.innerHTML = '';
   A.appendChild(collapsible('deal', 'Which route should I take?',
@@ -1211,7 +1350,7 @@ function rDeal(){
     '<p><b>A tip either way:</b> once every player has looked at their own card, collect all the cards and ' +
     'keep them stacked in seat order in your lap. Nobody needs their card again, and with nothing at any ' +
     'seat there is nothing for anyone to feel being lifted.</p>'));
-  const extra = el('button','btn sec wide','Bỏ qua — tìm ra trong đêm · Skip');
+  const extra = el('button','btn sec wide', T('Bỏ qua — tìm ra trong đêm','Skip \u2014 find out during the night'));
   extra.onclick = () => { snap(); G.knewDeal = false; G.night=1; G.phase='night';
     buildNight(); log('Night falls on Miller’s Hollow.','Night 1'); render(); };
   A.appendChild(extra);
@@ -1230,44 +1369,64 @@ function houseRulesUI(){
     { key:'selfHeal', q:'Phù Thuỷ tự cứu mình?',
       en:'May the Witch use her cure on herself?',
       now:witchMaySaveSelf(), byRule:byTradition,
-      note:'Miller’s Hollow cho phép. Ma Sói Việt Nam thì không.' },
+      note:'Miller’s Hollow cho phép. Ma Sói Việt Nam thì không.',
+      noteEn:'Miller\u2019s Hollow allows it. Ma S\u00f3i Vi\u1ec7t Nam does not.' },
     { key:'hunterPoison', q:'Thợ Săn bị thuốc độc có bắn được?',
       en:'Does the Hunter still fire when the Witch poisons him?',
       now:hunterFiresPoisoned(), byRule:byTradition,
-      note:'Miller’s Hollow: bắn, vì luật nói \u201cchết vì bất cứ lý do gì\u201d. Ma Sói Việt Nam theo 狼人杀: thuốc độc thì không kịp giương súng.' },
+      note:'Miller’s Hollow: bắn, vì luật nói \u201cchết vì bất cứ lý do gì\u201d. Ma Sói Việt Nam theo 狼人杀: thuốc độc thì không kịp giương súng.',
+      noteEn:'Miller\u2019s Hollow: he fires, because the card says \u201ckilled by any cause\u201d. ' +
+             'Ma S\u00f3i Vi\u1ec7t Nam follows \u72fc\u4eba\u6740: poison leaves no time to raise the gun.' },
     { key:'hunterElder', q:'Trưởng Lão bị dân giết \u2014 Thợ Săn còn bắn được?',
       en:'Does the Hunter still fire after the village kills the Elder?',
       now:hunterFiresPowerless(), byRule:false,
       note:'Hai lá bài nói khác nhau: Trưởng Lão xoá <b>toàn bộ</b> phép của dân làng và không trừ ai, ' +
            'còn bài Thợ Săn nói bắn khi \u201cchết vì bất cứ lý do gì\u201d. Không bộ luật nào xử vụ này, ' +
            'nên mặc định là <b>không bắn</b> \u2014 phát súng là một phép, và phép đã mất. ' +
-           'Bàn nào coi súng là vật chứ không phải phép thì chọn \u201cCó\u201d.' },
+           'Bàn nào coi súng là vật chứ không phải phép thì chọn \u201cCó\u201d.',
+      noteEn:'The two cards read past each other: the Elder cancels <b>every</b> villager power ' +
+             'and names no exception, while the Hunter\u2019s card says he fires when \u201ckilled by ' +
+             'any cause\u201d. No ruleset addresses the interaction, so the default is <b>no shot</b> ' +
+             '\u2014 the shot is a power, and the power is gone. A table that treats the gun as an ' +
+             'object rather than a power should choose \u201cYes\u201d.' },
     { key:'showCards', q:'Người chết có lật bài không?',
       en:'Is a dead player\u2019s card turned face up?',
       now:cardsShownOnDeath(), byRule:byTradition,
       note:'Miller’s Hollow lật <b>mọi</b> lá \u2014 chết đêm hay bị treo, không trừ ai. ' +
            'Nhiều bàn Ma Sói Việt Nam thì <b>không lật bài</b> cho khó đoán hơn. ' +
-           'Riêng Thằng Ngốc luôn phải lật, vì đó là cách dân làng biết mà tha.' },
+           'Riêng Thằng Ngốc luôn phải lật, vì đó là cách dân làng biết mà tha.',
+      noteEn:'Miller\u2019s Hollow turns <b>every</b> card \u2014 eaten at night or hanged by day, no ' +
+             'exception. Many Ma S\u00f3i Vi\u1ec7t Nam tables <b>leave them face down</b>, which makes ' +
+             'the deduction harder. The Village Idiot is turned either way: being shown is how the ' +
+             'village learns to spare him.' },
     { key:'hunterNight', q:'Thợ Săn bị sói ăn \u2014 bắn ngay trong đêm?',
       en:'Is a night-eaten Hunter\u2019s shot taken privately, during the night?',
       now:hunterShootsInTheNight(), byRule:false,
       note:'Mặc định là <b>không</b>: công bố người chết rồi Thợ Săn chỉ trước mặt cả bàn, ' +
            'đúng như luật in. Chọn <b>Có</b> thì lấy mục tiêu lúc mọi người còn nhắm mắt, ' +
            'rồi sáng ra đọc cả hai cái chết mà không giải thích \u2014 dành cho bàn không lật bài. ' +
-           'Chỉ áp dụng khi bị ăn đêm: bị treo ban ngày thì không cách nào giấu.' },
+           'Chỉ áp dụng khi bị ăn đêm: bị treo ban ngày thì không cách nào giấu.',
+      noteEn:'The default is <b>no</b>: announce the death, then let the Hunter point in front of ' +
+             'the whole table, exactly as printed. Choose <b>Yes</b> to take the target while ' +
+             'everyone still has their eyes shut, then read both deaths at dawn and explain ' +
+             'neither \u2014 for a table that keeps cards face down. Only applies to a night kill: ' +
+             'nothing hides a hanging.' },
   ];
   for (const r of rows){
-    wrap.appendChild(el('div','grp', r.q + ' \u00b7 ' + r.en));
+    wrap.appendChild(el('div','grp', T(r.q, r.en)));
     const c = el('div','chips');
-    const opts = [[null, 'Theo luật \u00b7 ' + (r.byRule ? 'có' : 'không')],
-                  [true, 'Có \u00b7 yes'], [false, 'Không \u00b7 no']];
+    const opts = [[null, T('Theo luật \u00b7 ' + (r.byRule ? 'có' : 'không'),
+                            'Follow the rule \u00b7 ' + (r.byRule ? 'yes' : 'no'))],
+                  [true, T('Có','Yes')], [false, T('Không','No')]];
     for (const [val, lab] of opts){
       const b = el('div','chip' + (G[r.key] === val ? ' sel' : ''), lab);
       b.onclick = () => { snap(); G[r.key] = val; render(); };
       c.appendChild(b);
     }
     wrap.appendChild(c);
-    wrap.appendChild(el('p','note', r.note + ' <b>Đang dùng: ' + (r.now ? 'có' : 'không') + '.</b>'));
+    wrap.appendChild(el('p','note', T(r.note, r.noteEn) +
+      ' <b>' + T('\u0110ang d\u00f9ng: ','Now: ') +
+      (r.now ? T('c\u00f3','yes') : T('kh\u00f4ng','no')) + '.</b>'));
   }
   return wrap;
 }
@@ -1291,13 +1450,19 @@ function autoFillLastCard(){
   if (short.length !== 1) return null;          // ambiguous, so leave it alone
   left[0].role = short[0];
   log(left[0].name + ' holds the last card, the ' +
-    (G.rules === 'vn' ? R[short[0]].vi : R[short[0]].name) + '.', 'Setup');
+    rName(R[short[0]]) + '.', 'Setup');
   return R[short[0]];
 }
 
 /* ---- collect the deal ---- */
 function rLearn(){
   show('sLearn');
+  $('lTtl').textContent = T('Ghi l\u1ea1i b\u1ed9 b\u00e0i', 'Collect the deal');
+  $('lSub').textContent = T(
+    '\u0110i m\u1ed9t v\u00f2ng quanh b\u00e0n. M\u1ed7i ng\u01b0\u1eddi cho b\u1ea1n xem l\u00e1 c\u1ee7a h\u1ecd, b\u1ea1n b\u1ea5m v\u00e0o. ' +
+    'Sau \u0111\u00f3 app bi\u1ebft h\u1ebft, n\u00ean kh\u00f4ng bao gi\u1edd ph\u1ea3i l\u1eadt b\u00e0i gi\u1eefa \u0111\u00eam.',
+    'Go once round the table. Each player shows you their card in private and you tap it in. ' +
+    'After this the app knows everything, so no card is ever lifted mid-night.');
   const B = $('lrBody'); B.innerHTML = '';
   const known = G.players.filter(p => p.role).length, total = G.players.length;
   if (G.assignTo){
@@ -1308,23 +1473,25 @@ function rLearn(){
       if (!G.counts[r.id]) continue;                 // only cards in this deck
       const placed = withRole(r.id).length, full = placed >= G.counts[r.id] && p.role !== r.id;
       const b = el('div','chip' + (p.role===r.id ? ' sel' : '') + (full ? ' dead' : ''),
-        '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name) +
+        '<span class="ic">' + icOf(r.id) + '</span>' + rName(r) +
         '<span class="bd">' + placed + '/' + G.counts[r.id] + '</span>');
       if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
         autoFillLastCard(); render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
-    bar([{ t:'Cancel', sec:true, wide:true, on:() => { G.assignTo = null; render(); } }]);
+    bar([{ t: T('Hu\u1ef7','Cancel'), sec:true, wide:true, on:() => { G.assignTo = null; render(); } }]);
     return;
   }
-  B.appendChild(el('div','alert' + (known === total ? ' ok' : ''),
+  B.appendChild(el('div','tell' + (known === total ? ' ok' : ''),
     known + ' of ' + total + ' cards recorded. Tap a player to set their card.'));
-  const ros = el('div','ros');
+  const ros = el('div','ros group');
   G.players.forEach((p,i) => ros.appendChild(playerRow(p, i, () => { G.assignTo = p.id; render(); })));
   B.appendChild(ros);
-  bar([{ t:'Back', sec:true, on:() => { snap(); G.phase='deal'; render(); } },
-       { t: known === total ? 'Begin the first night \u2192' : (total-known) + ' still to record',
+  bar([{ t: T('Quay l\u1ea1i','Back'), sec:true, on:() => { snap(); G.phase='deal'; render(); } },
+       { t: known === total
+              ? T('B\u1eaft \u0111\u1ea7u \u0111\u00eam \u0111\u1ea7u ti\u00ean \u2192','Begin the first night \u2192')
+              : T('C\u00f2n ' + (total-known) + ' ng\u01b0\u1eddi ch\u01b0a ghi', (total-known) + ' still to record'),
          off: known !== total,
          on:() => { snap(); G.knewDeal = true; G.night=1; G.phase='night'; buildNight();
            log('The deal was collected before play, so the table is fully known.','Setup');
@@ -1355,14 +1522,22 @@ function rNight(){
   const have = s.role === '__lovers' ? 0 : withRole(s.role).length;
   const identified = s.role === '__lovers' || have === need;
 
-  $('nStep').textContent = (G.night === 1 ? 'Roll call' : 'Night ' + G.night) +
-    ' \u00b7 step ' + (G.si+1) + ' of ' + G.steps.length;
-  const vn = G.rules === 'vn';
+  /* Ambient, not captioned. The header already carries "Roll call \u00b7 4 of 9" in words;
+     this is the same fact as a filled rule, which reads at a glance and costs no
+     vertical space. Both said it in 10px tracked micro-type before, and neither was
+     legible without stopping to read it. */
+  const st = $('nStep'), fill = st.firstElementChild;
+  const done = G.steps.length ? (G.si + 1) / G.steps.length : 0;
+  fill.style.width = Math.round(done * 100) + '%';
+  st.setAttribute('aria-valuenow', String(G.si + 1));
+  st.setAttribute('aria-valuemin', '1');
+  st.setAttribute('aria-valuemax', String(G.steps.length));
+  const vn = vnUI();
   const tIc = info.id === '__lovers' ? icOf('__lovers') : icOf(s.role);
   $('nTitle').innerHTML = (tIc ? '<span class="hIc">' + tIc + '</span>' : '') +
     ((vn && info.vi)
-    ? info.vi + ' <span style="font-size:14px;color:var(--txt2);font-family:var(--ui);font-weight:500">' + info.name + '</span>'
-    : info.name + (info.vi ? ' <span style="font-size:14px;color:var(--txt2);font-family:var(--ui);font-weight:500">' + info.vi + '</span>' : ''));
+    ? info.vi + ' <span class="vi">' + info.name + '</span>'
+    : info.name + (info.vi ? ' <span class="vi">' + info.vi + '</span>' : ''));
   const holders = s.role === '__lovers' ? G.players.filter(p => p.lover) : liveWith(s.role);
   $('nSub').textContent = (identified && holders.length ? holders.map(p=>p.name).join(', ') + ' \u2014 ' : '') + (info.d || '');
   const primary = (vn && info.sayVi) ? info.sayVi : info.say;
@@ -1391,7 +1566,8 @@ function rNight(){
       spent:     'This card has nothing left to spend.',
       powerless: 'The village killed the Elder, so every villager power is gone.',
     }[s.hush] || 'Nothing will happen on this call.';
-    $('nTitle').innerHTML += '<span class="hushTag">không ai thức · nobody wakes</span>';
+    $('nTitle').innerHTML += '<span class="hushTag">' +
+      T('kh\u00f4ng ai th\u1ee9c', 'nobody wakes') + '</span>';
     $('nSub').textContent = why + ' Say the line anyway, leave the same pause, then carry on.';
     H.appendChild(el('div','alert no','<b>Nobody will open their eyes.</b> ' + why +
       ' Nothing you read next is acted on — say it for the table, not for a player.' +
@@ -1399,7 +1575,7 @@ function rNight(){
         ? 'The lost powers are public, but how many calls vanish with them is not — that would tell the table how many powered village cards the deck held.'
         : 'Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.') +
       '</p>'));
-    bar([{ t:'Next →', wide:true, on:() => { G.si++; render(); } }]);
+    bar([{ t: T('Ti\u1ebfp \u2192','Next \u2192'), wide:true, on:() => { G.si++; render(); } }]);
     return;
   }
 
@@ -1421,21 +1597,23 @@ function rNight(){
        card and no later screen rebuilt it. It rebuilds from the deck now, so the sentence
        is true \u2014 and the button says which kind of skip this is, because a card nobody
        admits to holding is a gap in what the app knows, not a card that did nothing. */
-    B.appendChild(el('p','note', have + ' of ' + need + ' identified. ' +
-      'If nobody answers, skip: I will say at dawn that I could not be sure, call this ' +
-      'card again tomorrow night, and take it from the Roster if you learn it before then.'));
-    bar([{ t:'Nobody answered \u00b7 skip', sec:true, on:() => skipStep('card') }]);
+    B.appendChild(el('p','note', have + ' of ' + need + ' identified.'));
+    tip('If nobody answers, skip: I will say at dawn that I could not be sure, call this ' +
+      'card again tomorrow night, and take it from the Roster if you learn it before then.');
+    flushTips(B, 'night');
+    bar([{ t: T('Kh\u00f4ng ai tr\u1ea3 l\u1eddi \u00b7 b\u1ecf qua','Nobody answered \u00b7 skip'),
+           sec:true, on:() => skipStep('card') }]);
     return;
   }
 
   const lg = liveWith('littlegirl').filter(p => !powerGone(p));
   if (s.role === 'wolf' && lg.length)
-    B.appendChild(el('div','alert','The Little Girl (' + lg.map(p=>p.name).join(', ') + ') may be peeking. Watch her.'));
+    B.appendChild(el('div','tell','The Little Girl (' + lg.map(p=>p.name).join(', ') + ') may be peeking. Watch her.'));
 
   /* --- specials --- */
   if (info.special === 'witch'){
     const v = G.n.wolf ? byId(G.n.wolf) : null;
-    B.appendChild(el('div','card','<b>Tonight\u2019s victim:</b> ' + (v ? v.name : 'nobody chosen yet') +
+    B.appendChild(el('div','tell','<b>Tonight\u2019s victim:</b> ' + (v ? v.name : 'nobody chosen yet') +
       '<p class="note">Healing potion ' + (G.witchHeal ? 'available' : 'spent') +
       ' \u00b7 Poison ' + (G.witchPoison ? 'available' : 'spent') + '</p>'));
     const she = holders[0] || null;                    // the Witch herself
@@ -1444,7 +1622,7 @@ function rNight(){
       // Self-rescue is the one place the two traditions disagree. Miller’s Hollow
       // lets her drink her own cure; Vietnamese play does not.
       const blockSelf = selfVictim && !witchMaySaveSelf();
-      if (selfVictim) B.appendChild(el('div','alert' + (blockSelf ? ' no' : ''), blockSelf
+      if (selfVictim) B.appendChild(el('div', blockSelf ? 'alert no' : 'tell', blockSelf
         ? 'The victim is the Witch herself. Vietnamese rules do not let her drink her own cure \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.'
         : 'The victim is the Witch herself. Miller’s Hollow allows her to save herself.'));
       const b = el('button','btn sm sec', (G.n.witchSave ? '\u2713 Saving ' : 'Save ') + v.name);
@@ -1468,12 +1646,13 @@ function rNight(){
           on:() => { G.n.witchKill = G.n.witchKill===p.id ? null : p.id; render(); } }));
       }
       B.appendChild(c);
-      if (she) B.appendChild(el('p','note', she.name + ' is not listed \u2014 the Witch cannot poison herself.'));
+      if (she) tip(she.name + ' is not listed \u2014 the Witch cannot poison herself.');
       if (G.n.witchKill && G.n.witchKill === G.n.wolf && !G.n.witchSave)
-        B.appendChild(el('div','alert','That is already the wolves\u2019 victim tonight. The poison would be spent for nothing.'));
+        B.appendChild(el('div','tell','That is already the wolves\u2019 victim tonight. The poison would be spent for nothing.'));
     }
-    bar([{ t:'Skip', sec:true, on:() => skipStep() },
-         { t:'Done \u2192', on:() => { snap();
+    flushTips(B, 'night');
+    bar([{ t: T('B\u1ecf qua','Skip'), sec:true, on:() => skipStep() },
+         { t: T('Xong \u2192','Done \u2192'), on:() => { snap();
            if (G.n.witchSave) G.witchHeal = false;
            if (G.n.witchKill) G.witchPoison = false;
            G.si++; render(); } }]);
@@ -1489,18 +1668,18 @@ function rNight(){
       c.appendChild(b);
     }
     B.appendChild(c);
-    bar([{ t:'Skip', sec:true, on:() => skipStep() }]);
+    bar([{ t: T('B\u1ecf qua','Skip'), sec:true, on:() => skipStep() }]);
     return;
   }
   if (info.special === 'thief'){
-    B.appendChild(el('div','card','Show him the two spare cards. If he swaps, set his new card below.' +
+    B.appendChild(el('div','tell','Show him the two spare cards. If he swaps, set his new card below.' +
       '<p class="note">If both spares are Werewolves he <b>must</b> take one.</p>'));
     B.appendChild(el('div','grp','He swapped for'));
     const th = withRole('thief')[0];
     const c = el('div','chips');
     for (const r of ROLES){
       if (r.id === 'thief') continue;
-      const b = el('div','chip', '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name));
+      const b = el('div','chip', '<span class="ic">' + icOf(r.id) + '</span>' + rName(r));
       b.onclick = () => { snap(); if (th) thiefTakes(th, r); G.si++; render(); };
       c.appendChild(b);
     }
@@ -1508,17 +1687,17 @@ function rNight(){
     /* "He kept his card" is an ANSWER, so it is not routed through skipStep: recording
        it as a gap would make the app unsure about a night in which nothing is unknown.
        The moderator who never got round to asking him needs the other button. */
-    bar([{ t:'Not asked \u00b7 skip', sec:true, on:() => skipStep('card') },
-         { t:'He kept his card \u2192', on:() => { snap(); G.si++; render(); } }]);
+    bar([{ t: T('Ch\u01b0a h\u1ecfi \u00b7 b\u1ecf qua','Not asked \u00b7 skip'), sec:true, on:() => skipStep('card') },
+         { t: T('Gi\u1eef nguy\u00ean l\u00e1 c\u1ee7a m\u00ecnh \u2192','He kept his card \u2192'), on:() => { snap(); G.si++; render(); } }]);
     return;
   }
 
   const pickN = info.pick || 0;
   if (!pickN){
-    B.appendChild(el('div','card tight', roll
+    B.appendChild(el('div','tell', roll
       ? 'Noted. Nothing more to do tonight \u2014 this card acts when the moment comes.'
       : 'Nothing to record for this step.'));
-    bar([{ t:'Next \u2192', wide:true, on:() => { snap(); if (info.say) log(info.name + ' was called.'); G.si++; render(); } }]);
+    bar([{ t: T('Ti\u1ebfp \u2192','Next \u2192'), wide:true, on:() => { snap(); if (info.say) log(info.name + ' was called.'); G.si++; render(); } }]);
     return;
   }
 
@@ -1541,20 +1720,16 @@ function rNight(){
   const tn = targetNote(s.role);
   if (tn) B.appendChild(el('p','note', tn));
   if ((s.role === 'wolf' || s.role === 'whitewolf') && !wolfSideKnown())
-    B.appendChild(el('div','alert', unplacedWolfCards() +
+    B.appendChild(el('div','tell', unplacedWolfCards() +
       ' still unaccounted for, so I cannot promise this list excludes every wolf \u2014 check it against the real deal.'));
   if (info.after) B.appendChild(el('p','note', info.after));
   if (blocked) B.appendChild(el('p','note','Cannot shield ' + byId(blocked).name + ' again \u2014 they were protected last night.'));
 
   if (s.role === 'seer'){
-    B.appendChild(el('p','note', G.rules === 'vn'
-      ? 'She is called after the pack here, so I already know every wolf and can answer on screen.'
-      : 'She is called before the pack on purpose \u2014 she must commit without knowing tonight\u2019s victim. The Witch is called last for the opposite reason.'));
+    tip(G.rules === 'vn' ? 'She is called after the pack here, so I already know every wolf and can answer on screen.' : 'She is called before the pack on purpose \u2014 she must commit without knowing tonight\u2019s victim. The Witch is called last for the opposite reason.');
   }
   if (s.role === 'fox'){
-    B.appendChild(el('p','note', G.rules === 'vn'
-      ? 'He is called after the pack here, so I already know every wolf and can answer without you touching a card.'
-      : 'Miller’s Hollow calls him before the pack. He is asleep while the wolves choose, so it costs him nothing \u2014 but on the first night I may not know the pack yet, and I will ask rather than guess.'));
+    tip(G.rules === 'vn' ? 'He is called after the pack here, so I already know every wolf and can answer without you touching a card.' : 'Miller’s Hollow calls him before the pack. He is asleep while the wolves choose, so it costs him nothing \u2014 but on the first night I may not know the pack yet, and I will ask rather than guess.');
   }
   // The Seer's look is how a moderator reads a card mid-night. If the app has
   // never seen that card, it asks, and remembers it from then on.
@@ -1562,22 +1737,20 @@ function rNight(){
     const t = byId(chosen[0]);
     const vnAnswerable = G.rules === 'vn' && wolfSideKnown();
     if (t.role || vnAnswerable){
-      B.appendChild(el('div','alert ok', G.rules === 'vn'
+      B.appendChild(el('div','tell ok', G.rules === 'vn'
         ? 'She only needs to know whether they are on the werewolf side, and I know every wolf. Answer on the screen \u2014 touch nothing on the table.'
         : 'I know this card. Answer her on the screen \u2014 touch nothing on the table, so nobody can feel their card being lifted.'));
       const sb = el('button','btn wide','Show her the answer');
       sb.onclick = () => showSeer(t);
       B.appendChild(sb);
     } else {
-      B.appendChild(el('div','alert','I have never seen ' + t.name + '\u2019s card, so you must read it at the table.'));
-      B.appendChild(el('div','card tight','<b>Read it without giving it away</b>' +
-        '<p class="note">' +
-        '\u00b7 Turn on <b>\u266b night sounds</b> in the header. Rain covers the card and your footsteps.<br>' +
+      B.appendChild(el('div','tell','I have never seen ' + t.name + '\u2019s card, so you must read it at the table.'));
+      tip('<b>Read it without giving it away.</b><br>' +
+        '\u00b7 Turn on <b>\u266b night sounds</b> in the Roster. Rain covers the card and your footsteps.<br>' +
         '\u00b7 Walk the <b>whole circle</b>, every night, whether or not you need to read anything.<br>' +
         '\u00b7 Touch <b>three or four cards</b>, not just theirs. Only you know which one mattered.<br>' +
         '\u00b7 Better still: <b>collect all the cards</b> after the first reveal and keep them stacked in ' +
-        'seat order in your lap. Then there is nothing at any seat to lift, and you can read any card in silence.' +
-        '</p>'));
+        'seat order in your lap. Then there is nothing at any seat to lift, and you can read any card in silence.');
       B.appendChild(el('p','note','Tap what you saw and I will answer on screen from now on \u2014 you will never need to read that card again.'));
       const rc = el('div','chips');
       for (const r of ROLES){
@@ -1594,15 +1767,15 @@ function rNight(){
   if (info.special === 'fox' && chosen.length === 1){
     const t = byId(chosen[0]), grp = [t, ...neighbours(t)];
     // always name the trio, so the moderator knows who is being checked
-    B.appendChild(el('div','card tight','<b>Sniffing:</b> ' + grp.map(p=>p.name).join(' \u00b7 ') +
+    B.appendChild(el('div','tell','<b>Sniffing:</b> ' + grp.map(p=>p.name).join(' \u00b7 ') +
       '<p class="note">The card he points at, plus their two living neighbours.</p>'));
     // I do not need to know what these three hold — only whether any is a wolf.
     if (wolfSideKnown()){
       G.n.foxAns = grp.some(isWolf);
-      B.appendChild(el('div','alert ok','Every wolf card is placed, so I can answer this with certainty. Show him on the screen \u2014 touch nothing on the table.'));
+      B.appendChild(el('div','tell ok','Every wolf card is placed, so I can answer this with certainty. Show him on the screen \u2014 touch nothing on the table.'));
     } else {
       needAnswer = G.n.foxAns == null;
-      B.appendChild(el('div','alert','I cannot be certain yet: <b>' + unplacedWolfCards() +
+      B.appendChild(el('div','tell','I cannot be certain yet: <b>' + unplacedWolfCards() +
         '</b> still unaccounted for. Look at those three cards yourself, then tell me what you found \u2014 I will not guess.'));
       const yn = el('div','chips');
       const y = el('div','chip' + (G.n.foxAns === true ? ' sel' : ''), 'A werewolf is among them');
@@ -1618,8 +1791,9 @@ function rNight(){
       B.appendChild(fb);
     }
   }
-  bar([{ t:'Skip', sec:true, on:() => skipStep() },
-       { t:'Confirm \u2192', off:chosen.length !== pickNeed || pickNeed === 0 || needAnswer,
+  flushTips(B, 'night');
+  bar([{ t: T('B\u1ecf qua','Skip'), sec:true, on:() => skipStep() },
+       { t: T('X\u00e1c nh\u1eadn \u2192','Confirm \u2192'), off:chosen.length !== pickNeed || pickNeed === 0 || needAnswer,
          on:() => { snap(); applyStep(s, chosen); G.si++; render(); } }]);
 }
 function applyStep(s, chosen){
@@ -1665,19 +1839,23 @@ function finishRollCall(){
 /* ---- dawn ---- */
 function rDawn(){
   show('sDawn');
-  $('dwTitle').textContent = 'Dawn of day ' + G.night;
+  $('dwTitle').textContent = T('R\u1ea1ng s\u00e1ng ng\u00e0y ', 'Dawn of day ') + G.night;
+  $('dwSub').textContent = T(
+    'Lu\u1eadt \u0111\u00e3 quy\u1ebft xong \u0111\u00eam nay. \u0110\u1ecdc to l\u00ean, r\u1ed3i sang ban ng\u00e0y.',
+    'The rules have already settled the night. Read it out, then move to the day.');
   const B = $('dwBody'); B.innerHTML = '';
   const un = unassigned();
-  if (un.length) B.appendChild(el('div','alert','Still unknown: ' + un.map(p=>p.name).join(', ') +
+  if (un.length) B.appendChild(el('div','tell','Still unknown: ' + un.map(p=>p.name).join(', ') +
     '. Set their cards from the Roster when you learn them.'));
   for (const b of liveWith('beartamer').filter(p => !powerGone(p))){
     const nb = neighbours(b);
     if (!wolfSideKnown()){
-      B.appendChild(el('div','alert','Bear Tamer <b>' + b.name + '</b> \u2014 ' + unplacedWolfCards() +
+      B.appendChild(el('div','tell','Bear Tamer <b>' + b.name + '</b> \u2014 ' + unplacedWolfCards() +
         ' still unaccounted for, so I cannot tell you whether to growl. Check yourself.'));
     } else {
       const growl = nb.some(isWolf);
-      B.appendChild(el('div','alert' + (growl ? '' : ' ok'),
+      // the growl is one of the two or three things that genuinely stop the moderator
+      B.appendChild(el('div', growl ? 'alert' : 'tell ok',
         'Bear Tamer <b>' + b.name + '</b> \u2014 neighbours ' + nb.map(p=>p.name).join(' & ') + '. ' +
         (growl ? '<b>GROWL.</b>' : 'Stay silent.')));
     }
@@ -1696,25 +1874,28 @@ function rDawn(){
   if (on.length) B.appendChild(el('p','note', revealNote(on.map(d => byId(d.id)))));
 
   if (G.dawnWhy && G.dawnWhy.length){
-    const w = el('div','card tight');
-    w.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:.16em;' +
-      'text-transform:uppercase;color:var(--txt2);margin-bottom:8px">How that follows</div>' +
-      G.dawnWhy.map(t => '<div style="font-size:13px;line-height:1.6;color:var(--txt70)">\u00b7 ' + t + '</div>').join('');
+    const w = el('div','why');
+    w.innerHTML = '<div class="k">' + T('V\u00ec sao nh\u01b0 v\u1eady','How that follows') + '</div>' +
+      G.dawnWhy.map(t => '<p>\u00b7 ' + t + '</p>').join('');
     B.appendChild(w);
   }
-  for (const d of on){
-    const p = byId(d.id);
-    const row = el('div','p');
-    row.innerHTML = icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
-      '<span class="rl">' + causeLabel(d.cause) + '</span>';
-    B.appendChild(row);
+  if (on.length){
+    const g = el('div','group');
+    for (const d of on){
+      const p = byId(d.id);
+      const row = el('div','p');
+      row.innerHTML = icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
+        '<span class="rl">' + causeLabel(d.cause) + '</span>';
+      g.appendChild(row);
+    }
+    B.appendChild(g);
   }
 
   // computeDawn opens the editor once, on entering dawn. Setting it here fired on every
   // render, so the collapse was unreachable and the announcement was read with the whole
   // adjust list and the add-someone chip set underneath it.
   if (!G.dawnSure)
-    B.appendChild(el('div','alert','I cannot be certain tonight \u2014 ' + G.dawnGaps.join('; ') +
+    B.appendChild(el('div','tell','I cannot be certain tonight \u2014 ' + G.dawnGaps.join('; ') +
       '. Check the outcome below before you announce it.'));
 
   if (!G.dawnEdit){
@@ -1728,15 +1909,17 @@ function rDawn(){
     hide.onclick = () => { G.dawnEdit = false; render(); };
     B.appendChild(hide);
     B.appendChild(el('div','grp','Adjust \u2014 tap to include or exclude'));
+    const ag = el('div','group');
     for (const d of G.dawn){
       const p = byId(d.id);
       const row = el('div','p' + (d.on ? '' : ' dead'));
       row.innerHTML = icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
         '<span class="rl">' + (d.on ? causeLabel(d.cause) : 'spared') + '</span>';
       row.style.cursor = 'pointer';
-      row.onclick = () => { d.on = !d.on; render(); };
-      B.appendChild(row);
+      row.onclick = () => { buzz('tap'); d.on = !d.on; render(); };
+      ag.appendChild(row);
     }
+    B.appendChild(ag);
     B.appendChild(el('div','grp','Add someone the rules did not cover'));
     const c = el('div','chips');
     for (const p of alive()){
@@ -1746,8 +1929,8 @@ function rDawn(){
     B.appendChild(c);
   }
   if (on.some(d => byId(d.id).role === 'hunter'))
-    B.appendChild(el('div','alert','The Hunter is among the dead \u2014 he fires before the day begins.'));
-  bar([{ t:'Announce the dawn \u2192', wide:true, on:applyDawn }]);
+    B.appendChild(el('div','tell','The Hunter is among the dead \u2014 he fires before the day begins.'));
+  bar([{ t: T('C\u00f4ng b\u1ed1 r\u1ea1ng s\u00e1ng \u2192','Announce the dawn \u2192'), wide:true, on:applyDawn }]);
 }
 function icSpanD(p){ return pIcon(p); }
 
@@ -1758,14 +1941,14 @@ function rDay(){
   const settled = checkWin();
   if (settled) return finish(settled);
   show('sDay');
-  $('dyTitle').textContent = 'Day ' + G.day;
+  $('dyTitle').textContent = T('Ng\u00e0y ','Day ') + G.day;
   const A = alive();
   $('dySub').textContent = A.length + ' still alive, ' + A.filter(isWolf).length + ' of them not what they seem.';
   const B = $('dyBody'); B.innerHTML = '';
 
   if (G.day === 1 && !G.sheriffDone){
     const vn = G.rules === 'vn';
-    B.appendChild(el('div','card','<b>Elect the ' + (vn ? 'Trưởng Làng \u00b7 Sheriff' : 'Sheriff') +
+    B.appendChild(el('div','tell','<b>' + T('B\u1ea7u Trưởng Làng','Elect the Sheriff') +
       '</b><p class="note">Their vote is worth <b>' + SHERIFF_WEIGHT() +
       '</b>, and on dying they name their successor.</p>'));
     B.appendChild(collapsible('sheriff', 'What the badge actually does',
@@ -1783,13 +1966,13 @@ function rDay(){
     for (const p of A) c.appendChild(chip(p, { on:() => { snap(); p.sheriff = true; G.sheriffDone = true;
       log(p.name + ' was elected Sheriff.'); render(); } }));
     B.appendChild(c);
-    bar([{ t:'Play without a Sheriff', sec:true, wide:true, on:() => { snap(); G.sheriffDone = true;
+    bar([{ t: T('Ch\u01a1i kh\u00f4ng c\u1ea7n Tr\u01b0\u1edfng L\u00e0ng','Play without a Sheriff'), sec:true, wide:true, on:() => { snap(); G.sheriffDone = true;
       log('The village declined to elect a Sheriff.'); render(); } }]);
     return;
   }
   const jd = liveWith('judge').filter(p => !powerGone(p));
   if (jd.length && !G.judgeUsed){
-    B.appendChild(el('div','alert','Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.'));
+    B.appendChild(el('div','tell','Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.'));
     /* G.judgeUsed was written nowhere: initialised, read here, never set. So the alert
        stood for the whole game and the flag was decoration. His power is once per game,
        and the moderator is the only person who sees the sign, so they record it. */
@@ -1801,8 +1984,8 @@ function rDay(){
     B.appendChild(el('p','note','The Stuttering Judge has spent his second vote \u2014 once per game, and it is gone.'));
   }
   const sc = liveWith('scapegoat').filter(p => !powerGone(p));
-  if (sc.length) B.appendChild(el('div','alert','If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.'));
-  if (scapegoatBinds()) B.appendChild(el('div','alert','Only these may vote today: <b>' +
+  if (sc.length) B.appendChild(el('div','tell','If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.'));
+  if (scapegoatBinds()) B.appendChild(el('div','tell','Only these may vote today: <b>' +
     G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b><p class="note">The Scapegoat named them as he died yesterday. Tomorrow the whole village speaks again.</p>'));
   if (G.powersLost){
     // name the route, because "by the village" covers the vote, the poison and the shot
@@ -1827,7 +2010,7 @@ function rDay(){
   }
 
   const sh = A.find(p => p.sheriff);
-  if (sh) B.appendChild(el('div','alert ok','<b>' + sh.name + '</b> holds the badge — count their hand as <b>' +
+  if (sh) B.appendChild(el('div','tell ok','<b>' + sh.name + '</b> holds the badge — count their hand as <b>' +
     SHERIFF_WEIGHT() + '</b>. If they die today they name the next holder.'));
   /* A vote only bites if it clears half the voting weight. Counting that by hand
      is exactly what a moderator gets wrong, especially with a weighted badge and
@@ -1839,7 +2022,7 @@ function rDay(){
   // The threshold itself is pinned into the action bar by refresh(); this card keeps
   // only the things you read once, at the start.
   if (sh || scapegoatBinds())
-    B.appendChild(el('div','card tight',
+    B.appendChild(el('div','tell',
       (sh ? '<b>' + sh.name + '</b> holds the badge, so their hand counts ' + wt + '. ' +
             'Tap the badge beside whoever they voted for.' : '') +
       (scapegoatBinds() ? (sh ? '<p class="note">' : '') +
@@ -1889,7 +2072,7 @@ function rDay(){
     list.appendChild(row);
     cells.push({ p, power, minus, plus, box, row, fill });
   }
-  const verdict = el('div','alert'); B.appendChild(verdict);
+  const verdict = el('div','tell'); B.appendChild(verdict);
   const twice  = el('div','alert no'); B.appendChild(twice);
 
   function tallyOf(p){ return G.votes[p.id] || 0; }
@@ -1905,8 +2088,9 @@ function rDay(){
      else's +. The order is frozen for the whole run of taps and settles once, shortly
      after the last one. The bar, the highlight and the verdict all update immediately;
      only the row positions wait. */
-  let settle = null;
+  let settle = null, wasPassing = false;
   function holdOrder(){
+    buzz('tap');
     clearTimeout(settle);
     settle = setTimeout(() => { settle = null; if (list.isConnected) refresh(); }, 1200);
   }
@@ -1935,7 +2119,9 @@ function rDay(){
     }
     const cast = A.reduce((a,p) => a + tallyOf(p), 0) + (G.sheriffVote && sh ? wt - 1 : 0);
     const passing = lead.length === 1 && best > thr;
-    verdict.className = 'alert' + (passing ? ' ok' : '');
+    if (passing && !wasPassing) buzz('commit');
+    wasPassing = passing;
+    verdict.className = 'tell' + (passing ? ' ok' : '');
     verdict.innerHTML = passing
       ? '<b>' + lead[0].name + '</b> has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.' +
         // said before the button, not after: once it is tapped the screen has moved on
@@ -1950,8 +2136,8 @@ function rDay(){
       '. Somebody has voted twice.';
 
     const opts = [];
-    if (passing) opts.push({ t:'Hang ' + lead[0].name + ' \u2192', on:() => resolveVote(lead[0]) });
-    if (sc.length && lead.length > 1) opts.push({ t:'Tied \u2014 Scapegoat dies', sec:true, on:() => resolveVote(sc[0], true) });
+    if (passing) opts.push({ t: T('Treo c\u1ed5 ','Hang ') + lead[0].name + ' \u2192', on:() => resolveVote(lead[0]) });
+    if (sc.length && lead.length > 1) opts.push({ t: T('Ho\u00e0 \u2014 V\u1eadt T\u1ebf Th\u1ea7n ch\u1ebft thay','Tied \u2014 Scapegoat dies'), sec:true, on:() => resolveVote(sc[0], true) });
     opts.push({ t: best > 0 ? 'Clear the tally' : 'Nobody was voted out', sec:true, on:() => {
       if (best > 0){ G.votes = {}; G.sheriffVote = null; refresh(); return; }
       snap(); log('The vote did not clear half. Nobody was hanged.');
@@ -2014,7 +2200,7 @@ function renderHunter(){
   /* How the shot physically happens \u2014 the thing the screen never said. "Tap whoever he
      points at" assumed the moderator already knew they were meant to ask a dead player to
      point, out loud, in front of everybody. */
-  if (hp) B.appendChild(el('div','card tight', priv
+  if (hp) B.appendChild(el('div','tell', priv
     ? '<b>Wake him and nobody else.</b> Touch his shoulder, let him point at one living ' +
       'player, then have him close his eyes again. Say nothing aloud.' +
       '<p class="note">He is dead either way \u2014 this only decides whether the table learns ' +
@@ -2032,15 +2218,15 @@ function renderHunter(){
   const targets = alive().filter(p => !hp || p.id !== hp.id);
 
   if (!targets.length){
-    B.appendChild(el('div','card tight','There is nobody left for him to hit.'));
-    bar([{ t:'Continue \u2192', wide:true, on:() => { snap();
+    B.appendChild(el('div','tell','There is nobody left for him to hit.'));
+    bar([{ t: T('Ti\u1ebfp t\u1ee5c \u2192','Continue \u2192'), wide:true, on:() => { snap();
       G.pending.hunterId = null; G.pending.nightShot = null;
       // marked taken here too, or dawn would queue the same empty shot a second time
       if (priv){ G.nightShotTaken = true; G.phase = 'dawn'; render(); } else proceed(); } }]);
     return;
   }
 
-  B.appendChild(el('div','alert','He <b>must</b> choose somebody. The rules give him no option to spare the village \u2014 tap whoever he points at.'));
+  B.appendChild(el('div','tell','He <b>must</b> choose somebody. The rules give him no option to spare the village \u2014 tap whoever he points at.'));
   const c = el('div','chips');
   for (const p of targets) c.appendChild(chip(p, { on:() => {
     snap();
@@ -2081,7 +2267,7 @@ function renderSheriff(){
     snap(); G.pending.badge = false; p.sheriff = true;
     log(p.name + ' takes the badge.'); proceed(); } }));
   B.appendChild(c);
-  bar([{ t:'They destroyed the badge', sec:true, wide:true,
+  bar([{ t: T('H\u1ecd hu\u1ef7 ph\u00f9 hi\u1ec7u','They destroyed the badge'), sec:true, wide:true,
          on:() => { snap(); G.pending.badge = false;
            log('The badge was destroyed — nobody carries it now.'); proceed(); } }]);
 }
@@ -2096,9 +2282,9 @@ function renderScapegoat(){
     const i = pick.indexOf(p.id); if (i>=0) pick.splice(i,1); else pick.push(p.id);
     G.pending.sg = pick; render(); } }));
   B.appendChild(c);
-  bar([{ t:'Everyone may vote', sec:true, on:() => { snap();
+  bar([{ t: T('C\u1ea3 l\u00e0ng \u0111\u01b0\u1ee3c b\u1ecf phi\u1ebfu','Everyone may vote'), sec:true, on:() => { snap();
          G.scapegoatVoters=null; G.scapegoatDay=null; G.pending.sg=null; proceed(); } },
-       { t:'Confirm \u2192', off:!pick.length, on:() => { snap();
+       { t: T('X\u00e1c nh\u1eadn \u2192','Confirm \u2192'), off:!pick.length, on:() => { snap();
          G.scapegoatVoters=pick.slice(); G.scapegoatDay=G.day + 1; G.pending.sg=null;
          log('The Scapegoat allows only ' + pick.map(i=>byId(i).name).join(', ') +
              ' to vote on day ' + (G.day + 1) + '. The day after, everyone speaks again.');
@@ -2117,13 +2303,14 @@ function rEnd(){
   $('enTitle').textContent = G.over.who + ' win';
   $('enSub').textContent = G.over.why;
   const C = $('enCard'); C.innerHTML = '';
-  C.appendChild(el('div','grp','Every card, revealed'));
-  const ros = el('div','ros');
+  $('enChronicle').textContent = T('To\u00e0n b\u1ed9 nh\u1eadt k\u00fd', 'Full chronicle');
+  C.appendChild(el('div','grp', T('L\u1eadt h\u1ebft m\u1ecdi l\u00e1','Every card, revealed')));
+  const ros = el('div','ros group');
   G.players.forEach((p,i) => ros.appendChild(playerRow(p, i)));
   C.appendChild(ros);
   const L = $('enLog'); L.innerHTML = '';
   for (const e of G.log) L.appendChild(logRow(e));
-  bar([{ t:'Same table, new game', wide:true, on:() => {
+  bar([{ t: T('C\u00f9ng b\u00e0n, v\u00e1n m\u1edbi','Same table, new game'), wide:true, on:() => {
     const names = G.players.map(p => p.name), counts = G.counts;
     clearUndo(); G = blank();
     names.forEach((nm,i) => G.players.push({ id:'p'+i+Math.random().toString(36).slice(2,5),
@@ -2133,8 +2320,38 @@ function rEnd(){
     G.counts = counts; G.phase = 'roles'; render(); } }]);
 }
 
+/* The teaching layer's own switch. Retiring it after two games is a guess about the
+   moderator, and a guess needs an override: a table with a new Qu\u1ea3n Tr\u00f2 every week wants
+   it on forever, and somebody who has read it once wants it gone tonight. Same three-chip
+   shape as the house rules, and the same meaning for null. */
+function tipsUI(){
+  const wrap = el('div', null, '');
+  wrap.appendChild(el('div','grp', T('M\u1eb9o & h\u01b0\u1edbng d\u1eabn', 'Rules & tips')));
+  const c = el('div','chips');
+  const opts = [[null, T('T\u1ef1 \u0111\u1ed9ng','Automatic')],
+                [true, T('Lu\u00f4n hi\u1ec7n','Always show')],
+                [false, T('\u1ea8n','Hide')]];
+  for (const [val, lab] of opts){
+    const b = el('div','chip' + (G.tips === val ? ' sel' : ''), lab);
+    b.onclick = () => { snap(); G.tips = val; openRoster(); };
+    c.appendChild(b);
+  }
+  wrap.appendChild(c);
+  wrap.appendChild(el('p','note', T(
+    'T\u1ef1 \u0111\u1ed9ng: hi\u1ec7n \u0111\u1ea7y \u0111\u1ee7 trong hai v\u00e1n \u0111\u1ea7u, sau \u0111\u00f3 g\u1ecdn l\u1ea1i m\u1ed9t d\u00f2ng. ' +
+    'M\u00e1y n\u00e0y \u0111\u00e3 ch\u01a1i ' + gamesPlayed + ' v\u00e1n.',
+    'Automatic shows everything for the first two games, then folds it into one line. ' +
+    'This device has finished ' + gamesPlayed + '.') +
+    ' <b>' + T('\u0110ang: ','Now: ') + (teaching() ? T('hi\u1ec7n','showing') : T('g\u1ecdn','folded')) + '.</b>'));
+  return wrap;
+}
+
 /* ---- roster modal, with role correction ---- */
 function openRoster(){
+  $('rosTtl').textContent = T('Danh s\u00e1ch', 'Roster');
+  $('rosSub').textContent = T('B\u1ea5m v\u00e0o m\u1ed9t ng\u01b0\u1eddi \u0111\u1ec3 \u0111\u1eb7t ho\u1eb7c s\u1eeda l\u00e1 b\u00e0i.',
+    'Tap a player to set or correct their card.');
+  $('rosChronicle').textContent = T('Nh\u1eadt k\u00fd', 'Chronicle');
   const B = $('rosBody'); B.innerHTML = '';
   if (G.assignTo){
     const p = byId(G.assignTo);
@@ -2151,7 +2368,7 @@ function openRoster(){
       const placed = withRole(r.id).length;
       const full = inDeck && placed >= G.counts[r.id] && p.role !== r.id;
       const b = el('div','chip' + (p.role===r.id ? ' sel' : '') + (full ? ' dead' : ''),
-        '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name) +
+        '<span class="ic">' + icOf(r.id) + '</span>' + rName(r) +
         '<span class="bd">' + (inDeck ? placed + '/' + G.counts[r.id] : 'off-deck') + '</span>');
       if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
         log(p.name + ' is the ' + r.name + '.'); autoFillLastCard(); openRoster(); };
@@ -2164,15 +2381,17 @@ function openRoster(){
     tog.onclick = () => { G.showAllRoles = !G.showAllRoles; openRoster(); };
     B.appendChild(tog);
   } else {
-    const ros = el('div','ros');
+    const ros = el('div','ros group');
     G.players.forEach((p,i) => ros.appendChild(playerRow(p, i,
       () => { G.assignTo = p.id; openRoster(); })));
     B.appendChild(ros);
     const need = {}; for (const k in G.counts) need[k] = G.counts[k];
     for (const p of G.players) if (p.role && need[p.role] != null) need[p.role]--;
     const missing = Object.keys(need).filter(k => need[k] > 0);
-    if (missing.length) B.appendChild(el('div','alert','Cards not yet placed: ' +
-      missing.map(k => R[k].name + (need[k]>1 ? ' \u00d7'+need[k] : '')).join(', ')));
+    if (missing.length) B.appendChild(el('div','tell',
+      T('Ch\u01b0a \u0111\u1eb7t l\u00e1: ','Cards not yet placed: ') +
+      missing.map(k => rName(R[k]) + (need[k]>1 ? ' \u00d7'+need[k] : '')).join(', ')));
+    B.appendChild(tipsUI());
   }
   /* The chronicle only grows, and this rebuilt every line of it each time the roster
      opened AND each time a card was set inside it — so the roster got slower for the rest
@@ -2190,6 +2409,10 @@ function openRoster(){
     if (more.open) fill();            // reopened from a previous visit, so no toggle fires
     L.appendChild(more);
   }
+  // every label in this sheet is language-dependent, and the language can change mid-game
+  paintSound();
+  paintHaptic();
+  $('bCloseR').textContent = T('\u0110\u00f3ng','Close');
   showVersion();
   $('mRoster').classList.add('on');
 }
@@ -2306,7 +2529,7 @@ $('bSeerDone').onclick = () => { holdShow(false); $('mSeer').classList.remove('o
 $('bRoster').onclick = () => { G.assignTo = null; openRoster(); };
 $('bCloseR').onclick = () => { G.assignTo = null; $('mRoster').classList.remove('on'); render(); };
 function paintSound(){
-  $('bSound').innerHTML = icon('music') + (soundOn ? 'On' : 'Off');
+  $('bSound').innerHTML = icon('music') + (soundOn ? T('B\u1eadt','On') : T('T\u1eaft','Off'));
   // --moon is "this control is on" everywhere else in the app; amber used to mean
   // that here and "expansion card" elsewhere, which is the hue collision in full.
   $('bSound').classList.toggle('on', soundOn);
@@ -2317,6 +2540,18 @@ $('bSound').onclick = () => {
   ambience(soundOn && G.phase === 'night');
 };
 paintSound();
+/* Hidden entirely where the browser has no vibrator — iOS Safari does not implement the
+   Vibration API — rather than offered as a switch that does nothing. Degrading silently
+   is the ask; a dead toggle would be degrading dishonestly. */
+function paintHaptic(){
+  const b = $('bHaptic');
+  if (!canBuzz()){ b.hidden = true; return; }
+  b.hidden = false;
+  b.textContent = hapticOn ? T('Rung', 'Buzz') : T('Rung tắt', 'No buzz');
+  b.classList.toggle('on', hapticOn);
+}
+$('bHaptic').onclick = () => { hapticOn = !hapticOn; paintHaptic(); buzz('tap'); };
+paintHaptic();
 $('bUndo').onclick = undo;
 function addName(){
   const v = $('iName').value;
@@ -2327,28 +2562,38 @@ function addName(){
 $('bAdd').onclick = addName;
 $('iName').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); addName(); } });
 
-/* Offer to pick up an interrupted game before anything is drawn. */
+/* Offer to pick up an interrupted game before anything is drawn.
+   This screen speaks the SAVED game's language, not the fresh default from the browser:
+   the moderator who was mid-game already chose one, and this is the first thing they see
+   on a phone that reloaded itself. T() reads the live G, which at this point is still
+   blank, so the choice has to be read off the box being offered. */
 (() => {
   const box = loadSaved();
   if (!box) return;
   const g = box.g;
+  const V = (vi, en) => g.lang !== 'en' ? vi : en;
   const mins = Math.round((Date.now() - box.at) / 60000);
-  const when = g.phase === 'night' || g.phase === 'dawn' ? 'Night ' + g.night
+  const when = g.phase === 'night' || g.phase === 'dawn' ? V('\u0110\u00eam ', 'Night ') + g.night
              : g.phase === 'day' || g.phase === 'hunter' || g.phase === 'sheriff' ||
-               g.phase === 'scapegoat' ? 'Day ' + g.day : 'setup';
+               g.phase === 'scapegoat' ? V('Ng\u00e0y ', 'Day ') + g.day : V('chu\u1ea9n b\u1ecb', 'setup');
+  const ago = mins < 1 ? V('v\u1eeba xong', 'just now')
+            : V(mins + ' ph\u00fat tr\u01b0\u1edbc', mins + ' min ago');
   const v = document.createElement('div');
   v.className = 'veil on';
-  v.innerHTML = '<div class="kicker">Ván đang dở \u00b7 game in progress</div>' +
-    '<h1>Tiếp tục?</h1>' +
-    '<p>' + g.players.length + ' người \u00b7 ' + when +
-    ' \u00b7 dừng ' + (mins < 1 ? 'vừa xong' : mins + ' phút trước') + '.</p>' +
-    '<p class="dim">The app reloaded. Everything was kept \u2014 roles, deaths, the badge, ' +
-    'the tally. Resume where you were, or start again.</p>';
+  v.innerHTML = '<div class="kicker">' + V('V\u00e1n \u0111ang d\u1edf','Game in progress') + '</div>' +
+    '<h1>' + V('Ti\u1ebfp t\u1ee5c?','Resume?') + '</h1>' +
+    '<p>' + g.players.length + V(' ng\u01b0\u1eddi', ' players') + ' \u00b7 ' + when +
+    ' \u00b7 ' + ago + '.</p>' +
+    '<p class="dim">' + V(
+      'App v\u1eeba t\u1ea3i l\u1ea1i. M\u1ecdi th\u1ee9 v\u1eabn c\u00f2n \u2014 vai, ng\u01b0\u1eddi ch\u1ebft, ph\u00f9 hi\u1ec7u, ' +
+      's\u1ed1 phi\u1ebfu. Ti\u1ebfp t\u1ee5c ch\u1ed7 c\u0169, ho\u1eb7c ch\u01a1i l\u1ea1i t\u1eeb \u0111\u1ea7u.',
+      'The app reloaded. Everything was kept \u2014 roles, deaths, the badge, the tally. ' +
+      'Resume where you were, or start again.') + '</p>';
   const go = document.createElement('div'); go.className = 'go';
   const yes = document.createElement('button'); yes.type = 'button';
-  yes.className = 'btn'; yes.textContent = 'Tiếp tục \u00b7 Resume';
+  yes.className = 'btn'; yes.textContent = V('Ti\u1ebfp t\u1ee5c','Resume');
   const no  = document.createElement('button'); no.type = 'button';
-  no.className = 'btn ghost'; no.textContent = 'Bỏ, chơi ván mới';
+  no.className = 'btn ghost'; no.textContent = V('B\u1ecf, ch\u01a1i v\u00e1n m\u1edbi','Discard, new game');
   yes.onclick = () => { G = g; v.remove(); render(); };
   no.onclick  = () => { dropSaved(); v.remove(); };
   go.append(yes, no); v.appendChild(go);

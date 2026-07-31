@@ -17,7 +17,7 @@ const ADD         = rule(/\.row\.tall \.btn\{[^}]*\}/);
 
 console.log('ONE SHARED SPEC');
 t('the control tokens are declared once', () =>
-  /--ctl-size:15\.5px; --ctl-weight:600; --ctl-track:[.\d]+em;/.test(src)
+  /--ctl-size:var\(--t-body\); --ctl-weight:600; --ctl-track:[.\d]+em;/.test(src)
     ? true : 'tokens missing or changed shape');
 for (const [what, css] of [['the field', FIELD], ['the placeholder', PLACEHOLDER], ['.btn', BTN]]){
   t(what + ' takes its size from the token', () =>
@@ -59,7 +59,7 @@ t('the repeated Remove action recedes until wanted', () =>
 t('Remove still reveals itself on hover and keyboard focus', () =>
   /\.ico\.quiet:hover,\.ico\.quiet:focus-visible/.test(src) ? true : 'no focus-visible, unusable by keyboard');
 t('the seat list uses the quiet variant', () =>
-  /el\('button','ico quiet','Remove'\)/.test(src) ? true : 'still loud');
+  /el\('button','ico quiet', T\(/.test(src) ? true : 'still loud');
 t('"werewolfs" is gone', () =>
   !/werewolf' \+ \(rec/.test(src) && !/werewolfs/.test(src) ? true : 'bad plural remains');
 t('both plural sites agree', () => {

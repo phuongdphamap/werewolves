@@ -14,6 +14,7 @@ eval(src.match(/const witchMaySaveSelf[\s\S]*?hunterPoison;/)[0]
   .replace('const hunterFiresPoisoned','globalThis.hunterFiresPoisoned'));
 const logs = [];
 globalThis.log = t => logs.push(t);
+globalThis.buzz = () => {};      // haptics are covered by haptic-test.js
 /* eval, deliberately and throughout these suites: the point is to run the SHIPPED
    function, lifted out of ../js/app.js, so a test cannot pass against a copy that has
    drifted. The only input is this repo's own source. */
@@ -141,13 +142,13 @@ t('it is said at the dawn announcement', () => {
 });
 t('and at the vote, before the button that commits it', () => {
   const day = (src.match(/function rDay\(\)\{[\s\S]*?\n  \}\n\}/) || [''])[0];
-  const iNote = day.indexOf('revealNote('), iHang = day.indexOf("t:'Hang '");
+  const iNote = day.indexOf('revealNote('), iHang = day.indexOf("'Hang '");
   return (iNote > -1 && iHang > -1 && iNote < iHang)
     ? true : 'said after the tap, by which time the screen has moved on';
 });
 t('and on the Hunter screen, which is where it was asked about', () => {
   const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  return /if \(hp\) B\.appendChild\(el\('div','card tight', priv/.test(fn) && /revealNote\(\[hp\]\)/.test(fn)
+  return /if \(hp\) B\.appendChild\(el\('div','tell', priv/.test(fn) && /revealNote\(\[hp\]\)/.test(fn)
     ? true : 'the death that most needs it says nothing, or the call is unreachable';
 });
 t('no branch in the app is switched off with a literal', () => {
@@ -165,28 +166,48 @@ t('every rule in the panel has a live accessor', () => {
   const dead = keys.filter(k => !new RegExp('G\\.' + k + '\\s*== null').test(src));
   return dead.length === 0 ? true : 'a chip writes a flag nothing reads: ' + dead.join(', ');
 });
-t('and every accessor is offered in the panel', () => {
-  // an accessor with no chip is a rule the table cannot actually set
+/* An accessor with no control is a rule the table cannot actually set. It used to be
+   enough to look inside houseRulesUI, but G.tips has the same three-state shape and lives
+   in the Roster instead, so the invariant is "some chip writes it", not "it appears in
+   that one panel". */
+t('and every accessor is settable from some panel', () => {
   const accessors = [...src.matchAll(/G\.(\w+)\s*== null \?/g)].map(m => m[1]);
-  const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
-  const hidden = accessors.filter(a => !keys.includes(a));
+  const hidden = accessors.filter(a =>
+    !new RegExp('G\\.' + a + ' = val').test(src) &&
+    !new RegExp("\\{ key:'" + a + "'").test(src));
   return hidden.length === 0 ? true : 'settable in code but not in the UI: ' + hidden.join(', ');
+});
+t('and the follow-the-default shape is shared, not reinvented per panel', () => {
+  const panels = (src.match(/const opts = \[\[null, T\(/g) || []).length;
+  return panels >= 2 ? true : 'only ' + panels + ' panel(s) offer a follow-the-default option';
 });
 t('each row labels its own default, rather than sharing one', () =>
   /byRule:byTradition/.test(src) && /byRule:false/.test(src) && /r\.byRule \? /.test(src)
     ? true : 'one shared default would mislabel any rule that is not a tradition split');
 
 console.log('\nTHE SETTINGS ARE REACHABLE AND EXPLAINED');
+// the panel title is a T() pair now, and the source spells the Vietnamese as a \uXXXX
+// escape, so the pattern matches a literal backslash rather than the character it denotes
 t('a House rules panel exists on the deck screen', () =>
-  /collapsible\('house', 'Luật nhà/.test(src) ? true : 'no panel');
+  /collapsible\('house', T\('Lu\\u1eadt nh/.test(src) ? true : 'no panel');
 t('it offers three states per rule, not a bare on/off', () =>
-  /\[null, 'Theo luật[\s\S]*?\[true, 'Có[\s\S]*?\[false, 'Không/.test(src)
+  /\[null, T\('Theo lu[\s\S]*?\[true, T\('C[\s\S]*?\[false, T\('Kh/.test(src)
     ? true : 'no follow-the-ruleset option');
 t('it names both traditions so the choice is informed', () =>
   /狼人杀/.test(src) && /chết vì bất cứ lý do gì/.test(src)
     ? true : 'the reasoning is not shown');
 t('it reports which setting is currently in force', () =>
-  /Đang dùng: /.test(src) ? true : 'no effective-value readout');
+  /T\('[^']*','Now: '\)/.test(src) && /r\.now \? T\(/.test(src)
+    ? true : 'no effective-value readout');
+/* The reasoning is the whole point of the panel: a table settles an argument by reading
+   it. An English-only interface showing Vietnamese-only reasoning is a panel that cannot
+   do its job, so every row carries both. */
+t('and every rule explains itself in both languages', () => {
+  const notes  = (src.match(/^      note:/gm) || []).length;
+  const notesE = (src.match(/^      noteEn:/gm) || []).length;
+  return notes > 0 && notes === notesE
+    ? true : notes + ' note(s) but ' + notesE + ' translated';
+});
 t('the panel is built as a node and collapsible accepts one', () => {
   const c = src.match(/function collapsible\(key, title, body\)\{[\s\S]*?\n\}/);
   return (c && /typeof body === 'string'/.test(c[0]) && /b\.appendChild\(body\)/.test(c[0]))

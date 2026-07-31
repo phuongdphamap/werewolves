@@ -27,6 +27,8 @@ const blocks = [
   src.match(/const ROLES = \[[\s\S]*?\n\];/)[0].replace('const ROLES','globalThis.ROLES'),
   'globalThis.R = {}; ROLES.forEach(r => R[r.id] = r);',
   'globalThis.log = t => LOG.push(t);',
+  // registerDeaths now pulses the phone; this suite is about the rules, not the channel
+  'globalThis.buzz = () => {};',
   'globalThis.alive = () => G.players.filter(p => p.alive);',
   'globalThis.byId = id => G.players.find(p => p.id === id);',
   'globalThis.liveWith = id => G.players.filter(p => p.alive && p.role === id);',

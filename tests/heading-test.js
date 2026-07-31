@@ -80,9 +80,25 @@ t('the stack-to-stack rule cannot reach the role list', () => {
 });
 
 console.log('\nTHE HEADINGS THEMSELVES ARE ALL THERE');
-for (const label of ['in your deck', 'Base game', 'Characters expansion']){
-  t('"' + label + '" is still emitted', () =>
-    src.includes(label) ? true : 'heading text missing');
+/* Each of the three is a T() pair now. Both halves have to survive: dropping the
+   Vietnamese would silently make the app English-only for the moderators it was
+   written for, and dropping the English would strand the other choice. */
+/* The Vietnamese half is spelled with \uXXXX escapes in the source, so rather than
+   matching the words this checks the SHAPE: the English half must sit as the second
+   argument of a T() call, which is only true if a first argument exists. */
+for (const en of ['In your deck', 'Base game', 'Characters expansion']){
+  t('"' + en + '" is still emitted', () =>
+    src.includes(en) ? true : 'heading text missing');
+  t('...and it is one half of a pair, not the only language', () => {
+    const i = src.indexOf("'" + en);
+    if (i < 0) return 'not found as a literal';
+    // it must be a second argument: a comma right before it, and a T( opening the call.
+    // Scanned as a window rather than one regex because the first argument can contain
+    // parentheses -- totalCards() -- which any [^)]* pattern stops dead on.
+    const before = src.slice(Math.max(0, i - 200), i);
+    return /,\s*$/.test(before) && before.includes('T(')
+      ? true : '"' + en + '" is not the second half of a T() pair, so this heading is English-only';
+  });
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

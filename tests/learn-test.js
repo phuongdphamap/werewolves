@@ -14,6 +14,11 @@ globalThis.withRole = id => G.players.filter(p => p.role === id);
 globalThis.unassigned = () => G.players.filter(p => !p.role);
 globalThis.logged = [];
 globalThis.log = (t) => logged.push(t);
+// autoFillLastCard names the card it deduced, and that name now follows the interface
+// language rather than the ruleset
+globalThis.vnUI = () => G.lang !== 'en';
+globalThis.T = (vi, en) => vnUI() ? vi : en;
+globalThis.rName = r => T(r.vi, r.name);
 
 function grab(name){
   const i = src.indexOf('function ' + name + '(');
@@ -35,8 +40,8 @@ const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.m
   else { fail++; console.log('  FAIL ' + name + '  -> ' + r); } };
 
 // counts is the deck; roles is what has been recorded so far, one entry per seat
-const board = (counts, roles, rules) => {
-  globalThis.G = { counts, rules: rules || 'vn', log: [],
+const board = (counts, roles, rules, lang) => {
+  globalThis.G = { counts, rules: rules || 'vn', lang: lang || 'vi', log: [],
     players: roles.map((role, i) => ({ id: i + 1, name: 'P' + (i + 1), role, alive: true })) };
   globalThis.logged = [];
 };
@@ -63,13 +68,23 @@ t('it says what it deduced, so the moderator is not surprised', () => {
   autoFillLastCard();
   return logged.length === 1 && /P2/.test(logged[0]) ? true : 'log was ' + JSON.stringify(logged);
 });
-t('the deduced name follows the ruleset', () => {
-  board({ wolf:1, guard:1 }, ['wolf',null], 'vn');
+t('the deduced name follows the interface language', () => {
+  board({ wolf:1, guard:1 }, ['wolf',null], 'vn', 'vi');
   autoFillLastCard();
-  const vn = logged[0];
-  board({ wolf:1, guard:1 }, ['wolf',null], 'mh');
+  const vi = logged[0];
+  board({ wolf:1, guard:1 }, ['wolf',null], 'vn', 'en');
   autoFillLastCard();
-  return (/Bảo Vệ/.test(vn) && /Bodyguard/.test(logged[0])) ? true : vn + ' | ' + logged[0];
+  return (/B\u1ea3o V\u1ec7/.test(vi) && /Bodyguard/.test(logged[0])) ? true : vi + ' | ' + logged[0];
+});
+/* ...and NOT the ruleset. Choosing Miller\u2019s Hollow used to rename every card in the
+   app, because one flag meant both "which call order" and "which language". */
+t('and does not change when only the ruleset does', () => {
+  board({ wolf:1, guard:1 }, ['wolf',null], 'vn', 'vi');
+  autoFillLastCard();
+  const a = logged[0];
+  board({ wolf:1, guard:1 }, ['wolf',null], 'mh', 'vi');
+  autoFillLastCard();
+  return a === logged[0] ? true : 'the ruleset still renames the card: ' + a + ' | ' + logged[0];
 });
 
 console.log('\nIT STAYS QUIET WHEN THE ANSWER IS NOT FORCED');

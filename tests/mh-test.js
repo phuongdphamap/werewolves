@@ -540,7 +540,11 @@ t('nothing else moves a card without telling the deck', () => {
 
 console.log('\nEVERY SKIP IS RECORDED');
 t('every Skip button in the app reaches skipStep', () => {
-  const skips = [...src.matchAll(/\{ t:'[^']*[Ss]kip[^']*'[^}]*on:([^}]*(?:\}[^}]*)??)\}/g)]
+  /* A label may be a bare string or a T(vi, en) pair; the English half always carries the
+     word, which is what this looks for. Matching only the bare form silently dropped two
+     of the five buttons from the check — the count guard below is what caught that. */
+  const skips = [...src.matchAll(
+    /\{ t: ?(?:'[^']*[Ss]kip[^']*'|T\([^)]*[Ss]kip[^)]*\))[^}]*on:([^}]*(?:\}[^}]*)??)\}/g)]
     .map(m => m[1].trim());
   if (skips.length < 5) return 'only found ' + skips.length + ' Skip buttons to check';
   const bare = skips.filter(h => !/skipStep\(/.test(h));

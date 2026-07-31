@@ -20,9 +20,19 @@ t('it defaults to closed', () =>
   /d\.open = expOpen\.has\(key\)/.test(helper) ? true : 'does not default to closed');
 t('it remembers whether you opened it', () =>
   /addEventListener\('toggle'[\s\S]*?expOpen\.(add|delete)/.test(helper) ? true : 'no state memory');
-t('the state store lives outside the snapshotted game state', () =>
-  /const expOpen = new Set\(\);/.test(src) && !/expOpen/.test(src.match(/function blank\(\)\{[\s\S]*?\n\}/)[0])
-    ? true : 'expOpen is inside G, so Undo would clobber it');
+/* Two sets now: "opened by hand" and "shut by hand". They are different states once the
+   teaching layer gets a vote on the default, because only an explicit close should
+   override it. Both must stay out of G, or Undo would clobber them. */
+t('the state stores live outside the snapshotted game state', () => {
+  const decl = /const expOpen = new Set\(\), expShut = new Set\(\);/.test(src);
+  const inBlank = /exp(Open|Shut)/.test(src.match(/function blank\(\)\{[\s\S]*?\n\}/)[0]);
+  return decl && !inBlank ? true : 'a collapsible store is inside G, so Undo would clobber it';
+});
+t('an unopened block still defaults to closed once the tips retire', () => {
+  const h = src.match(/function collapsible\(key, title, body\)\{[\s\S]*?\n\}/)[0];
+  return /d\.open = expOpen\.has\(key\) \|\| \(teaching\(\) && !expShut\.has\(key\)\)/.test(h)
+    ? true : 'the default is no longer tied to experience';
+});
 
 console.log('\nEVERY LONG BLOCK IS FOLDED');
 const keys = [...src.matchAll(/collapsible\('(\w+)'/g)].map(m => m[1]);
@@ -70,10 +80,15 @@ for (const [call, n] of [['RB.appendChild(pc);',1], ['RB.appendChild(rec);',1]])
 }
 t('the essential deal instruction is still shown unfolded', () =>
   /Shuffle these <b>' \+ totalCards\(\)/.test(src) ? true : 'lost the actual instruction');
+// both labels are T() pairs now, so the check is on the shape rather than the wording
 t('the night order reference is still shown unfolded', () =>
-  /<b>Đêm đầu tiên:<\/b>/.test(src) ? true : 'lost the order lines');
+  /T\('[^']*','First night:'\)/.test(src) && /chain\(one\)/.test(src)
+    ? true : 'lost the order lines');
 t('the current deck is still shown unfolded', () =>
-  /<b>Bộ hiện tại:<\/b>/.test(src) ? true : 'lost the deck listing');
+  /T\('[^']*','This deck:'\)/.test(src) ? true : 'lost the deck listing');
+t('and both name their cards in the interface language', () =>
+  /const chain = list => list\.length \? list\.map\(rName\)/.test(src)
+    ? true : 'the call-order preview is back to hard-coded Vietnamese names');
 t('the Sheriff vote weight is still shown unfolded', () =>
   /Their vote is worth <b>' \+ SHERIFF_WEIGHT\(\)/.test(src) ? true : 'lost the weight');
 
