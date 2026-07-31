@@ -31,16 +31,26 @@ const blocks = [
              .replace('const n1Of','globalThis.n1Of').replace('const everyOf','globalThis.everyOf')
              .replace('const ord','globalThis.ord'); })(),
   'globalThis.log = () => {};',
+  src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','globalThis.CAUSE'),
+  src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'),
+  src.match(/const villageKilled = [^;]*;/)[0].replace('const villageKilled','globalThis.villageKilled'),
   grab('teamOf').replace('function teamOf','globalThis.teamOf = function'),
   grab('neighbours').replace('function neighbours','globalThis.neighbours = function'),
   grab('clockwiseWolfFrom').replace('function clockwiseWolfFrom','globalThis.clockwiseWolfFrom = function'),
   grab('buildNight').replace('function buildNight','globalThis.buildNight = function'),
   grab('kill').replace('function kill','globalThis.kill = function'),
+  grab('noteSkip').replace('function noteSkip','globalThis.noteSkip = function'),
   'globalThis.withRole = id => G.players.filter(p => p.role === id);',
   src.match(/function unplacedWolfCards\(\)\{[\s\S]*?\n\}/)[0].replace('function unplacedWolfCards','globalThis.unplacedWolfCards = function'),
   src.match(/function wolfSideKnown\(\)\{[\s\S]*?\n\}/)[0].replace('function wolfSideKnown','globalThis.wolfSideKnown = function'),
   grab('checkWin').replace('function checkWin','globalThis.checkWin = function'),
   grab('computeDawn').replace('function computeDawn','globalThis.computeDawn = function'),
+  // applyDawn is the commit step, and the split between "work out the night" and "commit
+  // it" is itself under test now, so the real function has to be here. Only the things
+  // that touch the DOM or the phase machine are stubbed.
+  'globalThis.snap = () => {}; globalThis.registerDeaths = () => {};',
+  'globalThis.proceed = () => {}; globalThis.finish = w => w; globalThis.render = () => {};',
+  grab('applyDawn').replace('function applyDawn','globalThis.applyDawn = function'),
 ];
 eval(blocks.join('\n'));
 
@@ -56,7 +66,8 @@ function mk(roles){
       turned:false, revealed:false })),
     counts:{}, night:1, day:0, log:[], steps:[], si:0, n:{}, dawn:[], pending:{},
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true, powersLost:false,
-    houndSide:null, infectNext:null, over:null, rules:'vn', lastGuard:null };
+    houndSide:null, infectNext:null, over:null, rules:'vn', lastGuard:null,
+    elderAbsorbed:false, votes:{}, sheriffVote:null, resume:'night' };
   roles.forEach(r => G.counts[r] = (G.counts[r]||0)+1);
   return G;
 }
@@ -101,16 +112,62 @@ t('night 2 drops the one-off roles', () => {
   const n = names();
   return JSON.stringify(n) === JSON.stringify(['Werewolf','Seer','Witch']) ? true : n.join(' | ');
 });
-t('night 2 never calls a card nobody holds', () => {
+/* This used to assert the opposite — that an unidentified card is dropped from night 2 —
+   which is what the app did, for the whole rest of the game rather than for one night. A
+   Bodyguard who was asleep during his own roll call never shielded anybody again, the
+   Witch kept both potions to the end, and dawn still called every one of those nights
+   fully resolved. The card is in play, so the step exists; what the app does not know is
+   who holds it, so it asks. */
+t('a card in the deck that nobody answered for is still called', () => {
   mk(['seer','wolf','wolf','villager']);
-  G.counts.witch = 1;                              // in the deck but never identified
+  G.counts.guard = 1;                              // in the deck but never identified
   G.night = 2; buildNight();
-  return !names().includes('Witch') ? true : names().join(' | ');
+  return names().includes('Bodyguard') ? true
+    : 'dropped for the rest of the game: ' + names().join(' | ');
 });
-t('a dead Seer is not called', () => {
+t('and it is called as an identification, not as an action', () => {
+  mk(['seer','wolf','wolf','villager']);
+  G.counts.guard = 1;
+  G.night = 2; buildNight();
+  const s = G.steps.find(x => x.role === 'guard');
+  return (s && s.roll === true && !s.hush) ? true
+    : 'the step would ask him to shield somebody nobody has identified: ' + JSON.stringify(s);
+});
+t('a partly identified pair is asked about, not assumed complete', () => {
+  // one Sister named, one never answered: the app knows the pair is short
+  mk(['sisters','sisters','wolf','wolf','villager']);
+  G.players[1].role = null;
+  G.night = 2; buildNight();
+  const s = G.steps.find(x => x.role === 'sisters');
+  return (s && s.roll === true) ? true : JSON.stringify(s);
+});
+t('once every copy is identified it becomes an ordinary call again', () => {
+  mk(['sisters','sisters','wolf','wolf','villager']);
+  G.night = 2; buildNight();
+  const s = G.steps.find(x => x.role === 'sisters');
+  return (s && !s.roll && !s.hush) ? true : JSON.stringify(s);
+});
+/* Dropping a call is audible. If the Seer dies and the night gets one step shorter, the
+   table hears it and narrows the rest by elimination — so a dead card is still called,
+   marked hush so only the moderator's screen knows nobody wakes. */
+t('a dead Seer is still called, so the night sounds unchanged', () => {
   mk(['seer','wolf','wolf','villager']);
   G.players[0].alive = false; G.night = 2; buildNight();
-  return !names().includes('Seer') ? true : names().join(' | ');
+  return names().includes('Seer') ? true : 'the missing step would announce the death';
+});
+t('the dead Seer’s step is hushed, not actionable', () => {
+  mk(['seer','wolf','wolf','villager']);
+  G.players[0].alive = false; G.night = 2; buildNight();
+  const s = G.steps.find(x => x.role === 'seer');
+  return s && s.hush === 'dead' ? true : JSON.stringify(s);
+});
+t('a card that was never in the deck is not called', () => {
+  // the other half of the old check: absent cards must stay absent
+  mk(['seer','wolf','wolf','villager']);
+  G.night = 2; buildNight();
+  const absent = ['The Pied Piper','Bodyguard','The Actor','The Two Sisters'];
+  const wrong = absent.filter(n => names().includes(n));
+  return wrong.length === 0 ? true : 'called a card nobody has: ' + wrong.join(', ');
 });
 t('White Werewolf is identified on night 1, then kills only on even nights', () => {
   mk(['whitewolf','wolf','wolf','seer','villager']);
@@ -122,15 +179,24 @@ t('White Werewolf is identified on night 1, then kills only on even nights', () 
   G.night = 3; buildNight(); const odd  = names().includes('White Werewolf');
   return (roll && even && !odd) ? true : 'roll=' + roll + ' n2=' + even + ' n3=' + odd;
 });
-t('spent Witch is skipped', () => {
+t('a spent Witch is still called, hushed', () => {
+  // she is alive, so skipping her would tell the pack both potions are gone
   mk(['witch','wolf','wolf','villager']);
   G.night = 2; G.witchHeal = false; G.witchPoison = false; buildNight();
-  return !names().includes('Witch') ? true : names().join(' | ');
+  const s = G.steps.find(x => x.role === 'witch');
+  return (s && s.hush === 'spent') ? true : JSON.stringify(s);
 });
-t('powerless Fox is skipped', () => {
+t('a Witch with one potion left is a real call, not hushed', () => {
+  mk(['witch','wolf','wolf','villager']);
+  G.night = 2; G.witchHeal = false; G.witchPoison = true; buildNight();
+  const s = G.steps.find(x => x.role === 'witch');
+  return (s && !s.hush) ? true : 'hushed a Witch who can still act: ' + JSON.stringify(s);
+});
+t('a powerless Fox is still called, hushed', () => {
   mk(['fox','wolf','wolf','villager']);
   G.night = 2; G.foxPower = false; buildNight();
-  return !names().includes('The Fox') ? true : names().join(' | ');
+  const s = G.steps.find(x => x.role === 'fox');
+  return (s && s.hush === 'spent') ? true : JSON.stringify(s);
 });
 t('Elder killed by village silences every village power', () => {
   mk(['seer','witch','fox','wolf','wolf','elder']);
@@ -138,6 +204,54 @@ t('Elder killed by village silences every village power', () => {
   const n = names();
   return (n.length === 1 && n[0] === 'Werewolf') ? true : n.join(' | ');
 });
+
+/* The consequence above was already right; the TRIGGER was not. powersLost was set at
+   the vote only, so poisoning or shooting the Elder left every village power intact. */
+console.log('\nTHE ELDER’S DEATH, BY EVERY ROUTE');
+const elderDeadBy = cause => {
+  mk(['elder','seer','wolf','wolf']);
+  G.elderLife = false;                      // his one free life already spent
+  kill(G.players[0], cause);
+  return G.powersLost;
+};
+for (const cause of ['vote', 'tie', 'poison', 'shot'])
+  t('“' + causeLabel(cause) + '” costs the village its powers', () =>
+    elderDeadBy(cause) ? true : 'powers survived a village-caused Elder death');
+
+t('a werewolf kill costs the village nothing', () =>
+  // surviving one attack is the point of the card; a second is an ordinary death
+  !elderDeadBy('wolves') ? true : 'a wolf kill wrongly stripped the village');
+t('nor does the White Werewolf or the Knight’s rust', () =>
+  (!elderDeadBy('white') && !elderDeadBy('rust'))
+    ? true : 'a wolf-side death wrongly stripped the village');
+
+/* The rule is decided by a CODE on the cause, not by matching the sentence. Both of the
+   rules that used to read the prose — this one and the poisoned Hunter's — would have
+   switched off silently the first time somebody edited the copy or translated it. */
+console.log('\nA CAUSE IS A CODE, NOT A SENTENCE');
+t('every cause the app passes to kill() is a declared code', () => {
+  const passed = [...src.matchAll(/(?:kill|add)\([^,]+, *'([a-z]+)'/g)].map(m => m[1]);
+  const unknown = [...new Set(passed)].filter(c => !CAUSE[c]);
+  return unknown.length === 0 ? true : 'undeclared, so it would render raw: ' + unknown.join(', ');
+});
+t('every village-caused code is one the app really passes somewhere', () => {
+  const passed = new Set([...src.matchAll(/(?:kill|add)\([^,]+, *'([a-z]+)'/g)].map(m => m[1]));
+  const village = Object.keys(CAUSE).filter(c => CAUSE[c].village);
+  const dead = village.filter(c => !passed.has(c));
+  return dead.length === 0 ? true : 'these would never fire: ' + dead.join(', ');
+});
+t('no cause is passed as the display sentence any more', () => {
+  const prose = [...src.matchAll(/(?:kill|add)\([^,]+, *'([^']*(?: [^']*)+)'/g)].map(m => m[1]);
+  return prose.length === 0 ? true : 'a sentence is still being used as a cause: ' + prose.join(' / ');
+});
+t('the poisoned Hunter is decided on the code, not on /poison/', () => {
+  const rd = grab('registerDeaths');
+  return /c\.cause === 'poison'/.test(rd) && !/\/poison\/\.test/.test(rd)
+    ? true : 'still matching the prose: ' + rd;
+});
+t('a code with no label still renders as something, for an old save', () =>
+  (causeLabel('the tie') === 'the tie' && causeLabel(null) === 'dead')
+    ? true : 'a pre-code save would print undefined beside a dead player');
 t('Sisters are called on the first night and every night after', () => {
   mk(['sisters','sisters','wolf','wolf','villager']);
   G.night = 1; buildNight(); const a = names().filter(x=>x==='The Two Sisters').length;
@@ -264,14 +378,54 @@ t('Wolf Hound follows the side it chose', () => {
 t('Elder survives the first werewolf attack', () => {
   mk(['elder','wolf','wolf','villager']);
   G.n.wolf = 'p0'; computeDawn();
-  const spared = G.dawn.length === 0 && G.elderLife === false;
-  return spared ? true : 'dawn=' + JSON.stringify(G.dawn) + ' life=' + G.elderLife;
+  return G.dawn.length === 0 ? true : JSON.stringify(G.dawn);
 });
 t('Elder dies to the second attack', () => {
   mk(['elder','wolf','wolf','villager']);
   G.elderLife = false; G.n.wolf = 'p0'; computeDawn();
   return G.dawn.length === 1 && G.dawn[0].id === 'p0' ? true : JSON.stringify(G.dawn);
 });
+/* computeDawn is documented as producing a read model. It also spent the Elder's life —
+   inside the branch that composes the sentence explaining it — and applyDawn takes the
+   snapshot Undo returns to afterwards. So Undo came back to a state where the life was
+   already gone, and the moderator can act in the gap: "something else happened — adjust"
+   lets them decide the Elder died after all, and he died having also spent the life that
+   was supposed to save him. */
+console.log('\nTHE ELDER’S LIFE IS SPENT BY THE OUTCOME, NOT BY THE REPORT');
+const elderAttacked = () => { mk(['elder','wolf','wolf','villager']); G.n.wolf = 'p0'; computeDawn(); };
+t('working out the dawn does not spend it', () => {
+  elderAttacked();
+  return G.elderLife === true ? true : 'a read model wrote to the game state';
+});
+t('but it records that it will be spent', () => {
+  elderAttacked();
+  return G.elderAbsorbed === true ? true : 'the intent is not recorded, so nothing can commit it';
+});
+t('announcing the dawn spends it', () => {
+  elderAttacked(); applyDawn();
+  return (G.elderLife === false && G.elderAbsorbed === false)
+    ? true : 'life=' + G.elderLife + ' intent=' + G.elderAbsorbed;
+});
+t('and Undo comes back to a state where he still has it', () => {
+  elderAttacked();
+  // snapshot exactly where applyDawn does, before it commits anything
+  const before = JSON.parse(JSON.stringify(G));
+  applyDawn();
+  return before.elderLife === true ? true : 'Undo would restore a spent life';
+});
+t('adjusting the dawn to kill him after all does not also spend it', () => {
+  elderAttacked();
+  G.dawn.push({ id:'p0', cause:'night', on:true });   // "something else happened"
+  applyDawn();
+  return (!G.players[0].alive && G.elderLife === true)
+    ? true : 'he died having also burnt the life that was meant to save him';
+});
+t('a second attack still kills him', () => {
+  mk(['elder','wolf','wolf','villager']);
+  G.elderLife = false; G.n.wolf = 'p0'; computeDawn();
+  return (G.dawn.length === 1 && G.elderAbsorbed === false) ? true : JSON.stringify(G.dawn);
+});
+
 t('the Witch overrides the wolves', () => {
   mk(['witch','villager','wolf','wolf']);
   G.n.wolf = 'p1'; G.n.witchSave = true; computeDawn();
@@ -281,6 +435,102 @@ t('poison and fangs on one night kill two', () => {
   mk(['witch','villager','villager','wolf','wolf']);
   G.n.wolf = 'p1'; G.n.witchKill = 'p2'; computeDawn();
   return G.dawn.length === 2 ? true : JSON.stringify(G.dawn);
+});
+
+/* noteSkip exists so computeDawn can be honest about gaps, and it was wired to exactly
+   one caller. The roll-call Skip, the Witch's, the Wolf Hound's and the Thief's all
+   advanced the step on their own — so skipping the Bodyguard left the gap list empty,
+   dawnSure stayed true, and the moderator read out a death the app had no standing to be
+   sure about. A missing entry in a gap list looks exactly like no gap. */
+console.log('\nEVERY SKIP IS RECORDED');
+t('every Skip button in the app reaches skipStep', () => {
+  const skips = [...src.matchAll(/\{ t:'[^']*[Ss]kip[^']*'[^}]*on:([^}]*(?:\}[^}]*)??)\}/g)]
+    .map(m => m[1].trim());
+  if (skips.length < 5) return 'only found ' + skips.length + ' Skip buttons to check';
+  const bare = skips.filter(h => !/skipStep\(/.test(h));
+  return bare.length === 0 ? true
+    : bare.length + ' Skip button(s) advance the step without recording it: ' + bare.join(' // ');
+});
+t('a skipped action is recorded as one', () => {
+  mk(['guard','seer','wolf','wolf']);
+  noteSkip('guard');
+  return (G.n.skipped || []).includes('guard') ? true : JSON.stringify(G.n);
+});
+t('an unanswered card is recorded separately from a skipped action', () => {
+  mk(['guard','seer','wolf','wolf']);
+  noteSkip('guard', 'card');
+  return ((G.n.noCard || []).includes('guard') && !(G.n.skipped || []).includes('guard'))
+    ? true : JSON.stringify(G.n);
+});
+t('skipping the Bodyguard stops dawn calling itself certain', () => {
+  mk(['guard','villager','wolf','wolf']);
+  G.n.wolf = 'p1'; noteSkip('guard'); computeDawn();
+  return (G.dawnSure === false && /Bảo Vệ/.test(G.dawnGaps.join(' ')))
+    ? true : 'sure=' + G.dawnSure + ' gaps=' + JSON.stringify(G.dawnGaps);
+});
+t('so does a card nobody would answer for', () => {
+  mk(['guard','villager','wolf','wolf']);
+  G.n.wolf = 'p1'; noteSkip('guard', 'card'); computeDawn();
+  return (G.dawnSure === false && /nobody answered/.test(G.dawnGaps.join(' ')))
+    ? true : 'sure=' + G.dawnSure + ' gaps=' + JSON.stringify(G.dawnGaps);
+});
+t('a night with nothing skipped is still reported as certain', () => {
+  mk(['guard','villager','wolf','wolf']);
+  G.n.wolf = 'p1'; G.n.guard = 'p0'; computeDawn();
+  return G.dawnSure === true ? true : JSON.stringify(G.dawnGaps);
+});
+t('an uncertain dawn opens the editor once, and does not hold it open', () => {
+  mk(['guard','villager','wolf','wolf']);
+  G.n.wolf = 'p1'; noteSkip('guard'); computeDawn();
+  const opened = G.dawnEdit === true;
+  // The only place rDawn may open it is the moderator's own button. It used to set it on
+  // every render while the dawn was uncertain, so the collapse was unreachable.
+  const forced = grab('rDawn').split('\n')
+    .filter(l => /G\.dawnEdit = true/.test(l) && !/onclick/.test(l));
+  return (opened && forced.length === 0)
+    ? true : 'opened=' + opened + ' render-path writes: ' + forced.join(' // ');
+});
+t('and there is a control that actually closes it', () => {
+  // opening it once is only half the fix if the editor has no way back
+  const day = grab('rDawn');
+  return /G\.dawnEdit = false; render\(\)/.test(day)
+    ? true : 'the adjust list can be opened but never collapsed';
+});
+
+/* G.judgeUsed was initialised in blank(), read in rDay, and written nowhere. So the alert
+   telling the moderator to watch for the sign stood for the whole game, and the flag was
+   decoration — exactly the "option that looks meaningful but does nothing" the project's
+   own rules warn about. */
+console.log('\nNO DEAD FLAGS');
+t('judgeUsed is written somewhere, not only read', () => {
+  const writes = [...src.matchAll(/G\.judgeUsed = (\w+)/g)].map(m => m[1]);
+  return writes.includes('true') ? true : 'still a flag nothing can ever set';
+});
+t('the thing that sets it is a control the moderator can reach', () => {
+  const day = grab('rDay');
+  const line = day.split('\n').find(l => /G\.judgeUsed = true/.test(l));
+  return (line && /onclick/.test(day.slice(day.indexOf(line) - 200, day.indexOf(line) + 200)))
+    ? true : 'set somewhere the moderator cannot trigger: ' + line;
+});
+t('and it clears the tally, because a second vote is a fresh count', () => {
+  const day = grab('rDay');
+  const i = day.indexOf('G.judgeUsed = true');
+  return /G\.votes = \{\}/.test(day.slice(i, i + 120))
+    ? true : 'the second vote would start from the first one’s numbers';
+});
+t('once spent, the watch-for-the-sign alert stops', () => {
+  const day = grab('rDay');
+  return /jd\.length && !G\.judgeUsed/.test(day)
+    ? true : 'the alert does not read the flag, so setting it changes nothing';
+});
+t('every flag in blank() is written somewhere in the app', () => {
+  const flags = [...grab('blank').matchAll(/(\w+):(?:true|false|null)/g)].map(m => m[1]);
+  // the house rules are set through G[r.key], so their names live in the rows, not in a
+  // literal assignment — a genuinely dynamic write, not a missing one
+  const dynamic = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
+  const dead = flags.filter(f =>
+    !dynamic.includes(f) && !new RegExp('G\\.' + f + '\\s*=[^=]').test(src));
+  return dead.length === 0 ? true : 'read but never written: ' + dead.join(', ');
 });
 
 console.log('\nVICTORY');
@@ -296,12 +546,40 @@ t('wolves win with no villagers left', () => {
   const w = checkWin();
   return w && w.who === 'The Werewolves' ? true : JSON.stringify(w);
 });
-t('two surviving Lovers win alone', () => {
+t('two surviving Lovers win alone when the pair is mixed', () => {
   mk(['villager','wolf','villager','wolf']);
-  G.players[0].lover = G.players[1].lover = true;
+  G.players[0].lover = G.players[1].lover = true;    // one villager, one wolf
   G.players[2].alive = G.players[3].alive = false;
   const w = checkWin();
   return w && w.who === 'The Lovers' ? true : JSON.stringify(w);
+});
+/* The pair only wins ALONE when it is mixed — that is the whole of Cupid's card. This
+   test sat above the team checks, so a wolf-and-wolf or villager-and-villager pair that
+   outlasted everyone was credited to Cupid rather than to the side that actually won. */
+t('two lovers on the wolf side win as the werewolves', () => {
+  mk(['wolf','wolf','villager','villager']);
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;
+  const w = checkWin();
+  return w && w.who === 'The Werewolves' ? true : JSON.stringify(w);
+});
+t('two lovers on the village side win as the village', () => {
+  mk(['villager','seer','wolf','wolf']);
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;
+  const w = checkWin();
+  return w && w.who === 'The Village' ? true : JSON.stringify(w);
+});
+t('a turned Wild Child makes a pair mixed that started matched', () => {
+  // he was on the village side when Cupid joined them, and is not any more
+  mk(['wildchild','villager','wolf','wolf']);
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;
+  const same = checkWin();
+  G.players[0].turned = true;
+  const mixed = checkWin();
+  return (same && same.who === 'The Village' && mixed && mixed.who === 'The Lovers')
+    ? true : JSON.stringify([same, mixed]);
 });
 t('Piper wins when everyone living is charmed', () => {
   mk(['piper','villager','villager','wolf']);

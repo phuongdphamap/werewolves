@@ -85,6 +85,38 @@ t('but it still refreshes in the background', () =>
 t('fonts are cached separately and kept across versions', () =>
   /const FONTS/.test(sw) && /keep = new Set\(\[SHELL, FONTS\]\)/.test(sw)
     ? true : 'fonts would be refetched on every release');
+
+/* Both faces used to come from Google on a render-blocking stylesheet — the last external
+   dependency in an app whose whole premise is a cellar with no signal, and the only thing
+   standing between the moderator and a first paint. They are beside the app now. */
+console.log('\nTHE FONTS ARE OURS');
+const FONTLIST = (sw.match(/const FONT_FILES = \[[\s\S]*?\];/) || [''])[0];
+const fontFiles = [...FONTLIST.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]);
+t('the worker names the font files it must have offline', () =>
+  fontFiles.length >= 2 ? true : 'FONT_FILES is missing or empty');
+t('every one of them exists', () => {
+  const missing = fontFiles.filter(f => !fs.existsSync(D + f));
+  return missing.length === 0 ? true : 'missing: ' + missing.join(', ');
+});
+t('every face the stylesheet asks for is one of them', () => {
+  const css = fs.readFileSync(D + 'css/app.css', 'utf8');
+  const asked = [...css.matchAll(/url\("\.\.\/([^"]+\.woff2)"\)/g)].map(m => m[1]);
+  const absent = [...new Set(asked)].filter(u => !fontFiles.includes(u));
+  return (asked.length > 0 && absent.length === 0)
+    ? true : 'declared but never cached: ' + absent.join(', ');
+});
+t('they are precached at install, not merely on first use', () =>
+  /FONT_FILES\.map\(u => put\(fonts, u\)\)/.test(sw)
+    ? true : 'a first-ever launch in a cellar would render in the fallback face forever');
+t('they go into the cache the fetch handler reads', () => {
+  // precaching them into SHELL while serving from FONTS is a cold-start miss
+  const served = (sw.match(/if \(isFont\(url\)\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return /caches\.open\(FONTS\)/.test(served) ? true : 'served from a cache nothing fills';
+});
+t('the font cache name was bumped, or Google’s copies would survive the switch', () =>
+  /const FONTS   = 'mh-fonts-v2'/.test(sw) ? true : 'stale third-party font cache kept alive');
+t('nothing on the page reaches fonts.googleapis.com or fonts.gstatic.com', () =>
+  !/fonts\.(googleapis|gstatic)\.com/.test(src) ? true : 'the external font dependency is back');
 t('a navigation with an empty cache still gets the shell', () =>
   /req\.mode === 'navigate'/.test(sw) ? true : 'a cold offline start would fail');
 t('only GET is intercepted', () => /req\.method !== 'GET'/.test(sw) ? true : 'would break any future POST');
@@ -129,7 +161,7 @@ console.log('\nNO BUILD STEP WAS INTRODUCED');
 // script it does not ship itself.
 t('every script and stylesheet is a local relative path', () => {
   const refs = [...src.matchAll(/(?:script[^>]+src|link[^>]+href)="([^"]+)"/g)].map(m => m[1]);
-  const bad = refs.filter(u => !u.startsWith('./') && !/fonts\.(googleapis|gstatic)\.com/.test(u));
+  const bad = refs.filter(u => !u.startsWith('./'));
   return bad.length === 0 ? true : 'non-local asset: ' + bad.join(', ');
 });
 t('no module system was introduced', () => {
@@ -146,10 +178,9 @@ t('no framework runtime was added', () => {
   const hit = marks.filter(re => re.test(src));
   return hit.length === 0 ? true : 'framework artefact: ' + hit[0];
 });
-t('the only network dependency is the font stylesheet', () => {
+t('there is no network dependency left at all', () => {
   const ext = [...src.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map(m => m[1]);
-  const bad = ext.filter(u => !/fonts\.(googleapis|gstatic)\.com/.test(u));
-  return bad.length === 0 ? true : 'also depends on ' + bad.join(', ');
+  return ext.length === 0 ? true : 'still depends on ' + ext.join(', ');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

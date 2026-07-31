@@ -97,5 +97,30 @@ t('the recorded answer drives the power loss, not a recomputation', () =>
 t('confirm is still blocked until an unknown trio is answered', () =>
   /needAnswer = G\.n\.foxAns == null/.test(src) ? true : 'could confirm with no answer');
 
+/* The phone is handed to another player with two full-width buttons stacked at the bottom,
+   Done the lower of the pair — nearest where a hand grips, and one release away from
+   dismissing the reveal they were just handed. */
+console.log('\nDISMISS IS NOT UNDER THE RECIPIENT’S THUMB');
+const PANEL = (src.match(/<div class="modal seer"[\s\S]*?<\/div><\/div>/) || [''])[0];
+t('Done comes before the hold button in the overlay', () => {
+  const iDone = PANEL.indexOf('bSeerDone'), iHold = PANEL.indexOf('bReveal');
+  return (iDone > -1 && iHold > -1 && iDone < iHold)
+    ? true : 'Done is still stacked beneath the hold gesture';
+});
+t('and it no longer spans the width the hold button does', () =>
+  !/class="btn sec wide"[^>]*id="bSeerDone"/.test(PANEL) && /id="bSeerDone"/.test(PANEL)
+    ? true : 'a full-width dismiss beside a full-width reveal is a coin flip');
+t('it is styled deliberately rather than inheriting .wide', () => {
+  const r = (src.match(/\.btn\.sec\.done\{[^}]*\}/) || [''])[0];
+  return /width:auto/.test(r) ? true : r || 'no rule, so .btn.wide would still stretch it';
+});
+t('the hold gesture itself is unchanged', () =>
+  /class="btn wide hold" id="bReveal"/.test(PANEL) ? true : 'the reveal button lost its width or its class');
+t('releasing still hides the answer, however the release happens', () => {
+  const evs = ['pointerup','pointercancel','pointerleave','lostpointercapture'];
+  const missing = evs.filter(e => !src.includes("'" + e + "'"));
+  return missing.length === 0 ? true : 'not handled: ' + missing.join(', ');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
