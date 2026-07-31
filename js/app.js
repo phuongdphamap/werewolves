@@ -1295,17 +1295,26 @@ function rNight(){
   $('nSay').style.display = primary ? '' : 'none';
 
   const B = $('nBody'); B.innerHTML = '';
+  const H = $('nHush'); H.innerHTML = '';
 
   /* A hushed call: read the line, wait, move on. Nobody wakes, and nothing is asked —
-     but from the table it sounds identical to a real call, which is the point. */
+     but from the table it sounds identical to a real call, which is the point.
+
+     The notice goes ABOVE the read-aloud line, and the heading carries a tag. It used to
+     land in #nBody, below the say block, so the screen read: role name, what the card
+     does, "point to the player whose true nature you wish to see" — and only then, small
+     and underneath, that nobody was going to. A moderator moving at the speed of a real
+     night reads that as the power still working, which is how it came back as a bug. */
   if (s.hush){
     const why = {
       dead:      'This card is out of the game.',
       spent:     'This card has nothing left to spend.',
-      powerless: 'The Elder died by the village, so every villager power is gone.',
+      powerless: 'The village killed the Elder, so every villager power is gone.',
     }[s.hush] || 'Nothing will happen on this call.';
-    B.appendChild(el('div','alert','<b>Nobody will open their eyes.</b> ' + why +
-      ' Read the line, leave the same pause you always do, then carry on.' +
+    $('nTitle').innerHTML += '<span class="hushTag">không ai thức · nobody wakes</span>';
+    $('nSub').textContent = why + ' Say the line anyway, leave the same pause, then carry on.';
+    H.appendChild(el('div','alert no','<b>Nobody will open their eyes.</b> ' + why +
+      ' Nothing you read next is acted on — say it for the table, not for a player.' +
       '<p class="note">' + (s.hush === 'powerless'
         ? 'The lost powers are public, but how many calls vanish with them is not — that would tell the table how many powered village cards the deck held.'
         : 'Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.') +

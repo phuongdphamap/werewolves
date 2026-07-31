@@ -177,6 +177,46 @@ t('the night calls stop too, which was the half that already worked', () => {
     ? true : 'a village card can still act at night';
 });
 
+/* Reported twice from the same table, the second time as "the next night the villager team
+   still have spell". The rule was firing; the SCREEN said otherwise. A hushed call put its
+   notice in #nBody, which the document places after the read-aloud block, so the order was:
+   role name, what the card does, "point to the player whose true nature you wish to see",
+   and only then, small and underneath, that nobody was going to. At the speed of a real
+   night that reads as a live power. */
+console.log('\nA HUSHED CALL DOES NOT READ AS A LIVE ONE');
+t('the notice comes before the line to be read out', () => {
+  const iHush = src.indexOf('id="nHush"'), iSay = src.indexOf('id="nSay"');
+  return (iHush > -1 && iHush < iSay)
+    ? true : 'the moderator reads "choose someone" before learning nobody will';
+});
+t('the notice is rendered into that container, not below the line', () => {
+  const branch = (src.match(/if \(s\.hush\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return (/H\.appendChild/.test(branch) && !/B\.appendChild/.test(branch))
+    ? true : 'still appending the notice under the say block: ' + branch.slice(0, 200);
+});
+t('the heading itself is marked, so the state is visible at a glance', () => {
+  const branch = (src.match(/if \(s\.hush\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return /hushTag/.test(branch) ? true : 'the role name reads exactly like a live call';
+});
+t('and the marker is styled, or it renders as bare text', () =>
+  /\.hushTag\{/.test(src) ? true : 'no rule for .hushTag');
+t('the description is replaced, not left describing a power that is gone', () => {
+  const branch = (src.match(/if \(s\.hush\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return /\$\('nSub'\)\.textContent = why/.test(branch)
+    ? true : 'the sub line still explains what the card does each night';
+});
+t('the container is cleared on a real call, so nothing carries over', () => {
+  const fn = grab('rNight');
+  return /H\.innerHTML = ''/.test(fn)
+    ? true : 'a live call would inherit the previous step’s hush notice';
+});
+t('the line itself is still read aloud, which is the whole point', () => {
+  const branch = (src.match(/if \(s\.hush\)\{[\s\S]*?\n  \}/) || [''])[0];
+  // suppressing it would shorten the night audibly, which is the leak being closed
+  return !/nSay.*display.*none|nSayT.*= *''/.test(branch)
+    ? true : 'the read-aloud line was suppressed, which re-opens the leak';
+});
+
 console.log('\nWHAT THE RULE DOES NOT TAKE');
 t('the badge survives — it is a title, not a card', () => {
   table(['elder','villager','wolf','wolf']);

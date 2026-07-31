@@ -208,6 +208,12 @@
   .ic i{font-style:normal;font-size:12px;color:var(--txt2)}
   /* the role glyph beside a night-call heading sits on the text baseline */
   .hIc{display:inline-block;vertical-align:-4px;margin-right:8px}
+  /* On a hushed call the heading must not read as a live role. --wolf, because this is the
+     one thing on the screen that changes what the moderator does with the next sentence. */
+  .hushTag{display:inline-block;vertical-align:3px;margin-left:10px;font-family:var(--ui);
+    font-size:9px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--wolf);border:1px solid var(--wolf);border-radius:5px;padding:3px 7px;
+    white-space:nowrap}
   /* Nerd Font glyphs sit in the Private Use Area, so they need the font declared */
   /* Control glyphs, from the same sprite as the roles. They take the button's own
      colour rather than a team tint. */
