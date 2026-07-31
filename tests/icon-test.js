@@ -1,63 +1,67 @@
-// Checks the icon layer: the requested Nerd Font code points are exactly right,
-// every glyph has a fallback, and the CSS that makes them render is present.
-// This exists because I deleted the .ic rule once while removing "dead" CSS and
-// my grep-based check passed anyway.
+// The icon layer: one monochrome sprite, tinted by team, no emoji and no font
+// dependency. It replaced full-colour platform emoji plus a Nerd Font probe that in
+// practice fell back to an emoji anyway.
+// The .ic assertion is here because I deleted that rule once while removing "dead"
+// CSS and a grep-based check passed regardless.
 const fs = require('fs');
-const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+const html = fs.readFileSync('../index.html', 'utf8');
+const js   = fs.readFileSync('../js/app.js', 'utf8');
+const src  = [html, fs.readFileSync('../css/app.css','utf8'), js].join('\n');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.message; }
   if (r === true){ pass++; console.log('  ok   ' + name); }
   else { fail++; console.log('  FAIL ' + name + '  -> ' + r); } };
 
-eval(src.match(/const NF = \{[^}]*\};/)[0].replace('const NF','globalThis.NF'));
-eval(src.match(/const FB = \{[^}]*\};/)[0].replace('const FB','globalThis.FB'));
+const symbols = new Set([...html.matchAll(/<symbol id="i-([a-z-]+)"/g)].map(m => m[1]));
+const roleIds = [...js.matchAll(/\{id:'([a-z_]+)'/g)].map(m => m[1]);
 
-console.log('THE REQUESTED CODE POINTS');
-t('shuffle is U+F074', () =>
-  NF.shuffle.codePointAt(0) === 0xF074 ? true : 'U+' + NF.shuffle.codePointAt(0).toString(16));
-t('shuffle is a single BMP code unit', () =>
-  NF.shuffle.length === 1 ? true : NF.shuffle.length + ' units');
-t('music decodes the surrogate pair to U+F0AD4', () =>
-  NF.music.codePointAt(0) === 0xF0AD4 ? true : 'U+' + NF.music.codePointAt(0).toString(16));
-t('music is a valid surrogate pair', () =>
-  (NF.music.length === 2 && [...NF.music].length === 1) ? true
-    : NF.music.length + ' units, ' + [...NF.music].length + ' code points');
-t('both sit in a Private Use Area', () => {
-  const pua = cp => (cp >= 0xE000 && cp <= 0xF8FF) || (cp >= 0xF0000 && cp <= 0xFFFFD);
-  return (pua(NF.shuffle.codePointAt(0)) && pua(NF.music.codePointAt(0))) ? true : 'not PUA';
+console.log('EVERY ROLE HAS A GLYPH');
+t('the sprite covers all 25 roles', () => {
+  const missing = roleIds.filter(id => !symbols.has(id));
+  return missing.length === 0 ? true : 'no symbol for: ' + missing.join(', ');
+});
+t('the lovers step has one too', () =>
+  symbols.has('x-lovers') ? true : 'the pair step would render an empty box');
+t('the two UI controls come from the same sprite', () => {
+  const missing = ['ui-shuffle','ui-music'].filter(k => !symbols.has(k));
+  return missing.length === 0 ? true : 'missing: ' + missing.join(', ');
+});
+t('no symbol is referenced that does not exist', () => {
+  const refs = new Set([...src.matchAll(/href="#i-([a-z-]+)"/g)].map(m => m[1]));
+  const dangling = [...refs].filter(r => !symbols.has(r) && !/'/.test(r));
+  return dangling.length === 0 ? true : 'dangling <use>: ' + dangling.join(', ');
 });
 
-console.log('\nFALLBACKS');
-t('every Nerd glyph has a fallback', () => {
-  const missing = Object.keys(NF).filter(k => !FB[k]);
-  return missing.length === 0 ? true : 'no fallback for ' + missing.join(', ');
+console.log('\nMONOCHROME, TINTED BY TEAM');
+t('glyphs inherit colour rather than carrying their own', () =>
+  /svg\.ic\{[^}]*stroke:currentColor/.test(src) ? true : 'icons would not take the team tint');
+t('a tint exists for every team', () => {
+  const missing = ['village','wolf','solo'].filter(x => !new RegExp('\\.ic\\.tm-' + x + '\\{').test(src));
+  return missing.length === 0 ? true : 'no tint for: ' + missing.join(', ');
 });
-t('no fallback is itself private-use', () => {
-  for (const k in FB){
-    const cp = FB[k].codePointAt(0);
-    if ((cp >= 0xE000 && cp <= 0xF8FF) || cp >= 0xF0000) return k + ' fallback is PUA too';
-  }
-  return true;
+t('a player icon uses their current side, not the card default', () =>
+  /pIcon = p => p\.role \? icSvg\(p\.role, teamOf\(p\)\)/.test(js)
+    ? true : 'a turned Wild Child would show the wrong side');
+t('the icon absorbed the team dot', () =>
+  !/class="dot t-/.test(js) ? true : 'a dot still repeats what the icon already says');
+
+console.log('\nNO EMOJI, NO FONT DEPENDENCY');
+t('no emoji survive in the app source', () => {
+  const found = (js + html).match(/[\u{1F300}-\u{1FAFF}]/gu);
+  return !found ? true : 'still present: ' + [...new Set(found)].join(' ');
 });
-t('detection compares a styled measurement against a plain one', () =>
-  /c\.font = '32px monospace'[\s\S]*?Symbols Nerd Font[\s\S]*?Math\.abs\(styled - plain\)/.test(src)
-    ? true : 'detection logic not found');
-t('detection cannot throw the app down', () =>
-  /catch \(e\)\{ return false; \}/.test(src) ? true : 'no try/catch guard');
+t('the Nerd Font probe and its fallbacks are gone', () =>
+  !/Symbols Nerd Font|const NF =|const FB =/.test(src)
+    ? true : 'the font probe is back, and it fell back to an emoji');
 
 console.log('\nCSS THAT MAKES THEM VISIBLE');
-t('the .nf rule declares Nerd Font families', () =>
-  /\.nf\{font-family:"Symbols Nerd Font Mono"/.test(src) ? true : '.nf rule missing');
 t('the .ic rule exists (it was deleted once)', () =>
   /\.ic\{width:22px/.test(src) ? true : '.ic rule missing again');
 t('the unknown-card placeholder is styled', () =>
   /\.ic i\{font-style:normal/.test(src) ? true : '.ic i rule missing');
-t('every class used in markup has a rule', () => {
-  const used = new Set([...src.matchAll(/class="(ic|nf)"/g)].map(m => m[1]));
-  for (const c of used) if (!new RegExp('\\.' + c + '\\{').test(src)) return '.' + c + ' used but unstyled';
-  return true;
-});
+t('control glyphs are styled too', () =>
+  /svg\.uic\{/.test(src) ? true : '.uic rule missing, so shuffle and sound draw at full size');
 
 console.log('\nTHE ADD BUTTON MATCHES ITS FIELD');
 t('the field draws its font from the shared control tokens', () =>

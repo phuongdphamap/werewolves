@@ -7,101 +7,101 @@
    so the moderator learns who they are.
 ========================================================================== */
 const ROLES = [
- {id:'villager',ic:'🌾',name:'Simple Villager',vi:'Dân làng',team:'village',set:'Base',max:24,
+ {id:'villager',name:'Simple Villager',vi:'Dân làng',team:'village',set:'Base',max:24,
   d:'No power. Never wakes. Assigned automatically to whoever is left after the roll call.'},
- {id:'thief',ic:'🃏',name:'Thief',vi:'Ăn trộm',team:'village',set:'Base',max:1,n1:10,
+ {id:'thief',name:'Thief',vi:'Ăn trộm',team:'village',set:'Base',max:1,n1:10,
   d:'Two extra cards are dealt. On the first night he may swap his card for one of them. If both spares are Werewolves he must take one.',
   say:'Thief, wake up. Here are the two spare cards. Take one, or keep your own.',
   sayVi:'Ăn trộm thức dậy. Đây là hai lá bài còn lại. Đổi một lá, hoặc giữ lá của mình.',special:'thief'},
- {id:'cupid',ic:'💘',name:'Cupid',vi:'Thần Tình Yêu',team:'village',set:'Base',max:1,n1:20,
+ {id:'cupid',name:'Cupid',vi:'Thần Tình Yêu',team:'village',set:'Base',max:1,n1:20,
   d:'On the first night, designates two Lovers. If one dies the other dies of grief. A mixed pair wins alone together.',
   say:'Cupid, wake up and point to the two people you are joining in love.',
   sayVi:'Thần Tình Yêu thức dậy và chỉ vào hai người mà bạn muốn nối tình yêu.',pick:2},
- {id:'judge',ic:'⚖️',name:'Stuttering Judge',vi:'Quan Toà Nói Lắp',team:'village',set:'Characters',max:1,n1:24,
+ {id:'judge',name:'Stuttering Judge',vi:'Quan Toà Nói Lắp',team:'village',set:'Characters',max:1,n1:24,
   d:'Once per game, by a secret sign agreed with the moderator, he forces a second vote the same day.',
   say:'Stuttering Judge, wake up and show me the sign you will use to demand a second vote.',
   sayVi:'Quan Toà Nói Lắp thức dậy và ra dấu hiệu bí mật để yêu cầu vòng bầu thứ hai.'},
- {id:'wolfhound',ic:'🐕',name:'The Wolf Hound',vi:'Sói Chó',team:'village',set:'Characters',max:1,n1:30,
+ {id:'wolfhound',name:'The Wolf Hound',vi:'Sói Chó',team:'village',set:'Characters',max:1,n1:30,
   d:'On the first night, secretly chooses to be a Villager or a Werewolf for the whole game.',
   say:'Wolf Hound, wake up. Choose your side now: villager, or werewolf.',
   sayVi:'Sói Chó thức dậy. Chọn phe của mình ngay bây giờ: dân làng, hay ma sói.',special:'hound'},
- {id:'wildchild',ic:'🐾',name:'The Wild Child',vi:'Đứa Trẻ Hoang',team:'village',set:'Characters',max:1,n1:34,
+ {id:'wildchild',name:'The Wild Child',vi:'Đứa Trẻ Hoang',team:'village',set:'Characters',max:1,n1:34,
   d:'Chooses a model on the first night. If the model ever dies, he becomes a werewolf.',
   say:'Wild Child, wake up and choose the player who will be your model.',
   sayVi:'Đứa Trẻ Hoang thức dậy và chọn một người làm hình mẫu của mình.',pick:1,special:'model'},
- {id:'sisters',ic:'👭',name:'The Two Sisters',vi:'Hai Chị Em',team:'village',set:'Characters',min:2,max:2,exact:2,n1:40,every:42,
+ {id:'sisters',name:'The Two Sisters',vi:'Hai Chị Em',team:'village',set:'Characters',min:2,max:2,exact:2,n1:40,every:42,
   d:'Wake together to learn each other, and may wake briefly each night to confer in silence.',
   say:'Two Sisters, wake up and look at one another.',
   sayVi:'Hai Chị Em thức dậy và nhìn mặt nhau.'},
- {id:'brothers',ic:'👬',name:'The Three Brothers',vi:'Ba Anh Em',team:'village',set:'Characters',min:3,max:3,exact:3,n1:44,every:46,
+ {id:'brothers',name:'The Three Brothers',vi:'Ba Anh Em',team:'village',set:'Characters',min:3,max:3,exact:3,n1:44,every:46,
   d:'Wake together to learn each other, and may wake briefly each night to confer in silence.',
   say:'Three Brothers, wake up and look at one another.',
   sayVi:'Ba Anh Em thức dậy và nhìn mặt nhau.'},
- {id:'guard',ic:'🛡️',name:'Bodyguard',vi:'Bảo Vệ',team:'village',set:'Base',only:'vn',max:1,n1:47,every:47,
+ {id:'guard',name:'Bodyguard',vi:'Bảo Vệ',team:'village',set:'Base',only:'vn',max:1,n1:47,every:47,
   d:'Each night protects one player. If the werewolves attack that player, nobody dies. He may not protect the same person on two nights in a row. Standard in Vietnamese play; not in the original Miller’s Hollow box.',
   say:'Bodyguard, wake up and choose one person to shield tonight.',
   sayVi:'Bảo Vệ thức dậy và chọn một người để che chở đêm nay.',pick:1,special:'guard'},
- {id:'littlegirl',ic:'👀',name:'Little Girl',vi:'Bé Gái',team:'village',set:'Base',max:1,n1:48,
+ {id:'littlegirl',name:'Little Girl',vi:'Bé Gái',team:'village',set:'Base',max:1,n1:48,
   d:'May peek through her fingers while the werewolves are awake, at her own risk.',
   say:'Little Girl, show yourself to me only, then close your eyes.',
   sayVi:'Bé Gái cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'fox',ic:'🦊',name:'The Fox',vi:'Cáo',team:'village',set:'Characters',max:1,n1:50,every:50,
+ {id:'fox',name:'The Fox',vi:'Cáo',team:'village',set:'Characters',max:1,n1:50,every:50,
   d:'Each night sniffs a player and their two living neighbours. If no werewolf is among them, he loses his power.',
   say:'Fox, wake up. Point to a player and I will tell you whether a werewolf hides among them and their neighbours.',
   sayVi:'Cáo thức dậy. Chỉ vào một người, tôi sẽ cho biết trong ba người đó có sói hay không.',pick:1,special:'fox'},
- {id:'actor',ic:'🎭',name:'The Actor',vi:'Diễn Viên',team:'village',set:'Characters',max:1,n1:52,every:52,
+ {id:'actor',name:'The Actor',vi:'Diễn Viên',team:'village',set:'Characters',max:1,n1:52,every:52,
   d:'Three character cards are placed face up. Each night he may use one of them, once each.',
   say:'Actor, wake up. Choose which of your three characters you play tonight.',
   sayVi:'Diễn Viên thức dậy. Chọn nhân vật bạn sẽ dùng đêm nay.'},
- {id:'seer',ic:'🔮',name:'Seer',vi:'Tiên Tri',team:'village',set:'Base',max:1,n1:55,every:55,
+ {id:'seer',name:'Seer',vi:'Tiên Tri',team:'village',set:'Base',max:1,n1:55,every:55,
   d:'Each night, looks at one player. In the original rules she sees the exact card; in Vietnamese play she learns only whether they are on the werewolf side.',
   say:'Seer, wake up. Point to the player whose true nature you wish to see.',
   sayVi:'Tiên Tri thức dậy. Chỉ vào người mà bạn muốn soi.',pick:1},
- {id:'wolf',ic:'🐺',name:'Werewolf',vi:'Ma Sói',team:'wolf',set:'Base',max:8,n1:60,every:60,
+ {id:'wolf',name:'Werewolf',vi:'Ma Sói',team:'wolf',set:'Base',max:8,n1:60,every:60,
   d:'Wakes each night with the pack and agrees on one victim.',
   say:'Werewolves, wake up. Recognise each other, and choose your victim.',
   sayVi:'Ma Sói thức dậy. Nhìn nhau nhận đồng đội, và chọn nạn nhân đêm nay.',pick:1},
- {id:'whitewolf',ic:'❄️',name:'White Werewolf',vi:'Sói Trắng',team:'wolf',set:'Characters',max:1,n1:65,every:65,alt:true,
+ {id:'whitewolf',name:'White Werewolf',vi:'Sói Trắng',team:'wolf',set:'Characters',max:1,n1:65,every:65,alt:true,
   d:'Wakes with the pack, then again every second night to devour a werewolf. Wins alone.',
   say:'White Werewolf, wake up. You may devour one of your own. Point, or shake your head.',
   sayVi:'Sói Trắng thức dậy. Bạn có thể ăn một con sói. Hãy chỉ, hoặc lắc đầu.',pick:1},
- {id:'witch',ic:'🧪',name:'Witch',vi:'Phù Thuỷ',team:'village',set:'Base',max:1,n1:70,every:70,
+ {id:'witch',name:'Witch',vi:'Phù Thuỷ',team:'village',set:'Base',max:1,n1:70,every:70,
   d:'One healing potion and one poison, each usable once in the whole game.',
   say:'Witch, wake up. This is the victim. Will you save them? Will you poison anyone?',
   sayVi:'Phù Thuỷ thức dậy. Đây là nạn nhân đêm nay. Bạn có cứu không? Có dùng thuốc độc không?',special:'witch'},
- {id:'piper',ic:'🎵',name:'The Pied Piper',vi:'Người Thổi Sáo',team:'solo',set:'Characters',max:1,n1:80,every:80,
+ {id:'piper',name:'The Pied Piper',vi:'Người Thổi Sáo',team:'solo',set:'Characters',max:1,n1:80,every:80,
   d:'Charms two players each night. Wins alone the moment every other living player is charmed.',
   say:'Pied Piper, wake up and charm two players.',
   sayVi:'Người Thổi Sáo thức dậy và mê hoặc hai người.',pick:2,special:'charm'},
- {id:'hunter',ic:'🏹',name:'Hunter',vi:'Thợ Săn',team:'village',set:'Base',max:1,n1:82,
+ {id:'hunter',name:'Hunter',vi:'Thợ Săn',team:'village',set:'Base',max:1,n1:82,
   d:'When he dies he must immediately shoot one living player — the shot is compulsory, not a choice. Vietnamese play denies him the shot if the Witch poisoned him; Miller’s Hollow lets him fire whatever killed him.',
   say:'Hunter, show yourself to me only, then close your eyes.',
   sayVi:'Thợ Săn cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'elder',ic:'⏳',name:'The Elder',vi:'Trưởng Lão',team:'village',set:'Characters',max:1,n1:84,
+ {id:'elder',name:'The Elder',vi:'Trưởng Lão',team:'village',set:'Characters',max:1,n1:84,
   d:'Survives the first werewolf attack. If the village eliminates him, every villager loses their power.',
   say:'Elder, show yourself to me only, then close your eyes.',
   sayVi:'Trưởng Lão cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'knight',ic:'🗡️',name:'Knight with the Rusty Sword',vi:'Hiệp Sĩ Kiếm Rỉ',team:'village',set:'Characters',max:1,n1:86,
+ {id:'knight',name:'Knight with the Rusty Sword',vi:'Hiệp Sĩ Kiếm Rỉ',team:'village',set:'Characters',max:1,n1:86,
   d:'When the werewolves kill him, the first werewolf clockwise from him dies of infection the next night.',
   say:'Knight, show yourself to me only, then close your eyes.',
   sayVi:'Hiệp Sĩ Kiếm Rỉ cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'beartamer',ic:'🐻',name:'Bear Tamer',vi:'Người Dạy Gấu',team:'village',set:'Characters',max:1,n1:88,
+ {id:'beartamer',name:'Bear Tamer',vi:'Người Dạy Gấu',team:'village',set:'Characters',max:1,n1:88,
   d:'Each dawn the moderator growls if either living neighbour is a werewolf.',
   say:'Bear Tamer, show yourself to me only, then close your eyes.',
   sayVi:'Người Dạy Gấu cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'angel',ic:'😇',name:'The Angel',vi:'Thiên Thần',team:'solo',set:'Characters',max:1,n1:90,
+ {id:'angel',name:'The Angel',vi:'Thiên Thần',team:'solo',set:'Characters',max:1,n1:90,
   d:'Wins immediately and alone if eliminated on the first day\u2019s vote, or taken on the first night.',
   say:'Angel, show yourself to me only, then close your eyes.',
   sayVi:'Thiên Thần cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'idiot',ic:'🤪',name:'Village Idiot',vi:'Thằng Ngốc',team:'village',set:'Characters',max:1,n1:92,
+ {id:'idiot',name:'Village Idiot',vi:'Thằng Ngốc',team:'village',set:'Characters',max:1,n1:92,
   d:'If voted out he is revealed and spared, but loses the right to vote forever.',
   say:'Village Idiot, show yourself to me only, then close your eyes.',
   sayVi:'Thằng Ngốc cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'scapegoat',ic:'🐐',name:'Scapegoat',vi:'Vật Tế Thần',team:'village',set:'Characters',max:1,n1:94,
+ {id:'scapegoat',name:'Scapegoat',vi:'Vật Tế Thần',team:'village',set:'Characters',max:1,n1:94,
   d:'If the village vote ties, he dies instead \u2014 and as he goes he decides who may vote tomorrow.',
   say:'Scapegoat, show yourself to me only, then close your eyes.',
   sayVi:'Vật Tế Thần cho tôi thấy mặt, rồi nhắm mắt lại.'},
- {id:'servant',ic:'🧹',name:'Devoted Servant',vi:'Người Hầu Trung Thành',team:'village',set:'Characters',max:1,n1:96,
+ {id:'servant',name:'Devoted Servant',vi:'Người Hầu Trung Thành',team:'village',set:'Characters',max:1,n1:96,
   d:'Before an eliminated player\u2019s card is revealed, she may show her own and take their role instead.',
   say:'Devoted Servant, show yourself to me only, then close your eyes.',
   sayVi:'Người Hầu Trung Thành cho tôi thấy mặt, rồi nhắm mắt lại.'},
@@ -117,8 +117,14 @@ const TEAM_NAME = { village:'Village', wolf:'Werewolves', solo:'Alone' };
 const provLabel = set => G && G.rules === 'vn'
   ? (set === 'Characters' ? 'Mở rộng' : 'Cơ bản')
   : (set === 'Characters' ? 'Expansion' : 'Base');
-const icOf  = id => (R[id] && R[id].ic) || '';
-const pIcon = p => p.role ? icOf(p.role) : '<i>?</i>';
+/* One monochrome glyph per role, tinted by the team it is on. The tint is the reason
+   rows no longer carry a separate coloured dot: the icon and the dot were saying the
+   same thing twice, six pixels apart. teamOf() rather than r.team for a player, so a
+   turned Wild Child or a Wolf Hound that chose the pack shows the side it is actually on. */
+const icSvg = (id, team) => '<svg class="ic tm-' + (team || 'none') + '" viewBox="0 0 24 24" ' +
+  'aria-hidden="true"><use href="#i-' + String(id).replace(/^__/, 'x-') + '"/></svg>';
+const icOf  = id => (R[id] || id === '__lovers') ? icSvg(id, R[id] && R[id].team) : '';
+const pIcon = p => p.role ? icSvg(p.role, teamOf(p)) : '<span class="ic none"><i>?</i></span>';
 // The Vietnamese public order differs from the French original in one place:
 // the Seer is called AFTER the pack, and she learns only wolf-or-not.
 // Everything else in the quoted order matches: Ăn trộm, Cupid, Cặp đôi,
@@ -283,24 +289,11 @@ const witchMaySaveSelf   = () => G.selfHeal     == null ? G.rules !== 'vn' : G.s
 const hunterFiresPoisoned = () => G.hunterPoison == null ? G.rules !== 'vn' : G.hunterPoison;
 const fmtN = n => (Math.round(n * 100) / 100).toString();
 
-/* Nerd Font glyphs: U+F074 for shuffle, U+F0AD4 for the music toggle. Both are
-   Private Use Area, so they only draw where such a font is installed. We ask the
-   canvas whether the glyph actually resolved and fall back to a plain Unicode
-   symbol when it did not, rather than showing an empty box at the table. */
-const NF = { shuffle:'\uf074', music:'\udb82\uded4' };
-const FB = { shuffle:'\uD83D\uDD00', music:'\u266a' };
-const nerd = (() => {
-  try {
-    const c = document.createElement('canvas').getContext('2d');
-    c.font = '32px monospace';
-    const plain = c.measureText(NF.shuffle).width;
-    c.font = '32px "Symbols Nerd Font Mono","Symbols Nerd Font","Hack Nerd Font",' +
-             '"JetBrainsMono Nerd Font","FiraCode Nerd Font","Iosevka Nerd Font",monospace';
-    const styled = c.measureText(NF.shuffle).width;
-    return styled > 0 && Math.abs(styled - plain) > 0.5;
-  } catch (e){ return false; }
-})();
-const icon = k => '<span class="nf">' + (nerd ? NF[k] : FB[k]) + '</span>';
+/* The two UI controls use the same monochrome sprite as the roles. This replaced a
+   Nerd Font probe with a Unicode fallback: the font is almost never installed, so in
+   practice it drew an emoji shuffle glyph — which, once the role emoji were gone, was
+   the only saturated object left on the screen. */
+const icon = k => '<svg class="uic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ui-' + k + '"/></svg>';
 // Who actually holds a vote today, and what the whole table is worth.
 function votePower(p){ return p.sheriff ? (G.rules === 'vn' ? 1.5 : 2) : 1; }
 function eligibleVoters(){
@@ -449,7 +442,7 @@ function buildNight(){
   G.steps = steps; G.si = 0; G.n = {};
 }
 function stepInfo(s){
-  if (s.role === '__lovers') return { name:'The Lovers', vi:'Cặp Đôi', ic:'💞', id:'__lovers',
+  if (s.role === '__lovers') return { name:'The Lovers', vi:'Cặp Đôi',  id:'__lovers',
     d:'The two Lovers learn who they are.',
     say:'Lovers, wake up and look at one another. You now win or lose together.',
     sayVi:'Cặp Đôi thức dậy và nhìn mặt nhau. Từ giờ hai người thắng hoặc chết cùng nhau.' };
@@ -651,8 +644,7 @@ function show(id){
 function chip(p, o){
   o = o || {};
   const c = el('div', 'chip' + (o.sel ? ' sel' : '') + (o.dead ? ' dead' : ''));
-  c.innerHTML = '<span class="ic">' + pIcon(p) + '</span>' + p.name +
-    '<span class="dot t-' + teamOf(p) + '"></span>' +
+  c.innerHTML = pIcon(p) + p.name +
     (o.badge ? '<span class="bd">' + o.badge + '</span>' : '');
   if (!o.dead && o.on) c.onclick = o.on;
   return c;
@@ -660,8 +652,7 @@ function chip(p, o){
 function playerRow(p, i, onTap){
   const d = el('div', 'p' + (p.alive ? '' : ' dead'));
   d.innerHTML = (i != null ? '<span class="seat">' + (i+1) + '</span>' : '') +
-    '<span class="ic">' + pIcon(p) + '</span>' +
-    '<span class="dot t-' + teamOf(p) + '"></span>' +
+    pIcon(p) +
     '<span class="nm">' + p.name + '</span>' +
     '<span class="rl">' + (p.role ? R[p.role].name : 'unknown') + '</span>';
   const tags = [];
@@ -901,7 +892,7 @@ function rRoles(){
     const row = el('div','r set-' + r.set + (off ? ' off' : '') + (c ? ' act' : '') +
       (chosen ? ' picked' : ''));
     const info = el('div','info',
-      '<div class="rn"><span class="ic">' + icOf(r.id) + '</span><span class="dot t-'+r.team+'"></span>' +
+      '<div class="rn">' + icOf(r.id) +
         (G.rules==='vn' ? r.vi : r.name) +
         '<span class="vi">' + (G.rules==='vn' ? r.name : r.vi) + '</span>' +
         (off ? '<span class="tag">not in this box</span>' : '') +
@@ -929,9 +920,8 @@ function rDeal(){
   for (const r of ROLES){
     const c = G.counts[r.id]; if (!c) continue;
     const row = el('div','dl set-' + r.set);
-    row.innerHTML = '<span class="q">' + c + '</span><span class="ic">' + icOf(r.id) +
-      '</span><span class="nn">' + (G.rules==='vn' ? r.vi + ' \u00b7 ' + r.name : r.name) + '</span>' +
-      '<span class="dot t-' + r.team + '"></span>';
+    row.innerHTML = '<span class="q">' + c + '</span>' + icOf(r.id) +
+      '<span class="nn">' + (G.rules==='vn' ? r.vi + ' \u00b7 ' + r.name : r.name) + '</span>';
     L.appendChild(row);
   }
   const mh = G.rules === 'mh';
@@ -1074,8 +1064,8 @@ function rNight(){
   $('nStep').textContent = (G.night === 1 ? 'Roll call' : 'Night ' + G.night) +
     ' \u00b7 step ' + (G.si+1) + ' of ' + G.steps.length;
   const vn = G.rules === 'vn';
-  const tIc = info.id === '__lovers' ? '💘' : icOf(s.role);
-  $('nTitle').innerHTML = (tIc ? '<span class="ic" style="font-size:22px;margin-right:8px">' + tIc + '</span>' : '') +
+  const tIc = info.id === '__lovers' ? icOf('__lovers') : icOf(s.role);
+  $('nTitle').innerHTML = (tIc ? '<span class="hIc">' + tIc + '</span>' : '') +
     ((vn && info.vi)
     ? info.vi + ' <span style="font-size:14px;color:var(--txt2);font-family:var(--ui);font-weight:500">' + info.name + '</span>'
     : info.name + (info.vi ? ' <span style="font-size:14px;color:var(--txt2);font-family:var(--ui);font-weight:500">' + info.vi + '</span>' : ''));
@@ -1258,7 +1248,7 @@ function rNight(){
       B.appendChild(el('p','note','Tap what you saw and I will answer on screen from now on \u2014 you will never need to read that card again.'));
       const rc = el('div','chips');
       for (const r of ROLES){
-        const b = el('div','chip','<span class="dot t-'+r.team+'"></span>' + r.name);
+        const b = el('div','chip', icOf(r.id) + r.name);
         b.onclick = () => { snap(); t.role = r.id;
           log('The Seer saw that ' + t.name + ' is the ' + r.name + '.'); render(); };
         rc.appendChild(b);
@@ -1417,8 +1407,7 @@ function rDawn(){
     B.appendChild(el('div','alert','The Hunter is among the dead \u2014 he fires before the day begins.'));
   bar([{ t:'Announce the dawn \u2192', wide:true, on:applyDawn }]);
 }
-function icSpanD(p){ return '<span class="ic">' + pIcon(p) + '</span>' +
-  '<span class="dot t-' + teamOf(p) + '"></span>'; }
+function icSpanD(p){ return pIcon(p); }
 
 /* ---- day ---- */
 function rDay(){
