@@ -13,10 +13,11 @@
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>Miller’s Hollow — Moderator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<!-- Both faces are self-hosted (see css/app.css). Nothing on this page reaches another
+     origin, which is the point of an app used in a cellar with no signal. -->
 <link rel="stylesheet" href="./css/app.css">
+<link rel="preload" href="./fonts/bevietnampro-500-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./fonts/lora-latin.woff2" as="font" type="font/woff2" crossorigin>
 </head>
 <body>
 <!-- Role icons. One monochrome set, inline so it costs no request and works
@@ -144,7 +145,11 @@
   <div class="bar"><div class="barnote" id="barNote" hidden></div><div class="in" id="bar"></div></div>
 </div>
 
+<!-- Done sits ABOVE the hold button. This phone is in another player's hand, and the
+     two were stacked full-width with Done the lower of the pair — nearest where a
+     player grips, one release away from dismissing the reveal they were handed. -->
 <div class="modal seer" id="mSeer"><div class="in seerin">
+  <button type="button" class="btn sec done" id="bSeerDone">Done</button>
   <div class="skick" id="revKick">Turn the screen</div>
   <div class="swho" id="seerWho">—</div>
   <div class="secret" id="revSecret" aria-hidden="true">
@@ -152,7 +157,6 @@
     <div class="steam" id="seerTeam">—</div>
   </div>
   <button type="button" class="btn wide hold" id="bReveal">Hold to see it</button>
-  <button type="button" class="btn sec wide" id="bSeerDone">Done</button>
 </div></div>
 
 <div class="modal" id="mRoster"><div class="in">

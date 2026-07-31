@@ -26,15 +26,16 @@ t('the state store lives outside the snapshotted game state', () =>
 
 console.log('\nEVERY LONG BLOCK IS FOLDED');
 const keys = [...src.matchAll(/collapsible\('(\w+)'/g)].map(m => m[1]);
-t('five blocks are collapsible', () =>
-  keys.length === 5 ? true : keys.length + ' found: ' + keys.join(', '));
+t('six blocks are collapsible', () =>
+  keys.length === 6 ? true : keys.length + ' found: ' + keys.join(', '));
 t('each has a distinct key, or they would share open state', () =>
   new Set(keys).size === keys.length ? true : 'duplicate keys: ' + keys.join(', '));
 for (const [key, what] of [['deal','the deal-route explanation'],
                            ['sheriff','what the badge does'],
                            ['order','how the two rulesets differ'],
                            ['deckhow','shuffle vs suggested'],
-                           ['house','the disputed house rules']]){
+                           ['house','the disputed house rules'],
+                           ['chronicle','the older half of the chronicle']]){
   t(what + " is folded (key '" + key + "')", () =>
     keys.includes(key) ? true : 'missing');
 }

@@ -17,13 +17,17 @@ eval(src.match(/function teamOf\(p\)\{[\s\S]*?\n\}/)[0].replace('function teamOf
 globalThis.isWolf = p => teamOf(p) === 'wolf';
 eval(src.match(/const fmtN = [^;]*;/)[0].replace('const fmtN','globalThis.fmtN'));
 eval(src.match(/function votePower\(p\)\{[^}]*\}/)[0].replace('function votePower','globalThis.votePower = function'));
+eval(src.match(/const scapegoatBinds = [^;]*;/)[0].replace('const scapegoatBinds','globalThis.scapegoatBinds'));
 eval(src.match(/function eligibleVoters\(\)\{[\s\S]*?\n\}/)[0].replace('function eligibleVoters','globalThis.eligibleVoters = function'));
 eval(src.match(/function totalPower\(\)\{[^}]*\}/)[0].replace('function totalPower','globalThis.totalPower = function'));
 eval(src.match(/function checkWin\(\)\{[\s\S]*?\n\}/)[0].replace('function checkWin','globalThis.checkWin = function'));
 
+/* eval, as in every suite here: the functions under test are lifted out of the shipped
+   ../js/app.js so a test cannot pass against a copy that has drifted. This repo's own
+   source is the only input. */
 function table(roles, extra){
   globalThis.G = Object.assign({ rules:'vn', houndSide:null, counts:{}, votes:{}, sheriffVote:null,
-    scapegoatVoters:null,
+    scapegoatVoters:null, scapegoatDay:null, day:1,
     players: roles.map((r,i) => ({ id:'p'+i, name:'P'+i, role:r, alive:true, sheriff:false,
       voteless:false, lover:false, charmed:false, turned:false })) }, extra||{});
   roles.forEach(r => G.counts[r] = (G.counts[r]||0)+1);
@@ -89,11 +93,40 @@ t('the badge can push a name over the line on its own', () => {
   const need = verdict({ p2:3 });           // 3 hands + 0.5 = 3.5 of 5.5 -> carries
   return (!with_.carries && need.carries) ? true : 'two=' + with_.best + ' three=' + need.best + ' thr=' + need.thr;
 });
-t('the Scapegoat\u2019s decree shrinks the electorate', () => {
+/* "As he dies he decides who may vote tomorrow." One day. The list used to be cleared
+   only by the "Everyone may vote" button on the screen that set it, so a tie on day 2
+   silenced the same people for every remaining day \u2014 and because the electorate sets the
+   threshold, every later vote was then measured against the wrong number. */
+t('the Scapegoat\u2019s decree shrinks the electorate on the day it governs', () => {
   const g = table(['wolf','wolf','villager','villager','villager','seer','witch']);
   const before = totalPower();
-  g.scapegoatVoters = ['p0','p1','p2'];
+  g.day = 3; g.scapegoatVoters = ['p0','p1','p2']; g.scapegoatDay = 3;
   return (before === 7 && totalPower() === 3) ? true : before + ' -> ' + totalPower();
+});
+t('and it is spent the day after, without anybody clearing it', () => {
+  const g = table(['wolf','wolf','villager','villager','villager','seer','witch']);
+  g.day = 3; g.scapegoatVoters = ['p0','p1','p2']; g.scapegoatDay = 3;
+  const during = totalPower();
+  g.day = 4;                                  // nothing else changes; the day moves on
+  return (during === 3 && totalPower() === 7)
+    ? true : 'day 3 = ' + during + ', day 4 = ' + totalPower() + ' (the village stayed silenced)';
+});
+t('it does not bite early either', () => {
+  const g = table(['wolf','wolf','villager','villager','villager','seer','witch']);
+  g.day = 2; g.scapegoatVoters = ['p0','p1','p2']; g.scapegoatDay = 3;
+  return totalPower() === 7 ? true : 'silenced them a day before he died';
+});
+t('a decree with no day attached is ignored, not applied forever', () => {
+  // a game saved before the day was recorded: everyone speaks, which is the safe read
+  const g = table(['wolf','wolf','villager','seer']);
+  g.day = 1; g.scapegoatVoters = ['p0']; g.scapegoatDay = null;
+  return totalPower() === 4 ? true : 'an old save would silence the table permanently';
+});
+t('the day screen reads the same rule, not the raw list', () => {
+  const day = (src.match(/function rDay\(\)\{[\s\S]*?\n  const cells = \[\];/) || [''])[0];
+  const raw = day.split('\n').filter(l => /G\.scapegoatVoters/.test(l) && !/scapegoatBinds/.test(l)
+    && !/\.map\(i=>byId\(i\)\.name\)/.test(l));
+  return raw.length === 0 ? true : 'a stale decree would still be announced: ' + raw.join(' // ');
 });
 
 console.log('\nPARITY ENDS IT');

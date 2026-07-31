@@ -7,7 +7,11 @@
  *   · navigation  -> cache first, revalidate in the background. The app opens
  *                    instantly and offline; a new version is picked up next launch.
  *   · same-origin -> stale-while-revalidate, same reasoning.
- *   · fonts       -> cache first and keep forever; they never change per version.
+ *
+ * There is no font branch any more, and no cross-origin branch at all: both faces are
+ * served from ./fonts and precached with everything else. They used to come from Google
+ * on a render-blocking stylesheet, which meant a first-ever launch with no signal waited
+ * on a request that could not succeed.
  *
  * VERSION names the cache, so it must change on every release or clients keep serving
  * the old bundle. It is not maintained here: static.yml rewrites this line from the
@@ -21,7 +25,23 @@
  */
 const VERSION = 'mh-v0.0.0-dev';
 const SHELL   = VERSION + '-shell';
-const FONTS   = 'mh-fonts-v1';
+/* The fonts are byte-identical across releases, so they live in their own cache, which
+   activate keeps. A release changes VERSION and therefore SHELL, and every shell file is
+   refetched on the next launch — 148 KB of unchanged font would ride along for nothing.
+   v2 because v1 held Google's copies, and this bump is what deletes them. */
+const FONTS   = 'mh-fonts-v2';
+const FONT_FILES = [
+  './fonts/bevietnampro-400-latin.woff2',
+  './fonts/bevietnampro-400-vietnamese.woff2',
+  './fonts/bevietnampro-500-latin.woff2',
+  './fonts/bevietnampro-500-vietnamese.woff2',
+  './fonts/bevietnampro-600-latin.woff2',
+  './fonts/bevietnampro-600-vietnamese.woff2',
+  './fonts/bevietnampro-700-latin.woff2',
+  './fonts/bevietnampro-700-vietnamese.woff2',
+  './fonts/lora-latin.woff2',
+  './fonts/lora-vietnamese.woff2',
+];
 
 // Everything needed to boot with no network at all. The PNGs are here because the
 // install prompt and the home-screen icon read them from the manifest, and a moderator
@@ -40,12 +60,15 @@ const PRECACHE = [
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
-    const c = await caches.open(SHELL);
+    const shell = await caches.open(SHELL), fonts = await caches.open(FONTS);
     // addAll fails the whole install if any single file 404s, which would leave
     // the app with no offline support at all. Add them individually instead —
     // but say which one failed, or a mistyped path is invisible forever.
-    await Promise.all(PRECACHE.map(u =>
-      c.add(u).catch(err => console.warn('[sw] precache failed:', u, err.message))));
+    const put = (c, u) => c.add(u).catch(err => console.warn('[sw] precache failed:', u, err.message));
+    // The fonts go straight into the cache the fetch handler serves them from, so a
+    // first-ever launch with no signal still has them.
+    await Promise.all([...PRECACHE.map(u => put(shell, u)),
+                       ...FONT_FILES.map(u => put(fonts, u))]);
     await self.skipWaiting();
   })());
 });
@@ -60,15 +83,16 @@ self.addEventListener('activate', e => {
   })());
 });
 
-const isFont = url =>
-  url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
+const isFont = url => /\.woff2$/.test(url.pathname);
 
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.origin !== location.origin) return;
 
-  // Fonts: cache first, forever. They are versioned by their own URLs.
+  // Fonts: cache first, forever, and out of the versioned cache. A release replaces the
+  // shell; these files do not change, so re-downloading them would be pure waste.
   if (isFont(url)){
     e.respondWith((async () => {
       const c = await caches.open(FONTS);
@@ -76,16 +100,14 @@ self.addEventListener('fetch', e => {
       if (hit) return hit;
       try {
         const res = await fetch(req);
-        if (res.ok || res.type === 'opaque') c.put(req, res.clone());
+        if (res.ok) c.put(req, res.clone());
         return res;
       } catch (err){
-        return hit || Response.error();
+        return Response.error();
       }
     })());
     return;
   }
-
-  if (url.origin !== location.origin) return;
 
   // The app itself, and anything beside it: serve from cache at once, refresh behind.
   e.respondWith((async () => {

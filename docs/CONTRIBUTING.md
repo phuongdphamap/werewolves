@@ -202,11 +202,18 @@ the full Vietnamese range. An earlier display font did not, and every `ả ệ �
 fell back to a different font per glyph, which looks like a rendering fault rather than
 a font choice.
 
+Both are **self-hosted** in `fonts/`, as latin and vietnamese `woff2` subsets — 148 KB
+across ten files, all precached. They used to load from Google on a render-blocking
+stylesheet, which is the last thing you want between a moderator in a cellar and a first
+paint. If you add a weight, add both subsets, the `@font-face` pair in `css/app.css`, and
+the files to `FONT_FILES` in `sw.js`; a test checks every face the stylesheet asks for is
+one the worker caches.
+
 If you touch typography, check a string with stacked diacritics renders in one face.
 
 ## Testing
 
-443 assertions across 22 suites, in about three seconds. No dependencies — they read
+571 assertions across 24 suites, in about three seconds. No dependencies — they read
 `index.html`, `sw.js` and the manifest as text and assert against them:
 
 ```bash

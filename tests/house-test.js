@@ -14,6 +14,12 @@ eval(src.match(/const witchMaySaveSelf[\s\S]*?hunterPoison;/)[0]
   .replace('const hunterFiresPoisoned','globalThis.hunterFiresPoisoned'));
 const logs = [];
 globalThis.log = t => logs.push(t);
+/* eval, deliberately and throughout these suites: the point is to run the SHIPPED
+   function, lifted out of ../js/app.js, so a test cannot pass against a copy that has
+   drifted. The only input is this repo's own source. */
+// The rule reads a cause CODE now, and registerDeaths renders the label from it
+eval(src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','globalThis.CAUSE'));
+eval(src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'));
 eval(src.match(/function registerDeaths\(chain\)\{[\s\S]*?\n\}/)[0]
   .replace('function registerDeaths','globalThis.registerDeaths = function'));
 
@@ -28,7 +34,7 @@ function shoots(rules, override, cause){
   registerDeaths([{ p:{ id:'h', name:'Thợ', role:'hunter', sheriff:false }, cause }]);
   return { fired: !!G.pending.hunterId, note: logs.find(l => l.includes('no shot')) };
 }
-const POISON = 'the Witch\u2019s poison';
+const POISON = 'poison';   // a code now, not the sentence
 
 console.log('THE DEFAULTS STILL FOLLOW EACH TRADITION');
 t('Miller’s Hollow: he fires even when poisoned', () =>
@@ -66,13 +72,13 @@ t('null means follow the ruleset, and is distinct from false', () => {
 });
 
 console.log('\nONLY POISON IS AFFECTED');
-for (const cause of ['werewolves','the village vote','the tie','grief','the White Werewolf']){
+for (const cause of ['wolves','vote','tie','grief','white','rust','shot']){
   t('"' + cause + '" always lets him fire, under both rulesets', () =>
     (shoots('vn', null, cause).fired && shoots('mh', null, cause).fired)
       ? true : 'suppressed by a non-poison cause');
 }
 t('a poison override does not disturb the other causes', () =>
-  shoots('vn', false, 'werewolves').fired ? true : 'forcing no broke a normal death');
+  shoots('vn', false, 'wolves').fired ? true : 'forcing no broke a normal death');
 
 console.log('\nTHE SETTINGS ARE REACHABLE AND EXPLAINED');
 t('a House rules panel exists on the deck screen', () =>

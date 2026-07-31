@@ -78,7 +78,7 @@ const ROLES = [
   say:'Hunter, show yourself to me only, then close your eyes.',
   sayVi:'Thợ Săn cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'elder',name:'The Elder',vi:'Trưởng Lão',team:'village',set:'Characters',max:1,n1:84,
-  d:'Survives the first werewolf attack. If the village eliminates him, every villager loses their power.',
+  d:'Survives the first werewolf attack. If the village kills him — the vote, the Witch’s poison or the Hunter’s shot — every villager loses their power. A werewolf kill does not cost the village anything.',
   say:'Elder, show yourself to me only, then close your eyes.',
   sayVi:'Trưởng Lão cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'knight',name:'Knight with the Rusty Sword',vi:'Hiệp Sĩ Kiếm Rỉ',team:'village',set:'Characters',max:1,n1:86,
@@ -228,11 +228,23 @@ function blank(){
     steps:[], si:0, n:{}, dawn:[], pending:{},
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
-    infectNext:null, over:null, scapegoatVoters:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
-    selfHeal:null, hunterPoison:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars', dawnWhy:[], dawnSure:true, dawnEdit:false };
+    infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
+    selfHeal:null, hunterPoison:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
+    dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
 G = blank();
-function snap(){ undoStack.push(JSON.stringify(G)); if (undoStack.length > 80) undoStack.shift(); }
+/* Eighty snapshots of a twenty-player game with a full chronicle is a live buffer of a
+   few megabytes, held on a phone that has been awake in someone's hand for an hour. The
+   count alone did not bound it, because the thing being counted grows all game. */
+const UNDO_MAX = 80, UNDO_BYTES = 1.5 * 1024 * 1024;
+let undoBytes = 0;
+function snap(){
+  const s = JSON.stringify(G);
+  undoStack.push(s); undoBytes += s.length;
+  while (undoStack.length > UNDO_MAX || (undoBytes > UNDO_BYTES && undoStack.length > 1))
+    undoBytes -= undoStack.shift().length;
+}
+function clearUndo(){ undoStack.length = 0; undoBytes = 0; }
 
 /* A phone locks, the tab is evicted, the browser reloads — and a game in progress
    would be gone with fifteen people waiting. The whole state is small and already
@@ -264,7 +276,11 @@ function loadSaved(){
   } catch (e){ return null; }
 }
 function dropSaved(){ try { localStorage.removeItem(SAVE_KEY); } catch (e){} }
-function undo(){ if (!undoStack.length) return; G = JSON.parse(undoStack.pop()); render(); }
+function undo(){
+  if (!undoStack.length) return;
+  const s = undoStack.pop(); undoBytes -= s.length;
+  G = JSON.parse(s); render();
+}
 
 const alive = () => G.players.filter(p => p.alive);
 const byId = id => G.players.find(p => p.id === id);
@@ -296,9 +312,15 @@ const fmtN = n => (Math.round(n * 100) / 100).toString();
 const icon = k => '<svg class="uic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ui-' + k + '"/></svg>';
 // Who actually holds a vote today, and what the whole table is worth.
 function votePower(p){ return p.sheriff ? (G.rules === 'vn' ? 1.5 : 2) : 1; }
+/* "As he dies he decides who may vote tomorrow." One day. The list used to be cleared
+   only by the "Everyone may vote" button on the screen that set it, so a tie on day 2
+   silenced the same people for the rest of the game — and because eligibleVoters feeds
+   totalPower, which sets the threshold, every later vote was measured against the wrong
+   arithmetic. Scoped by the day it governs, the same shape as G.lastGuard. */
+const scapegoatBinds = () => !!(G.scapegoatVoters && G.scapegoatDay === G.day);
 function eligibleVoters(){
   let list = alive().filter(p => !p.voteless);
-  if (G.scapegoatVoters) list = list.filter(p => G.scapegoatVoters.includes(p.id));
+  if (scapegoatBinds()) list = list.filter(p => G.scapegoatVoters.includes(p.id));
   return list;
 }
 function totalPower(){ return eligibleVoters().reduce((a,p) => a + votePower(p), 0); }
@@ -331,8 +353,29 @@ function targetNote(roleId){
     default:          return '';
   }
 }
-function noteSkip(id){ if (!id || id === '__lovers') return;
-  G.n.skipped = G.n.skipped || []; if (!G.n.skipped.includes(id)) G.n.skipped.push(id); }
+/* What the app was asked and could not answer. computeDawn reads it to decide whether it
+   may call the night certain, so anything that walks past a step without recording here
+   produces a dawn the app has no standing to be sure about.
+
+   Two kinds, because they fail differently: an ACTION not taken tonight ('the Witch did
+   nothing'), and a CARD nobody would answer for, which is a hole in what the app knows
+   rather than a thing that did not happen. */
+function noteSkip(id, kind){
+  if (!id || id === '__lovers') return;
+  const key = kind === 'card' ? 'noCard' : 'skipped';
+  G.n[key] = G.n[key] || [];
+  if (!G.n[key].includes(id)) G.n[key].push(id);
+}
+/* Every Skip in the app goes through here. Four of the five used to advance G.si on
+   their own — the roll call, the Witch, the Wolf Hound and the Thief — so skipping the
+   Bodyguard left the gap list empty and dawn called itself certain. */
+function skipStep(kind){
+  const s = G.steps[G.si];
+  snap();
+  if (s) noteSkip(s.role, kind);
+  G.si++;
+  render();
+}
 // Does this card do anything on the first night beyond identifying itself?
 // If the deal was collected up front, the identification-only cards need no call.
 const acts1 = r => !!(r.pick || r.special || r.every || r.id === 'judge');
@@ -430,12 +473,28 @@ function buildNight(){
   } else {
     for (const r of ord()){
       if (r.every == null) continue;
-      if (!liveWith(r.id).length) continue;
-      if (r.id === 'witch' && !G.witchHeal && !G.witchPoison) continue;
-      if (r.id === 'fox' && !G.foxPower) continue;
-      if (G.powersLost && r.team === 'village') continue;
+      if (!G.counts[r.id]) continue;                        // not in this deck at all
+      if (G.powersLost && r.team === 'village') continue;   // publicly known, so no leak
       if (r.alt && G.night % 2 !== 0) continue;
-      steps.push({ role:r.id });
+      /* The step exists because the CARD is in play, not because the app happens to know
+         who holds it. This used to be built from the identified holders, so a card nobody
+         answered for at the roll call was dropped from every night that followed — not
+         skipped for one night, gone for the whole game, with dawn still reporting itself
+         certain. Setting it later from the Roster did not help either, because no later
+         screen rebuilt the script. An unidentified card gets the same identification
+         panel night one uses, which turns a silent omission into a question. */
+      if (withRole(r.id).length < G.counts[r.id]){
+        steps.push({ role:r.id, roll:true });
+        continue;
+      }
+      /* A card that was in play and can no longer act is still CALLED. Dropping the step
+         shortens the night in a way the whole table can hear: miss the Seer and everyone
+         knows the Seer is dead, then narrows the rest by elimination. The moderator reads
+         the same line and waits the same beat — only this screen knows nobody wakes. */
+      const spent = (r.id === 'witch' && !G.witchHeal && !G.witchPoison) ||
+                    (r.id === 'fox' && !G.foxPower);
+      const hush = !liveWith(r.id).length ? 'dead' : spent ? 'spent' : null;
+      steps.push(hush ? { role:r.id, hush } : { role:r.id });
     }
     steps.sort((a,b) => everyOf(R[a.role]) - everyOf(R[b.role]));
   }
@@ -450,9 +509,38 @@ function stepInfo(s){
 }
 
 /* ========================== resolution ========================== */
+/* Every death carries a CODE, and the sentence the moderator reads is derived from it.
+   Two rules used to be decided by matching the display string instead — the Elder's
+   consequence against a list of English phrases, and the poisoned Hunter against
+   /poison/. One copy edit, or translating a cause, would have switched either rule off
+   with nothing failing.
+
+   village: the village itself did the killing. That is what costs the villagers their
+   powers when the Elder is the one who dies. A werewolf kill does not: surviving one
+   attack is the whole point of the card, and a second one is an ordinary death. */
+const CAUSE = {
+  wolves: { label:'werewolves' },
+  white:  { label:'the White Werewolf' },
+  rust:   { label:'the Knight’s rust' },
+  grief:  { label:'grief' },
+  night:  { label:'the night' },
+  vote:   { label:'the village vote',   village:true },
+  tie:    { label:'the tie',            village:true },
+  poison: { label:'the Witch’s poison', village:true },
+  shot:   { label:'the Hunter’s shot',  village:true },
+};
+// A game saved before causes carried codes holds the display string itself, and those
+// players are already dead, so the string is all it was ever going to be used for.
+const causeLabel = c => (CAUSE[c] && CAUSE[c].label) || c || 'dead';
+const villageKilled = c => !!(CAUSE[c] && CAUSE[c].village);
+
 function kill(p, cause){
   if (!p || !p.alive) return [];
   p.alive = false; p.cause = cause;
+  if (p.role === 'elder' && !G.powersLost && villageKilled(cause)){
+    G.powersLost = true;
+    log('The village killed the Elder — by ' + causeLabel(cause) + '. Every villager power is extinguished.');
+  }
   const chain = [{ p, cause }];
   if (p.lover) for (const q of G.players) if (q.alive && q.lover) chain.push(...kill(q, 'grief'));
   if (p.model){
@@ -468,6 +556,7 @@ function computeDawn(){
   const out = [], why = [];
   const add = (id, cause) => { if (id && !out.some(o => o.id === id)) out.push({ id, cause, on:true }); };
   const nm = id => { const q = byId(id); return q ? q.name : '?'; };
+  G.elderAbsorbed = false;
 
   if (G.n.wolf){
     const v = byId(G.n.wolf);
@@ -479,16 +568,21 @@ function computeDawn(){
       } else if (G.n.witchSave){
         why.push('The Witch spent her cure on ' + v.name + ' \u2014 the attack fails.');
       } else if (v.role === 'elder' && G.elderLife){
-        G.elderLife = false;
-        why.push('But ' + v.name + ' is the Elder. His second life absorbs it, and is now spent.');
+        /* Recorded, not spent. This function produces a read model \u2014 deaths, reasoning,
+           certainty \u2014 and applyDawn commits it after taking the snapshot Undo returns to.
+           Spending the life here put it outside that snapshot, so Undo came back to a
+           state where it was already gone; and a moderator who then adjusted the dawn to
+           kill the Elder killed him having also spent the life meant to save him. */
+        G.elderAbsorbed = true;
+        why.push('But ' + v.name + ' is the Elder. His second life absorbs it, and is spent when you announce the dawn.');
       } else {
-        add(G.n.wolf, 'werewolves');
+        add(G.n.wolf, 'wolves');
       }
     }
   }
-  if (G.n.witchKill){ add(G.n.witchKill, 'the Witch\u2019s poison'); why.push('The Witch poisoned <b>' + nm(G.n.witchKill) + '</b>.'); }
-  if (G.n.white){ add(G.n.white, 'the White Werewolf'); why.push('The White Werewolf devoured <b>' + nm(G.n.white) + '</b>.'); }
-  if (G.infectNext){ add(G.infectNext, 'the Knight\u2019s rust'); why.push('The Knight\u2019s rust reached <b>' + nm(G.infectNext) + '</b>.'); }
+  if (G.n.witchKill){ add(G.n.witchKill, 'poison'); why.push('The Witch poisoned <b>' + nm(G.n.witchKill) + '</b>.'); }
+  if (G.n.white){ add(G.n.white, 'white'); why.push('The White Werewolf devoured <b>' + nm(G.n.white) + '</b>.'); }
+  if (G.infectNext){ add(G.infectNext, 'rust'); why.push('The Knight\u2019s rust reached <b>' + nm(G.infectNext) + '</b>.'); }
 
   // grief is a consequence of the rules, so name it here rather than let it surprise anyone
   for (const d of out.slice()){
@@ -502,26 +596,36 @@ function computeDawn(){
 
   // the only honest reasons to ask the moderator anything
   const gaps = [];
-  const sk = G.n.skipped || [];
-  if (G.counts.wolf && !G.n.wolf && !sk.includes('wolf')) gaps.push('the pack never named a victim');
-  if (sk.length) gaps.push('skipped tonight: ' + sk.map(id => R[id] ? R[id].vi : id).join(', '));
+  const vi = id => R[id] ? R[id].vi : id;
+  const sk = G.n.skipped || [], nc = G.n.noCard || [];
+  if (G.counts.wolf && !G.n.wolf && !sk.includes('wolf') && !nc.includes('wolf'))
+    gaps.push('the pack never named a victim');
+  if (sk.length) gaps.push('skipped tonight: ' + sk.map(vi).join(', '));
+  // A skipped ACTION and a card nobody would answer for are different failures, and the
+  // second one used to be recorded nowhere at all.
+  if (nc.length) gaps.push('nobody answered for ' + nc.map(vi).join(', ') + ', so ' +
+    (nc.length > 1 ? 'those cards' : 'that card') + ' could not act');
   const unplacedRules = ['elder','knight'].filter(id => (G.counts[id] || 0) > withRole(id).length);
-  if (unplacedRules.length) gaps.push('the ' + unplacedRules.map(id => R[id].vi).join(' and ') +
+  if (unplacedRules.length) gaps.push('the ' + unplacedRules.map(vi).join(' and ') +
     ' card is not placed, so that rule may not have applied');
   G.dawn = out; G.dawnWhy = why; G.dawnSure = gaps.length === 0; G.dawnGaps = gaps;
-  G.dawnEdit = false;
+  // Set once, on entering dawn. rDawn used to force it true on every render while the
+  // dawn was uncertain, which made the collapse unreachable.
+  G.dawnEdit = gaps.length > 0;
 }
 /* A death can interrupt the flow: the Hunter fires, a dying Sheriff hands on the
    badge. Both can happen at night as well as by daylight, so the queue records
    them and `proceed` returns to wherever we were. */
 function registerDeaths(chain){
   for (const c of chain){
-    log(c.p.name + ' died \u2014 ' + (c.cause === 'grief' ? 'of grief' : c.cause) + '.');
+    log(c.p.name + ' died \u2014 ' + (c.cause === 'grief' ? 'of grief' : causeLabel(c.cause)) + '.');
     if (c.p.role === 'hunter' && !G.pending.hunterId){
       // Vietnamese play (and 狼人杀 before it) holds that poison leaves no time to
       // aim: the Hunter fires when eaten or hanged, but not when poisoned.
-      // Miller’s Hollow says he fires whatever the cause.
-      if (!hunterFiresPoisoned() && /poison/.test(c.cause)){
+      // Miller’s Hollow says he fires whatever the cause. Matched on the cause CODE:
+      // it used to be /poison/ against the sentence, so renaming the potion — or
+      // translating it — would have turned the rule off with nothing failing.
+      if (!hunterFiresPoisoned() && c.cause === 'poison'){
         log(c.p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
             'Change that under House rules if your table plays otherwise.');
       } else {
@@ -544,12 +648,23 @@ function applyDawn(){
   snap();
   G.lastGuard = G.n.guard || null;      // may not shield the same person twice running
   G.infectNext = null;
+  /* The Elder's second life is spent here, with every other commit, and inside the
+     snapshot Undo returns to. Only if he did not die anyway: the adjust list is still
+     open right up to this button, and a life cannot both absorb the attack and fail to. */
+  if (G.elderAbsorbed){
+    const eld = G.players.find(p => p.role === 'elder' && p.alive);
+    if (eld && !G.dawn.some(d => d.on && d.id === eld.id)){
+      G.elderLife = false;
+      log('The Elder’s second life absorbed the attack, and is now spent.');
+    }
+    G.elderAbsorbed = false;
+  }
   let knightDied = null;
   for (const d of G.dawn){
     if (!d.on) continue;
     const p = byId(d.id);
     if (!p || !p.alive) continue;
-    if (p.role === 'knight' && d.cause === 'werewolves') knightDied = p;
+    if (p.role === 'knight' && d.cause === 'wolves') knightDied = p;
     registerDeaths(kill(p, d.cause));
   }
   if (knightDied){
@@ -572,9 +687,13 @@ function checkWin(){
   // Counting the two sides needs only the wolf cards placed — not every villager
   // identified. Demanding the latter froze results for whole games.
   if (!wolfSideKnown()) return null;
+  /* The pair wins ALONE only when it is mixed — that is the whole of Cupid's card. Two
+     villagers or two wolves who outlast everyone win with their own side, and this test
+     sat above the team checks, so Cupid was credited with the pack's victory. */
   const lovers = a.filter(p => p.lover);
-  if (a.length === 2 && lovers.length === 2)
-    return { who:'The Lovers', why: lovers.map(p=>p.name).join(' and ') + ' are the last two alive and they belong to each other.' };
+  if (a.length === 2 && lovers.length === 2 && teamOf(lovers[0]) !== teamOf(lovers[1]))
+    return { who:'The Lovers', why: lovers.map(p=>p.name).join(' and ') +
+      ' are the last two alive, they belong to each other, and they were never on the same side.' };
   const piper = a.find(p => p.role === 'piper');
   if (piper && a.length > 1 && a.every(p => p.role === 'piper' || p.charmed))
     return { who:'The Pied Piper', why: piper.name + ' has charmed every living soul.' };
@@ -602,8 +721,14 @@ function finish(w){ G.over = w; G.phase = 'end'; log(w.who + ' win. ' + w.why); 
    footsteps. Low continuous rain covers all three. Generated, so there is no
    audio file to ship and it works offline.
 ========================================================================== */
-let soundOn = false, AC = null, amGain = null;
+let soundOn = false, AC = null, amGain = null, amWant = null;
 function ambience(want){
+  want = !!want;
+  /* render() calls this on every tap, and every call issued a fresh 1.1-second ramp — so
+     during a run of taps the rain never reached level. That is audible, and the whole
+     point of the rain is that it should be unremarkable. */
+  if (want === amWant) return;
+  amWant = want;
   if (want && !AC){
     try {
       AC = new (window.AudioContext || window.webkitAudioContext)();
@@ -625,7 +750,7 @@ function ambience(want){
       const lg = AC.createGain(); lg.gain.value = 260;
       lfo.connect(lg); lg.connect(lp.frequency);
       src.start(); lfo.start();
-    } catch(e){ AC = null; return; }
+    } catch(e){ AC = null; amWant = null; return; }   // so a later attempt can retry
   }
   if (!AC || !amGain) return;
   if (AC.state === 'suspended' && want) AC.resume();
@@ -646,7 +771,11 @@ function chip(p, o){
   const c = el('div', 'chip' + (o.sel ? ' sel' : '') + (o.dead ? ' dead' : ''));
   c.innerHTML = pIcon(p) + p.name +
     (o.badge ? '<span class="bd">' + o.badge + '</span>' : '');
-  if (!o.dead && o.on) c.onclick = o.on;
+  /* Mark the tapped node before the handler runs. The re-render destroys it, so this
+     class is only ever seen while the rebuild is in flight — which is exactly the wait it
+     exists to cover. It is also the only way .chip's 150ms transition has ever run: the
+     replacement node mounts already carrying .sel, so there is nothing to interpolate. */
+  if (!o.dead && o.on) c.onclick = () => { c.classList.toggle('sel'); o.on(); };
   return c;
 }
 function playerRow(p, i, onTap){
@@ -664,7 +793,7 @@ function playerRow(p, i, onTap){
   if (p.voteless) tags.push('<span class="tag urgent">No vote</span>');
   if (p.model) tags.push('<span class="tag">Model</span>');
   if (p.turned) tags.push('<span class="tag">Turned</span>');
-  if (!p.alive) tags.push('<span class="tag">' + (p.cause || 'dead') + '</span>');
+  if (!p.alive) tags.push('<span class="tag">' + causeLabel(p.cause) + '</span>');
   if (tags.length) d.appendChild(el('div','tags', tags.join('')));
   if (onTap){ d.style.cursor = 'pointer'; d.onclick = onTap; }
   return d;
@@ -672,6 +801,7 @@ function playerRow(p, i, onTap){
 /* Long guidance is worth having but not worth surrendering the screen to. These
    fold away by default and remember whether you opened them, so a moderator who
    already knows the routine never scrolls past an essay. */
+const logRow = e => el('div','le','<span class="w">' + e.w + '</span><span>' + e.t + '</span>');
 const expOpen = new Set();
 function collapsible(key, title, body){
   const d = document.createElement('details');
@@ -699,10 +829,39 @@ function collapsible(key, title, body){
 /* The outer .bar plate, not #bar — #bar is only the button row inside it, and
    measuring that misses the plate's padding and the pinned note. */
 const barEl = () => document.querySelector('.bar');
-const measureBar = () => {
-  const b = barEl();
-  if (b) document.documentElement.style.setProperty('--barh', b.offsetHeight + 'px');
-};
+const wrapEl = () => document.querySelector('.wrap');
+/* Reading offsetHeight forces a synchronous layout of a document render() has just
+   invalidated, and writing the property back invalidated style for the whole tree and woke
+   the ResizeObserver watching .bar, which measured again. Two forced layouts per chip tap,
+   for a number that changes when a label wraps — a few times a game.
+
+   Three things fix that. Measure after the frame has settled, so nothing is forced.
+   Coalesce, because one render calls this three times: bar() clears the note, builds the
+   buttons, and the caller pins a new note — genuinely three different heights, so
+   deduplicating on the value alone still wrote twice. And write on .wrap, the only element
+   that reads it, rather than on the root. */
+let barh = null, measureQueued = false;
+function measureBar(){
+  if (measureQueued) return;
+  measureQueued = true;
+  const run = () => {
+    if (!measureQueued) return;        // whichever scheduler won has already done it
+    measureQueued = false;
+    const b = barEl(), w = wrapEl();
+    if (!b || !w) return;
+    const h = b.offsetHeight;
+    if (h === barh) return;
+    barh = h;
+    w.style.setProperty('--barh', h + 'px');
+  };
+  /* A frame callback when the tab is visible, so the read lands after layout has settled.
+     A hidden tab never runs one, and the app can perfectly well do its first render in a
+     hidden tab — a phone that loaded the page and was switched away from — which would
+     leave the clearance on the CSS fallback against a bar that may be taller than it.
+     So a timer backs it up. Forcing layout in a tab that is not painting costs nothing. */
+  requestAnimationFrame(run);
+  setTimeout(run, 60);
+}
 if (typeof ResizeObserver === 'function'){
   const ro = new ResizeObserver(measureBar);
   addEventListener('DOMContentLoaded', () => { const b = barEl(); if (b) ro.observe(b); });
@@ -751,7 +910,10 @@ function render(){
   const prog = G.over ? '' : {
     players:'Who is playing', roles:'Building the deck', deal:'Dealing the cards',
     learn:'Collecting the deal',
-    night: (G.steps && G.steps.length) ? 'Roll call \u00b7 ' + (G.si+1) + ' of ' + G.steps.length : '',
+    // "Roll call" is the night-one ritual of learning who holds what; later nights are
+    // just the call order, so the label must not claim otherwise.
+    night: (G.steps && G.steps.length)
+      ? (G.night === 1 ? 'Roll call \u00b7 ' : 'Call \u00b7 ') + (G.si+1) + ' of ' + G.steps.length : '',
     day:'The vote', sheriff:'Electing the badge', hunter:'The Hunter fires',
     scapegoat:'The Scapegoat chooses' }[G.phase] || '';
   $('hTtl').textContent = pos;
@@ -1082,7 +1244,20 @@ function rNight(){
 
   const B = $('nBody'); B.innerHTML = '';
 
-  // step 1 of a roll-call step: learn who holds this card
+  /* A hushed call: read the line, wait, move on. Nobody wakes, and nothing is asked —
+     but from the table it sounds identical to a real call, which is the point. */
+  if (s.hush){
+    B.appendChild(el('div','alert','<b>Nobody will open their eyes.</b> ' +
+      (s.hush === 'dead'
+        ? 'This card is out of the game. Read the line, leave the same pause you always do, then carry on.'
+        : 'This card has nothing left to spend. Read the line, leave the same pause, then carry on.') +
+      '<p class="note">Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.</p>'));
+    bar([{ t:'Next →', wide:true, on:() => { G.si++; render(); } }]);
+    return;
+  }
+
+  // step 1 of a roll-call step: learn who holds this card. On a later night this is the
+  // same panel reached a different way — the card is in the deck and still unaccounted for.
   if (roll && !identified){
     B.appendChild(el('div','grp', need === 1 ? 'Who opened their eyes?' : 'Tap all ' + need));
     const pool = G.players.filter(p => p.alive && (!p.role || p.role === s.role));
@@ -1094,8 +1269,15 @@ function rNight(){
       render();
     }}));
     B.appendChild(c);
-    B.appendChild(el('p','note', have + ' of ' + need + ' identified. If nobody answers, skip \u2014 you can set it later from the Roster.'));
-    bar([{ t:'Skip', sec:true, on:() => { G.si++; render(); } }]);
+    /* "Skip" used to read as *not now* and mean *not this game*, and the reassurance was
+       a promise the app could not keep: the night script was already built without the
+       card and no later screen rebuilt it. It rebuilds from the deck now, so the sentence
+       is true \u2014 and the button says which kind of skip this is, because a card nobody
+       admits to holding is a gap in what the app knows, not a card that did nothing. */
+    B.appendChild(el('p','note', have + ' of ' + need + ' identified. ' +
+      'If nobody answers, skip: I will say at dawn that I could not be sure, call this ' +
+      'card again tomorrow night, and take it from the Roster if you learn it before then.'));
+    bar([{ t:'Nobody answered \u00b7 skip', sec:true, on:() => skipStep('card') }]);
     return;
   }
 
@@ -1143,7 +1325,7 @@ function rNight(){
       if (G.n.witchKill && G.n.witchKill === G.n.wolf && !G.n.witchSave)
         B.appendChild(el('div','alert','That is already the wolves\u2019 victim tonight. The poison would be spent for nothing.'));
     }
-    bar([{ t:'Skip', sec:true, on:() => { G.si++; render(); } },
+    bar([{ t:'Skip', sec:true, on:() => skipStep() },
          { t:'Done \u2192', on:() => { snap();
            if (G.n.witchSave) G.witchHeal = false;
            if (G.n.witchKill) G.witchPoison = false;
@@ -1160,7 +1342,7 @@ function rNight(){
       c.appendChild(b);
     }
     B.appendChild(c);
-    bar([{ t:'Skip', sec:true, on:() => { G.si++; render(); } }]);
+    bar([{ t:'Skip', sec:true, on:() => skipStep() }]);
     return;
   }
   if (info.special === 'thief'){
@@ -1176,7 +1358,11 @@ function rNight(){
       c.appendChild(b);
     }
     B.appendChild(c);
-    bar([{ t:'He kept his card \u2192', wide:true, on:() => { snap(); G.si++; render(); } }]);
+    /* "He kept his card" is an ANSWER, so it is not routed through skipStep: recording
+       it as a gap would make the app unsure about a night in which nothing is unknown.
+       The moderator who never got round to asking him needs the other button. */
+    bar([{ t:'Not asked \u00b7 skip', sec:true, on:() => skipStep('card') },
+         { t:'He kept his card \u2192', on:() => { snap(); G.si++; render(); } }]);
     return;
   }
 
@@ -1285,7 +1471,7 @@ function rNight(){
       B.appendChild(fb);
     }
   }
-  bar([{ t:'Skip', sec:true, on:() => { snap(); noteSkip(s.role); G.si++; render(); } },
+  bar([{ t:'Skip', sec:true, on:() => skipStep() },
        { t:'Confirm \u2192', off:chosen.length !== pickNeed || pickNeed === 0 || needAnswer,
          on:() => { snap(); applyStep(s, chosen); G.si++; render(); } }]);
 }
@@ -1370,27 +1556,33 @@ function rDawn(){
     const p = byId(d.id);
     const row = el('div','p');
     row.innerHTML = icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
-      '<span class="rl">' + d.cause + '</span>';
+      '<span class="rl">' + causeLabel(d.cause) + '</span>';
     B.appendChild(row);
   }
 
-  if (!G.dawnSure){
+  // computeDawn opens the editor once, on entering dawn. Setting it here fired on every
+  // render, so the collapse was unreachable and the announcement was read with the whole
+  // adjust list and the add-someone chip set underneath it.
+  if (!G.dawnSure)
     B.appendChild(el('div','alert','I cannot be certain tonight \u2014 ' + G.dawnGaps.join('; ') +
       '. Check the outcome below before you announce it.'));
-    G.dawnEdit = true;
-  }
 
   if (!G.dawnEdit){
     const adj = el('button','btn sec sm','Something else happened \u2014 adjust');
     adj.onclick = () => { G.dawnEdit = true; render(); };
     B.appendChild(adj);
   } else {
+    // Opening it once was only half the fix: there was no way back, so an uncertain dawn
+    // was still read out with the whole adjust list and the chip set underneath it.
+    const hide = el('button','btn sec sm','The list is right \u2014 hide it');
+    hide.onclick = () => { G.dawnEdit = false; render(); };
+    B.appendChild(hide);
     B.appendChild(el('div','grp','Adjust \u2014 tap to include or exclude'));
     for (const d of G.dawn){
       const p = byId(d.id);
       const row = el('div','p' + (d.on ? '' : ' dead'));
       row.innerHTML = icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
-        '<span class="rl">' + (d.on ? d.cause : 'spared') + '</span>';
+        '<span class="rl">' + (d.on ? causeLabel(d.cause) : 'spared') + '</span>';
       row.style.cursor = 'pointer';
       row.onclick = () => { d.on = !d.on; render(); };
       B.appendChild(row);
@@ -1399,7 +1591,7 @@ function rDawn(){
     const c = el('div','chips');
     for (const p of alive()){
       if (G.dawn.some(d => d.id === p.id)) continue;
-      c.appendChild(chip(p, { on:() => { G.dawn.push({ id:p.id, cause:'the night', on:true }); render(); } }));
+      c.appendChild(chip(p, { on:() => { G.dawn.push({ id:p.id, cause:'night', on:true }); render(); } }));
     }
     B.appendChild(c);
   }
@@ -1446,12 +1638,29 @@ function rDay(){
     return;
   }
   const jd = liveWith('judge');
-  if (jd.length && !G.judgeUsed)
+  if (jd.length && !G.judgeUsed){
     B.appendChild(el('div','alert','Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.'));
+    /* G.judgeUsed was written nowhere: initialised, read here, never set. So the alert
+       stood for the whole game and the flag was decoration. His power is once per game,
+       and the moderator is the only person who sees the sign, so they record it. */
+    const jb = el('button','btn sec sm','He gave the sign \u2014 second vote today');
+    jb.onclick = () => { snap(); G.judgeUsed = true; G.votes = {}; G.sheriffVote = null;
+      log('The Stuttering Judge demanded a second vote. The tally was cleared for it.'); render(); };
+    B.appendChild(jb);
+  } else if (jd.length){
+    B.appendChild(el('p','note','The Stuttering Judge has spent his second vote \u2014 once per game, and it is gone.'));
+  }
   const sc = liveWith('scapegoat');
   if (sc.length) B.appendChild(el('div','alert','If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.'));
-  if (G.scapegoatVoters) B.appendChild(el('div','alert','Only these may vote today: <b>' + G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b>'));
-  if (G.powersLost) B.appendChild(el('div','alert no','The Elder was killed by the village. Every villager has lost their power.'));
+  if (scapegoatBinds()) B.appendChild(el('div','alert','Only these may vote today: <b>' +
+    G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b><p class="note">The Scapegoat named them as he died yesterday. Tomorrow the whole village speaks again.</p>'));
+  if (G.powersLost){
+    // name the route, because "by the village" covers the vote, the poison and the shot
+    const eld = G.players.find(p => p.role === 'elder' && !p.alive);
+    B.appendChild(el('div','alert no','The Elder died by ' +
+      (eld && eld.cause ? causeLabel(eld.cause) : 'the village') +
+      '. Every villager has lost their power — no village card is called again.'));
+  }
 
   const sh = A.find(p => p.sheriff);
   if (sh) B.appendChild(el('div','alert ok','<b>' + sh.name + '</b> holds the badge — count their hand as <b>' +
@@ -1465,11 +1674,11 @@ function rDay(){
   B.appendChild(el('div','grp','Count the vote'));
   // The threshold itself is pinned into the action bar by refresh(); this card keeps
   // only the things you read once, at the start.
-  if (sh || G.scapegoatVoters)
+  if (sh || scapegoatBinds())
     B.appendChild(el('div','card tight',
       (sh ? '<b>' + sh.name + '</b> holds the badge, so their hand counts ' + wt + '. ' +
             'Tap the badge beside whoever they voted for.' : '') +
-      (G.scapegoatVoters ? (sh ? '<p class="note">' : '') +
+      (scapegoatBinds() ? (sh ? '<p class="note">' : '') +
             'The Scapegoat has silenced everyone else today.' + (sh ? '</p>' : '') : '')));
 
   // Rows are built once and a light refresh updates only the derived numbers, so
@@ -1489,12 +1698,12 @@ function rDay(){
     if (sh){
       const bg = el('button','ico', G.sheriffVote === p.id ? '\u2b50' : '\u2606');
       bg.title = 'The Sheriff voted for this player';
-      bg.onclick = () => { G.sheriffVote = G.sheriffVote === p.id ? null : p.id; refresh(); };
+      bg.onclick = () => { holdOrder(); G.sheriffVote = G.sheriffVote === p.id ? null : p.id; refresh(); };
       row.appendChild(bg);
     }
     const stp = el('div','stp');
     const minus = el('button',null,'\u2212');
-    minus.onclick = () => setVote(p, tallyOf(p) - 1);
+    minus.onclick = () => { holdOrder(); setVote(p, tallyOf(p) - 1); };
     const box = document.createElement('input');
     box.type = 'text'; box.inputMode = 'numeric'; box.autocomplete = 'off';
     box.setAttribute('aria-label', 'votes for ' + p.name);
@@ -1510,7 +1719,7 @@ function rDay(){
     box.onblur = () => { box.value = String(tallyOf(p)); };
     box.onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); box.blur(); } };
     const plus = el('button',null,'+');
-    plus.onclick = () => setVote(p, tallyOf(p) + 1);
+    plus.onclick = () => { holdOrder(); setVote(p, tallyOf(p) + 1); };
     stp.append(minus, box, plus);
     row.appendChild(stp);
     list.appendChild(row);
@@ -1525,15 +1734,27 @@ function rDay(){
     G.votes[p.id] = Math.max(0, Math.min(voters.length, Math.round(v) || 0));
     refresh();
   }
+  /* Counting a real vote is a fast run of taps down the list, out loud. Promotion used to
+     be held back only while a text box had focus — but the steppers are what people
+     actually use, and tapping + focuses nothing, so a trailing candidate taking the lead
+     jumped their row to the top and the + under the moderator's thumb became somebody
+     else's +. The order is frozen for the whole run of taps and settles once, shortly
+     after the last one. The bar, the highlight and the verdict all update immediately;
+     only the row positions wait. */
+  let settle = null;
+  function holdOrder(){
+    clearTimeout(settle);
+    settle = setTimeout(() => { settle = null; if (list.isConnected) refresh(); }, 1200);
+  }
   function refresh(){
     let lead = [], best = 0;
     for (const p of A){
       const pw = tallyOf(p) + extraOf(p);
       if (pw > best){ best = pw; lead = [p]; } else if (pw === best && pw > 0) lead.push(p);
     }
-    // Reordering while a box has focus would move the row out from under the thumb
-    // that is typing in it, so promotion waits until the field is released.
-    const typing = cells.some(c => document.activeElement === c.box);
+    // A box with the caret in it, or a tap within the last 1.2 seconds: either way the
+    // thumb is on this list and the rows must not move under it.
+    const frozen = settle !== null || cells.some(c => document.activeElement === c.box);
     for (const c of cells){
       const extra = extraOf(c.p), pw = tallyOf(c.p) + extra;
       const over = pw > thr;
@@ -1543,7 +1764,7 @@ function rDay(){
       c.row.classList.toggle('over', over);
       c.row.classList.toggle('lead', !over && pw > 0 && pw === best && lead.length === 1);
       c.power.textContent = over ? 'carries' : (extra ? '\u2b50' : '');
-      if (!typing) c.row.style.order = over ? -2 : (pw > 0 && pw === best ? -1 : 0);
+      if (!frozen) c.row.style.order = over ? -2 : (pw > 0 && pw === best ? -1 : 0);
       c.minus.disabled = !tallyOf(c.p);
       c.plus.disabled = tallyOf(c.p) >= voters.length;
       if (document.activeElement !== c.box) c.box.value = String(tallyOf(c.p));
@@ -1586,24 +1807,24 @@ function resolveVote(p, tie){
     toNight(); return;
   }
   if (p.role === 'angel' && G.day === 1){
-    kill(p, 'the village vote');
+    kill(p, 'vote');
     return finish({ who:'The Angel', why: p.name + ' wanted exactly this and got it on day one.' });
   }
-  if (p.role === 'elder'){ G.powersLost = true; log('The village killed the Elder. All village powers are extinguished.'); }
+  // kill() applies the Elder's consequence now, for every village-caused death.
   if (tie){
     log('The vote tied. The Scapegoat ' + p.name + ' was sacrificed.');
-    registerDeaths(kill(p, 'the tie'));
+    registerDeaths(kill(p, 'tie'));
     G.resume = 'night';
     G.phase = 'scapegoat'; render(); return;
   }
-  registerDeaths(kill(p, 'the village vote'));
+  registerDeaths(kill(p, 'vote'));
   G.resume = 'night';
   proceed();
 }
 function renderHunter(){
   show('sDay');
   const hp = byId(G.pending.hunterId);
-  const cause = G.pending.hunterCause || 'his death';
+  const cause = causeLabel(G.pending.hunterCause) || 'his death';
   $('dyTitle').textContent = 'The Hunter fires';
   $('dySub').textContent = (hp ? hp.name + ' is dead \u2014 ' + cause + '. ' : '') +
     'The shot is not optional: he must take one living player with him.';
@@ -1620,7 +1841,7 @@ function renderHunter(){
   const c = el('div','chips');
   for (const p of targets) c.appendChild(chip(p, { on:() => {
     snap(); G.pending.hunterId = null; G.pending.hunterCause = null;
-    registerDeaths(kill(p, 'the Hunter\u2019s shot'));
+    registerDeaths(kill(p, 'shot'));
     proceed();
   }}));
   B.appendChild(c);
@@ -1658,9 +1879,13 @@ function renderScapegoat(){
     const i = pick.indexOf(p.id); if (i>=0) pick.splice(i,1); else pick.push(p.id);
     G.pending.sg = pick; render(); } }));
   B.appendChild(c);
-  bar([{ t:'Everyone may vote', sec:true, on:() => { snap(); G.scapegoatVoters=null; G.pending.sg=null; proceed(); } },
-       { t:'Confirm \u2192', off:!pick.length, on:() => { snap(); G.scapegoatVoters=pick.slice(); G.pending.sg=null;
-         log('The Scapegoat allows only ' + pick.map(i=>byId(i).name).join(', ') + ' to vote.'); proceed(); } }]);
+  bar([{ t:'Everyone may vote', sec:true, on:() => { snap();
+         G.scapegoatVoters=null; G.scapegoatDay=null; G.pending.sg=null; proceed(); } },
+       { t:'Confirm \u2192', off:!pick.length, on:() => { snap();
+         G.scapegoatVoters=pick.slice(); G.scapegoatDay=G.day + 1; G.pending.sg=null;
+         log('The Scapegoat allows only ' + pick.map(i=>byId(i).name).join(', ') +
+             ' to vote on day ' + (G.day + 1) + '. The day after, everyone speaks again.');
+         proceed(); } }]);
 }
 function toNight(){
   const w = checkWin(); if (w) return finish(w);
@@ -1680,10 +1905,10 @@ function rEnd(){
   G.players.forEach((p,i) => ros.appendChild(playerRow(p, i)));
   C.appendChild(ros);
   const L = $('enLog'); L.innerHTML = '';
-  for (const e of G.log) L.appendChild(el('div','le','<span class="w">'+e.w+'</span><span>'+e.t+'</span>'));
+  for (const e of G.log) L.appendChild(logRow(e));
   bar([{ t:'Same table, new game', wide:true, on:() => {
     const names = G.players.map(p => p.name), counts = G.counts;
-    undoStack.length = 0; G = blank();
+    clearUndo(); G = blank();
     names.forEach((nm,i) => G.players.push({ id:'p'+i+Math.random().toString(36).slice(2,5),
       name:nm,
       role:null, alive:true, cause:null, sheriff:false, lover:false, charmed:false,
@@ -1732,8 +1957,22 @@ function openRoster(){
     if (missing.length) B.appendChild(el('div','alert','Cards not yet placed: ' +
       missing.map(k => R[k].name + (need[k]>1 ? ' \u00d7'+need[k] : '')).join(', ')));
   }
+  /* The chronicle only grows, and this rebuilt every line of it each time the roster
+     opened AND each time a card was set inside it — so the roster got slower for the rest
+     of the game, and the roster is what a moderator opens when they are already behind.
+     Bounded to the recent entries; the rest are built once, and only if asked for. */
   const L = $('rosLog'); L.innerHTML = '';
-  for (const e of [...G.log].reverse()) L.appendChild(el('div','le','<span class="w">'+e.w+'</span><span>'+e.t+'</span>'));
+  const entries = [...G.log].reverse(), RECENT = 40;
+  for (const e of entries.slice(0, RECENT)) L.appendChild(logRow(e));
+  if (entries.length > RECENT){
+    const rest = el('div','log');
+    const fill = () => { if (!rest.childElementCount)
+      for (const e of entries.slice(RECENT)) rest.appendChild(logRow(e)); };
+    const more = collapsible('chronicle', (entries.length - RECENT) + ' earlier entries', rest);
+    more.addEventListener('toggle', () => { if (more.open) fill(); });
+    if (more.open) fill();            // reopened from a previous visit, so no toggle fires
+    L.appendChild(more);
+  }
   showVersion();
   $('mRoster').classList.add('on');
 }

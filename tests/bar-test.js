@@ -74,18 +74,28 @@ t('no bar has two competing primaries', () => {
 // plate. These pin the plate, because the fog is the thing that must not come back.
 console.log('\nTHE BACKDROP IS A PLATE, NOT A FOG');
 const BAR = rule(/\.bar\{[^}]*\}/);
-t('the fill is flat and near-opaque', () =>
-  /background:rgba\(10,8,16,\.9\d\)/.test(BAR) ? true : BAR);
+t('the fill is flat and fully opaque', () =>
+  /background:#0A0810/.test(BAR) ? true : BAR);
 t('no gradient — a fade is what half-erased the row above it', () =>
   !/linear-gradient/.test(BAR) ? true : 'the bar is fading again: ' + BAR);
 t('it has a hairline top edge, so it reads as a surface', () =>
   /border-top:1px solid/.test(BAR) ? true : BAR);
-t('a blur is applied where supported, with the webkit prefix', () =>
-  /-webkit-backdrop-filter:blur/.test(BAR) && /[^-]backdrop-filter:blur/.test(BAR)
-    ? true : BAR);
-t('there is an opaque fallback where backdrop-filter is unsupported', () =>
-  /@supports not \(\(backdrop-filter[\s\S]*?\.bar\{background:#0A0810\}/.test(
-    src.replace(/\s+/g,' ')) ? true : 'a translucent bar with no blur would show content through');
+/* The blur is gone, and these hold it gone. It sat on a full-width fixed element over a
+   region every chip tap dirties, so it re-rasterised on each one — Chromium hands that to
+   the compositor, Firefox largely does not, and that was the delay on the night call. It
+   was also acting on four percent of the backdrop: the plate was already .96 opaque, and
+   the @supports fallback that shipped alongside it was an opaque plate, which is the
+   proof the design never needed it. */
+// declarations only: the comments explain why the blur went, and say its name doing so
+const CODE = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+t('no backdrop-filter: it re-rasterises on every tap', () =>
+  !/backdrop-filter/.test(CODE) ? true : 'the blur is back on the busiest paint path');
+t('and no @supports fallback, because there is nothing left to fall back from', () =>
+  !/@supports not \(\(backdrop-filter/.test(CODE.replace(/\s+/g,' '))
+    ? true : 'a dead fallback for a property nothing uses');
+t('the plate is opaque outright, not almost-opaque', () =>
+  !/background:rgba\(10,8,16/.test(BAR)
+    ? true : 'translucent with no blur would show the list through it: ' + BAR);
 
 console.log('\nNOTHING IS HIDDEN OR OVERFLOWS');
 t('clearance is the measured bar height, not a constant', () => {
@@ -102,6 +112,61 @@ t('something actually measures the bar and sets --barh', () =>
     ? true : '--barh is referenced but never written, so the fallback always wins');
 t('the measurement re-runs when the bar is rebuilt', () =>
   /measureBar\(\);\s*\}/.test(js) ? true : 'bar() does not re-measure, so a taller bar overlaps');
+/* Reading offsetHeight forces a synchronous layout of a document that render() has just
+   invalidated. Writing the result back then invalidated style for the whole tree and woke
+   the ResizeObserver watching .bar, which measured again: two forced layouts per chip tap,
+   for a number that changes a few times a game. */
+t('the measurement writes only when the height actually changed', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /if \(h === barh\) return;/.test(fn)
+    ? true : 'every tap re-writes the property and re-enters the observer: ' + fn;
+});
+/* Deduplicating on the value was not enough on its own. One render calls measureBar three
+   times — bar() clears the pinned note, builds the buttons, then the caller pins a new one
+   — and those really are three different heights, so two writes landed per tap and the
+   ResizeObserver woke for both. */
+t('the measurement is coalesced, so three calls per render cost one', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /if \(measureQueued\) return;/.test(fn) ? true : 'still measures once per call: ' + fn;
+});
+t('and it never reads synchronously, against a document render() just dirtied', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  // the read lives in the deferred callback, and nothing calls that callback directly
+  const deferred = (fn.match(/const run = \(\) => \{[\s\S]*?\n  \};/) || [''])[0];
+  const direct = fn.replace(deferred, '');
+  return (/offsetHeight/.test(deferred) && !/offsetHeight/.test(direct) && !/\brun\(\)/.test(direct))
+    ? true : 'offsetHeight is forced on the tap path: ' + direct;
+});
+t('the CSS still has a fallback for the frame before the first measurement', () => {
+  const wrap = rule(/\.wrap\{[^}]*\}/);
+  return /var\(--barh, *\d+px\)/.test(wrap)
+    ? true : 'the first paint would have no clearance at all: ' + wrap;
+});
+/* Found by measuring in a browser rather than by reading this: a hidden tab never runs a
+   frame callback, and the app can do its whole first render in one — a phone that loaded
+   the page and was switched away from. The clearance would then sit on the CSS fallback
+   against a bar that, with a wrapped label and a pinned note, can be taller than it. */
+t('a tab that never gets a frame is still measured', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /requestAnimationFrame\(run\)/.test(fn) && /setTimeout\(run, *\d+\)/.test(fn)
+    ? true : 'no fallback scheduler, so a first render in a hidden tab is never measured';
+});
+t('and whichever scheduler wins, the work happens once', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /if \(!measureQueued\) return;/.test(fn)
+    ? true : 'both schedulers would measure, which is the double write again';
+});
+t('it is written on .wrap, the only element that reads it', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return (/w\.style\.setProperty\('--barh'/.test(fn) && !/documentElement/.test(fn))
+    ? true : 'writing it on the root invalidates style for the entire document: ' + fn;
+});
+t('and .wrap is where the variable is consumed, so the scope holds', () => {
+  const wrap = rule(/\.wrap\{[^}]*\}/);
+  const users = [...src.matchAll(/([.#][\w-]+)\{[^}]*var\(--barh/g)].map(m => m[1]);
+  return (/var\(--barh/.test(wrap) && users.every(u => u === '.wrap'))
+    ? true : '--barh is read outside .wrap, where the scoped value will not reach: ' + users.join(', ');
+});
 t('a long label truncates instead of breaking the row', () => {
   const r = rule(/\.bar \.in \.btn\{[^}]*\}/);
   return (/min-width:0/.test(r) && /white-space:nowrap/.test(r) && /text-overflow:ellipsis/.test(r))

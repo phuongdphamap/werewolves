@@ -128,14 +128,6 @@ sign-in, nothing to explain.
 
 ## Optional polish
 
-**Self-host the fonts.** Right now Be Vietnam Pro and Lora load from Google. The
-service worker caches them after the first visit, so offline works — but the *very
-first* load needs a connection for correct typography. If you want true zero-network
-from the start, download the two families, subset them to Vietnamese + Latin, drop
-the `woff2` files beside `index.html`, replace the `<link>` with a local `@font-face`
-block, and add the files to `PRECACHE` in `sw.js`. Costs roughly 150 KB and removes
-the last external dependency.
-
 **A landing page.** If you want the app discoverable by search, add a small static
 `about.html` describing it and link to the app. That is still no reason to adopt a
 framework.
