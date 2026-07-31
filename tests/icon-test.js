@@ -74,7 +74,7 @@ t('the button inherits its font from .btn rather than restating it', () => {
   return /\.btn\{[^}]*font-size:var\(--ctl-size\)/.test(src) ? true : '.btn lost the token';
 });
 t('the token matches the body size, so nothing looks out of scale', () =>
-  /--ctl-size:15\.5px/.test(src) && /body\{[^}]*font-size:15\.5px/.test(src)
+  /--ctl-size:var\(--t-body\)/.test(src) && /body\{[^}]*font-size:var\(--t-body\)/.test(src)
     ? true : 'token and body size disagree');
 t('the button stretches to the field height', () =>
   /\.row\.tall\{align-items:stretch\}/.test(src) ? true : 'not stretching');

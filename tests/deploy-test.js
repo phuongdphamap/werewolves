@@ -143,7 +143,14 @@ t('a stale save expires rather than resurfacing days later', () =>
 t('a corrupt save cannot stop the app booting', () =>
   /catch \(e\)\{ return null; \}/.test(src) ? true : 'a bad JSON blob would throw on load');
 t('the prompt says what will be resumed', () =>
-  /' người \\u00b7 ' \+ when/.test(src) ? true : 'no context for the decision');
+  /g\.players\.length \+ V\(/.test(src) && /\+ when \+/.test(src) && /\+ ago \+/.test(src)
+    ? true : 'no context for the decision');
+/* It is the first thing a reloaded phone shows, and the moderator mid-game already chose
+   a language. T() reads the live G, which is still blank at this point, so the choice has
+   to come off the saved box rather than the browser default. */
+t('and it speaks the saved game’s language, not the browser’s', () =>
+  /const V = \(vi, en\) => g\.lang !== 'en' \? vi : en;/.test(src)
+    ? true : 'a resumed Vietnamese game could greet the table in English');
 t('declining clears the save, so it is not asked again', () =>
   /no\.onclick  = \(\) => \{ dropSaved\(\)/.test(src) ? true : 'would nag on every reload');
 

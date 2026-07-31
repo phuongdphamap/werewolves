@@ -16,8 +16,13 @@
 <!-- Both faces are self-hosted (see css/app.css). Nothing on this page reaches another
      origin, which is the point of an app used in a cellar with no signal. -->
 <link rel="stylesheet" href="./css/app.css">
+<!-- Both subsets of both faces. Only the latin halves were hinted, in a Vietnamese-first
+     app: on a cold open the diacritics were the last thing to arrive, in the language
+     that leads. Four files, 62 KB. -->
 <link rel="preload" href="./fonts/bevietnampro-500-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./fonts/bevietnampro-500-vietnamese.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="./fonts/lora-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./fonts/lora-vietnamese.woff2" as="font" type="font/woff2" crossorigin>
 </head>
 <body>
 <!-- Role icons. One monochrome set, inline so it costs no request and works
@@ -66,21 +71,21 @@
 
   <!-- 1. seats -->
   <section class="on" id="sPlayers">
-    <h2>Who is at the table?</h2>
-    <p class="sub">Add everyone in seating order, going clockwise. Seating is used by the Bear Tamer, the Fox and the Knight, so get the order right.</p>
+    <h2 id="pTtl"></h2>
+    <p class="sub" id="pSub"></p>
     <div class="card">
       <div class="row tall"><input type="text" id="iName" placeholder="Player name" autocomplete="off"
         autocapitalize="words" spellcheck="false" enterkeyhint="done">
         <button type="button" class="btn" id="bAdd">Add</button></div>
       <p class="note" id="pCount">No players yet.</p>
     </div>
-    <div class="ros" id="lPlayers"></div>
+    <div class="ros group" id="lPlayers"></div>
   </section>
 
   <!-- 2. deck -->
   <section id="sRoles">
-    <h2>Build the deck</h2>
-    <p class="sub">Choose the cards you will physically put in the shuffle. Start from a recommendation, then adjust.</p>
+    <h2 id="rTtl"></h2>
+    <p class="sub" id="rSub"></p>
     <div class="tally">
       <div class="tl"><div class="v" id="tCards">0</div><div class="k">cards</div></div>
       <div class="tl"><div class="v" id="tSeats">0</div><div class="k">seats</div></div>
@@ -93,25 +98,25 @@
 
   <!-- 3. physical deal -->
   <section id="sDeal">
-    <h2>Deal the real cards</h2>
-    <p class="sub">Pull exactly these from the box. Shuffle them face down and give one to each player. You are not meant to know who got what — you will find out during the first night.</p>
-    <div class="deal" id="dealList"></div>
-    <div class="card" style="margin-top:var(--s4)">
-      <p class="note" id="dealNote"></p>
-    </div>
+    <h2 id="dTtl"></h2>
+    <p class="sub" id="dSub"></p>
+    <div class="deal group" id="dealList"></div>
+    <p class="note" id="dealNote" style="margin-top:var(--s4)"></p>
     <div class="stack" id="dealAlt"></div>
   </section>
 
   <!-- 3b. collect the deal -->
   <section id="sLearn">
-    <h2>Collect the deal</h2>
-    <p class="sub">Go once round the table. Each player shows you their card in private and you tap it in. After this the app knows everything, so no card is ever lifted mid-night.</p>
+    <h2 id="lTtl"></h2>
+    <p class="sub" id="lSub"></p>
     <div class="stack" id="lrBody"></div>
   </section>
 
   <!-- 4. night -->
   <section id="sNight">
-    <div class="steps" id="nStep">—</div>
+    <!-- Progress through the night, as a 2px rule rather than the 10px caption it was.
+         The header keeps the words; this is here to be read without being read. -->
+    <div class="steps" id="nStep" role="progressbar" aria-label="progress through the night"><span></span></div>
     <h2 id="nTitle">—</h2>
     <p class="sub" id="nSub"></p>
     <!-- A hushed call's notice belongs ABOVE the line to be read out. Below it, the screen
@@ -141,8 +146,8 @@
   <section id="sEnd">
     <h2 id="enTitle">—</h2>
     <p class="sub" id="enSub"></p>
-    <div class="card stack" id="enCard"></div>
-    <div class="grp">Full chronicle</div>
+    <div class="stack" id="enCard"></div>
+    <div class="grp" id="enChronicle"></div>
     <div class="log" id="enLog"></div>
   </section>
 
@@ -164,14 +169,16 @@
 </div></div>
 
 <div class="modal" id="mRoster"><div class="in">
-  <div class="row" style="margin-bottom:var(--s4)"><h2 style="flex:1;margin:0">Roster</h2>
+  <div class="row" style="margin-bottom:var(--s4)"><h2 style="flex:1;margin:0" id="rosTtl"></h2>
     <!-- Night sounds live here, not the header: used once a night, and the header's
-         strip is worth more than a control that rarely moves. -->
+         strip is worth more than a control that rarely moves. Haptics sit beside them —
+         same kind of setting, and hidden entirely where the browser has no vibrator. -->
     <button type="button" class="ico" id="bSound" title="Night sounds"></button>
-    <button type="button" class="ico" id="bCloseR">Close</button></div>
-  <p class="sub" style="margin-bottom:var(--s3)">Tap a player to set or correct their card.</p>
+    <button type="button" class="ico" id="bHaptic" title="Haptic feedback" hidden></button>
+    <button type="button" class="ico" id="bCloseR"></button></div>
+  <p class="sub" id="rosSub" style="margin-bottom:var(--s3)"></p>
   <div class="stack" id="rosBody"></div>
-  <div class="grp">Chronicle</div>
+  <div class="grp" id="rosChronicle"></div>
   <div class="log" id="rosLog"></div>
   <p class="sub" id="rosVer" style="margin-top:var(--s3)"></p>
 </div></div>

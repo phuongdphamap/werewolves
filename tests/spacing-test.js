@@ -27,6 +27,22 @@ t('two adjacent stacks are spaced from each other', () =>
 t('an empty container adds no stray gap', () =>
   /:not\(:empty\)/.test(src) ? true : 'an empty #advice would still push the page down');
 
+/* Every $('id') has to resolve. Several headings moved out of static markup and into the
+   render functions so they could follow the interface language, and `$('pTtl').textContent
+   = …` throws on a typo — taking the whole screen down, not just the label. The suites
+   never execute a render, so nothing else here would notice. */
+console.log('\nEVERY ELEMENT THE APP ADDRESSES EXISTS');
+t('no $() lookup is missing from the markup', () => {
+  const ids = [...new Set([...js.matchAll(/\$\('(\w+)'\)/g)].map(m => m[1]))];
+  const missing = ids.filter(id => !new RegExp('id="' + id + '"').test(src));
+  return missing.length === 0
+    ? true : missing.length + ' would return null and throw: ' + missing.join(', ');
+});
+t('and enough of them are checked for this to mean something', () => {
+  const n = [...new Set([...js.matchAll(/\$\('(\w+)'\)/g)].map(m => m[1]))].length;
+  return n >= 50 ? true : 'only found ' + n + ' lookups, so the pattern has changed';
+});
+
 console.log('\nEVERY CONTAINER THE APP WRITES INTO IS A STACK');
 /* Find every element the code appends children to, then check its markup.
    Discovery used to require the appendChild within 80 characters of the lookup, which
@@ -62,8 +78,28 @@ for (const id of ['recBox','advice','nBody','dwBody','dyBody','lrBody','rosBody'
     new RegExp('<div class="stack" id="' + id + '">').test(src) ? true : 'not a stack');
 }
 
+/* .deal moved from a gapped list to a grouped container: one border round the whole
+   thing, hairlines between the rows, no per-row edge. So it no longer wants a gap — it
+   wants the .group separator rule instead, and having both would draw a line AND a space. */
+console.log('\nA GROUPED CONTAINER DIVIDES ITS OWN ROWS');
+t('#dealList is a group, so its rows give up their borders', () => {
+  const tag = (src.match(/<div[^>]*id="dealList"[^>]*>/) || [''])[0];
+  return /class="[^"]*\bgroup\b/.test(tag) ? true : tag || 'markup not found';
+});
+t('...and a group has no gap, or it would space AND divide', () =>
+  !/\.deal\{[^}]*gap:var/.test(src) ? true : '.deal still adds a gap on top of the hairline');
+t('the group draws the hairline between rows itself', () =>
+  /\.group > \* \+ \*\{border-top:1px solid var\(--line\)\}/.test(src)
+    ? true : 'a group with no separator is one undivided block');
+t('and the rows inside it surrender their own edges', () =>
+  /\.group > \.p,\.group > \.r,\.group > \.dl\{background:none;border:0;border-radius:0\}/.test(src)
+    ? true : 'a border inside a bordered container is a double edge');
+t('an empty group draws nothing', () =>
+  /\.group:empty\{display:none\}/.test(src)
+    ? true : '#lPlayers and #dealList start empty and would show an empty box');
+
 console.log('\nCONTAINERS WITH THEIR OWN GAP ARE LEFT ALONE');
-for (const [cls, id, how] of [['roles','lRoles','gap'], ['deal','dealList','gap'],
+for (const [cls, id, how] of [['roles','lRoles','gap'],
                               ['log','enLog','divider']]){
   t('#' + id + ' keeps its own ' + how + ' rather than doubling up', () => {
     const tag = (src.match(new RegExp('<div[^>]*id="' + id + '"[^>]*>')) || [''])[0];

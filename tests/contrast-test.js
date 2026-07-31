@@ -74,9 +74,16 @@ t('a dead chip clears 3:1 and has no strikethrough', () => {
 });
 
 console.log('\nVIETNAMESE KEEPS ITS DIACRITICS');
+/* Sizes are scale tokens now, so the value has to be resolved through :root rather than
+   read off the rule. A token that silently shrank would otherwise pass by returning NaN. */
+const tokenPx = name => {
+  const m = css.match(new RegExp('--' + name + ':(\\d+(?:\\.\\d+)?)px'));
+  return m ? parseFloat(m[1]) : NaN;
+};
 t('role sub-labels are at least 13px', () => {
   const rule = (css.match(/\.r \.rn \.vi\{[^}]*\}/) || [''])[0];
-  const px = parseFloat((rule.match(/font-size:([\d.]+)px/) || [])[1]);
+  const tok = (rule.match(/font-size:var\(--([\w-]+)\)/) || [])[1];
+  const px = tok ? tokenPx(tok) : parseFloat((rule.match(/font-size:([\d.]+)px/) || [])[1]);
   return px >= 13 ? true : 'ả ệ ườ lose their marks at ' + px + 'px';
 });
 

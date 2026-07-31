@@ -155,8 +155,10 @@ t('the bar is rebuilt by refresh, so it follows the tally', () => {
   const m = src.match(/function refresh\(\)\{[\s\S]*?\n  \}/);
   return (m && /bar\(opts\)/.test(m[0])) ? true : 'bar is outside refresh and would go stale';
 });
+// the label is a T() pair now; what is being pinned is the gate, not the wording
 t('Hang only appears when a single name clears half', () =>
-  /if \(passing\) opts\.push\(\{ t:'Hang '/.test(src) ? true : 'Hang is not gated on passing');
+  /if \(passing\) opts\.push\(\{ t: T\('[^']*','Hang '\)/.test(src)
+    ? true : 'Hang is not gated on passing');
 t('clearing the tally does not end the day by accident', () => {
   const m = src.match(/opts\.push\(\{ t: best > 0 \? 'Clear the tally'[\s\S]*?\} \}\);/);
   return (m && /if \(best > 0\)\{ G\.votes = \{\}; G\.sheriffVote = null; refresh\(\); return; \}/.test(m[0]))

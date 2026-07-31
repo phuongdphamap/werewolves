@@ -443,12 +443,89 @@ hand-maintained id list I kept forgetting to extend (B-16). `#lRoles` is deliber
 ### Control typography: one voice
 
 ```css
---ctl-size:15.5px; --ctl-weight:600; --ctl-track:.005em;
+--ctl-size:var(--t-body); --ctl-weight:600; --ctl-track:.005em;
 ```
 
 The field, its placeholder and every button read from these. Only weight differs, by
 one step (placeholder 500), so an empty field still reads as empty. `.row.tall .btn`
 adjusts **layout only** — a test asserts it declares no font properties.
+
+### Three surfaces, one job each
+
+Six container types — `.card`, `.p`, `.r`, `.alert`, `.exp`, `.tl` — were all surface
+plus a 1px line plus a radius between 10 and 14. A dawn screen stacked four boxes of
+equal weight and the eye had no reason to start anywhere.
+
+| surface | what it is for |
+|---|---|
+| `.group` | one rounded container, rows divided by hairlines, no per-row edge |
+| `.say` | the read-aloud block. Nothing else may look like it |
+| plain | text on the background — where most of what was a `.card` belongs |
+
+`.card` survives only for a genuine panel of controls (the two on the deck screen, the
+add-name row). Rows inside a group surrender their border and radius, and get the
+hairline back at higher specificity — see B-65 for why that is not optional.
+
+The **vote list is a deliberate exception** and keeps its per-row edges: each row carries
+state the others do not (`.lead`, `.over`), `.p.vote.over` signals "this vote carries"
+with a border a grouped row would have given up, and the rows are reordered with flex
+`order`, so a `border-top` on the DOM-first child would land mid-list.
+
+### One type scale, three radii
+
+Nineteen sizes shipped: 9, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5,
+17, 18, 21, 22, 30, 34. The half-pixel steps are the tell — three separate moments of
+nudging one element, not three decisions.
+
+```css
+--t-micro:10px  --t-cap:11px  --t-small:13px  --t-body:15px
+--t-lg:17px     --t-say:21px  --t-h:26px      --t-max:34px
+--r-ctl:10px    --r-grp:16px  --r-full:999px
+```
+
+`scale-test.js` asserts **no rule declares a bare font-size or radius**, in the stylesheet
+or as an inline style in `app.js`. One exception is enough to restart the drift.
+
+### The tint is reserved
+
+`.alert` is the highest-contrast object in the design and it was carrying twenty-seven
+different jobs. It is now kept for what genuinely stops the moderator — `.alert.no`, and
+the Bear Tamer's growl. Everything else is `.tell`: ordinary prose with a small leading
+mark, and a tinted **dot only** for the `.ok` variant, so "this is fine" survives at a
+glance without a whole block shouting. Twenty-four lines were demoted.
+
+### Interface language
+
+`G.lang` ('vi' | 'en'), defaulting from `navigator.language`, chosen on the deck screen.
+Separate from `G.rules`, which it used to ride on (B-66). One helper:
+
+```js
+const vnUI = () => !G || G.lang !== 'en';
+const T = (vi, en) => vnUI() ? vi : en;
+const rName = r => T(r.vi, r.name);          // was an inline ruleset test in nine places
+```
+
+`!== 'en'` rather than `=== 'vi'`, so a save written before the field existed resumes in
+Vietnamese rather than flipping. Both languages survive only where the second one **is**
+the content: the read-aloud line (one tap away) and role names in the deck list, which a
+table argues about in both.
+
+**Still single-language:** the long explanatory prose — the two deck-screen essays, the
+route-choice collapsible, and the night/dawn/day guidance — exists in one language each.
+Every *label*, heading, button and house-rule note is paired. Finishing the prose is
+translation work, not plumbing.
+
+### The teaching layer retires itself
+
+`gamesPlayed` in `localStorage['mh.games']`, its own key so ending a game does not erase
+it. `teaching()` is the same tri-state shape as a house rule: `G.tips == null` decides
+from experience (`gamesPlayed < 2`), true/false is the moderator overruling it, settable
+from the Roster. While it holds, collapsibles open themselves; `expShut` records an
+explicit close so the default cannot reopen it. `tip()` gathers prose per screen and
+`flushTips()` emits **one** affordance rather than six.
+
+`render()` clears `tipBuf` at the top: a screen that pushes a tip and returns early drops
+it rather than handing it to the next screen.
 
 ### Bottom bar
 
@@ -508,6 +585,9 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-63 | "His card stays down" implied the Hunter could be **kept secret** | Copy I added one commit earlier. True about the card and wrong about the secret: a dead player points and somebody drops, which identifies him whatever the reveal rule says — and a Hunter voted out fires in daylight, where nothing can hide it. The screen now says so, and points at the one arrangement that does hide him: take the shot in the night. |
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
+| B-65 | Grouped rows shipped with their hairlines **declared and never drawn** | The C1 surface work gave `.group` a separator (`.group > * + *`) and reset the rows inside it (`.group > .p, .group > .r, .group > .dl { border: 0 }`). Both rules were present and correct-looking in the diff. But the reset is two classes (0,2,0) and the separator is one (0,1,0), so `border:0` won wherever it applied and every grouped container rendered as one undivided block. Source order does not help: specificity is resolved first. Found by measuring `borderTopWidth` on a real row in a browser, not by reading. The fix restores the hairline at (0,3,0) with `:not(:first-child)`. |
+| B-66 | The interface language was decided by the **ruleset** | `G.rules === 'vn'` chose both the night call order and every label, in nine places plus the read-aloud line. So a table that wanted the Miller's Hollow *rules* got an English *interface* as a side effect of a decision about the rules, and a Vietnamese moderator on the original order was handed English cards to read out. Two unrelated questions on one switch. Split into `G.lang`, defaulting from `navigator.language`. |
+| B-67 | The masking tip pointed at an affordance that had **moved** | It told the moderator to turn on night sounds "in the header". The sound control was moved into the Roster sheet some releases earlier. This is the second cost of a teaching layer this voluminous, and the review named it: nobody re-reads a tip they have learned to scroll past, so it keeps instructing people to use something that is not there. |
 | B-61 | `#nHush` shipped as an **unclassed container** | The container added for B-58 had no spacing mechanism — its single `.alert` child happened to carry a margin, so it looked right and I measured it as right. Found by fixing the spacing suite's discovery, not by looking: it now carries `.stack` like every other container the app appends into, plus `.preSay` for the block margin `.stack` makes children surrender. A second block in there would have shipped flush. |
 | B-59 | A component inside a collapsible **lost its own spacing** | Reported as "why is the content paragraph tight with the header above". A collapsible body holds either prose or a component that arrives with its own spacing tokens. The prose rule was a bare descendant, `.expBody p` — a class **plus a type**, so it outranks `.note`, which is a class alone. Every note inside every collapsible therefore had its top margin flattened to 0 and sat against whatever was above it, while the identical grp/chips/note pattern in a plain `.card` kept its 10px. Scoped to `.expBody > p`: a string body's paragraphs are direct children and still get it, a node body's are grandchildren and keep their own. Measured rather than eyeballed — 0px against 10px for the same three elements. |
 | B-42 | One chip tap cost **two full-page reflows under a live blur** | Five things on the same click path: `snap()` serialised all of `G`; `render()` rebuilt every chip and `bar()` the action row; `measureBar()` read `offsetHeight`, forcing layout on a document just invalidated; it wrote `--barh` onto `documentElement`, invalidating style for the whole tree and waking the `ResizeObserver` watching `.bar`, which measured again; and all of it sat under `backdrop-filter: blur(14px)` over a region the rebuild had just dirtied. Chromium hands that to the compositor; Firefox largely does not, which is where the lag was reported. The blur was acting on **four percent** of the backdrop — the plate was already `.96` opaque, and the `@supports` fallback shipped alongside it was an opaque plate, which is proof the design never needed it. Blur deleted, fallback promoted to the rule, `--barh` moved to `.wrap`, and the measurement coalesced into one deferred read. |
@@ -581,7 +661,7 @@ icons/                  favicon, touch icon, PWA icons
 fonts/                  Be Vietnam Pro + Lora, latin & vietnamese woff2 subsets
 tests/
   run-all.sh            tests/run-all.sh
-  *-test.js             25 suites, no dependencies beyond node
+  *-test.js             30 suites, no dependencies beyond node
 docs/
   KNOWLEDGE.md          this file
   CONTRIBUTING.md       how to work on it
@@ -591,7 +671,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   672 assertions across 25 suites, 0 failing
+#   824 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -616,9 +696,14 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `icon-test.js` | 17 | Nerd Font code points, fallbacks, every class has a rule |
 | `target-test.js` | 16 | legal target pools per role |
 | `ruleset-test.js` | 14 | no ruleset-owned card leaks into the wrong ruleset |
+| `scale-test.js` | 37 | one type scale, three radii, three surfaces, the alert budget |
+| `lang-test.js` | 36 | interface language separate from ruleset; the teaching layer |
+| `reach-test.js` | 29 | safe-area insets, 44px touch targets, the haptic channel |
+| `motion-test.js` | 22 | phase and sheet motion, reduced-motion, ambient progress |
+| `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**443 assertions plus 57,000 generated decks.**
+**824 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -636,6 +721,12 @@ Several exist specifically because a naive check let a bug through:
   between `appendChild` calls is how B-06 happened.
 - **`tally-test.js`** asserts `oninput` does **not** call `render()`. That failure
   mode makes the feature unusable but looks fine in code review.
+- **`scale-test.js`** *resolves the cascade* rather than checking that two rules exist.
+  It computes selector specificity for every `.group`-scoped rule that touches a border,
+  works out which one wins on a non-first row, and reads the width it leaves. Both rules
+  being present is what B-65 looked like from the diff; only the winner matters.
+- **`tips-test.js`** **runs** `teaching()` and `collapsible()` at 0, 1, 2 and 10 games
+  instead of grepping for the expression. The invariant is the answer, not the source.
 
 ### Harness gotchas
 
@@ -770,6 +861,31 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     were not wrong logic — the rule fired correctly and the screen simply never said what
     the moderator was supposed to do with it (B-58, B-62). A rule the moderator cannot
     carry out is not implemented either.
+
+25. **Two rules can both be right and still not compose.** `.group > * + *` declares the
+    hairline; `.group > .p { border: 0 }` removes the row's own edge. Both are correct in
+    isolation and the diff reads as finished, but the second is two classes and the first
+    is one, so the separator never drew (B-65). Whenever a fix is "declare X, then reset
+    Y", the question is not whether both rules exist — it is which one wins, and CSS
+    answers that with specificity before it ever looks at source order.
+
+26. **A test that checks two rules exist is not testing the rule they make together.**
+    The first version of `scale-test` asserted the separator and the reset were both
+    present, and passed against the broken build. A mutation that reintroduced the exact
+    shipped bug survived it. It now computes specificity and resolves the winner, which is
+    the only form of the check that could have failed.
+
+27. **One flag answering two questions will eventually answer one of them wrongly.**
+    `G.rules` meant "which call order" and "which language" (B-66). Nothing was broken
+    while every Vietnamese table used the Vietnamese order — the two questions happened to
+    have the same answer. The bug is latent from the moment the flag is overloaded, and it
+    surfaces the first time somebody wants one without the other.
+
+28. **Teaching copy goes stale in silence.** A tip nobody re-reads cannot report that it
+    is wrong, so it keeps confidently naming an affordance that moved (B-67). The volume
+    is what makes it undetectable: at six essays per screen nobody proofreads, and the one
+    stale line is indistinguishable from the rest. Retiring the layer after a couple of
+    games is a correctness measure as much as a density one.
 
 ---
 

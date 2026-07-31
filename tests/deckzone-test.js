@@ -70,9 +70,15 @@ t('no hue means two different things', () => {
   const edges = (src.match(/border-left:3px solid rgba\((?:111,179,166|224,169,76)/g) || []).length;
   return edges === 0 ? true : edges + ' provenance edge(s) still colliding with a team hue';
 });
-t('the zone heading counts against the table size', () =>
-  /in your deck[^']*' \+\s*totalCards\(\) \+ ' of ' \+ n/.test(src)
-    ? true : 'heading does not show progress');
+/* The heading is a T() pair now, so the count has to appear in BOTH halves — an
+   English-only progress count would leave the Vietnamese heading saying nothing. */
+t('the zone heading counts against the table size', () => {
+  const h = (src.match(/T\('Trong b[\s\S]{0,220}?call order'\)\)\);/) || [''])[0];
+  const halves = (h.match(/totalCards\(\)/g) || []).length;
+  const sizes  = (h.match(/\+ n \+/g) || []).length;
+  return halves === 2 && sizes === 2
+    ? true : 'heading does not show progress in both languages: ' + h;
+});
 t('an empty deck shows a prompt, not a bare heading', () =>
   /Chưa chọn lá nào\. Bấm <b>\+<\/b>/.test(src) ? true : 'no empty-state message');
 t('a source section with nothing left is skipped entirely', () =>

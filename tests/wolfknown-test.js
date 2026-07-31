@@ -100,7 +100,7 @@ t('plain villagers never block it, however many are unidentified', () => {
 console.log('\nTHE SAME GUARD IS USED EVERYWHERE A WOLF IS ASKED ABOUT');
 for (const [what, re] of [
   ['the Fox trio',            /if \(wolfSideKnown\(\)\)\{\s*\n\s*G\.n\.foxAns/],
-  ['the Bear Tamer growl',    /if \(!wolfSideKnown\(\)\)\{\s*\n\s*B\.appendChild\(el\('div','alert','Bear Tamer/],
+  ['the Bear Tamer growl',    /if \(!wolfSideKnown\(\)\)\{\s*\n\s*B\.appendChild\(el\('div','tell','Bear Tamer/],
   ['the wolves\u2019 target list', /'whitewolf'\) && !wolfSideKnown\(\)/],
   ['the Knight\u2019s rust',       /if \(!wolfSideKnown\(\)\) log\('Not every wolf card is placed/],
   ['the victory check',       /if \(!wolfSideKnown\(\)\) return null;/],

@@ -57,8 +57,15 @@ t('the transition it declares has something to animate', () => {
 });
 t('and marking it does not swallow the real handler', () => {
   const c = grab('chip');
-  return /classList\.toggle\('sel'\); o\.on\(\)/.test(c)
+  // the haptic tick now sits between the two; what matters is that the mark still
+  // precedes the handler, and that the handler still runs
+  return /classList\.toggle\('sel'\);[^;]*;? ?o\.on\(\)/.test(c)
     ? true : 'the optimistic mark replaced the behaviour instead of preceding it';
+});
+t('and the tap is acknowledged in the other channel too', () => {
+  const c = grab('chip');
+  return /buzz\('tap'\)/.test(c)
+    ? true : 'a tap in the dark is still only ever confirmed on screen';
 });
 t('a chip with no handler is not made to look tappable', () => {
   const c = grab('chip');
