@@ -20,6 +20,8 @@ globalThis.log = t => logs.push(t);
 // The rule reads a cause CODE now, and registerDeaths renders the label from it
 eval(src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','globalThis.CAUSE'));
 eval(src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'));
+eval(src.match(/function teamOf\(p\)\{[\s\S]*?\n\}/)[0].replace('function teamOf','globalThis.teamOf = function'));
+eval(src.match(/const powerGone = [^;]*;/)[0].replace('const powerGone','globalThis.powerGone'));
 eval(src.match(/function registerDeaths\(chain\)\{[\s\S]*?\n\}/)[0]
   .replace('function registerDeaths','globalThis.registerDeaths = function'));
 

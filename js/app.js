@@ -292,6 +292,17 @@ function teamOf(p){
   return R[p.role].team;
 }
 const isWolf = p => teamOf(p) === 'wolf';
+/* "Every villager loses their power" means EVERY power, not only the ones that wake at
+   night. G.powersLost used to gate the night call list and nothing else, so after the
+   village killed the Elder the Hunter still fired, the Idiot still walked away from the
+   vote, the Scapegoat still died in place of a tie, the Bear Tamer still growled, the
+   Knight's rust still spread and the Judge could still demand a second vote — six powers
+   the village had just been stripped of, all of them triggered somewhere other than a
+   night step. Read teamOf, not the card, so a Wild Child who has already turned keeps
+   what being a wolf gives him.
+   The Sheriff's badge is deliberately NOT covered: it is a title the village votes on,
+   not a card, and it survives everything else too. */
+const powerGone = p => !!(G.powersLost && p && teamOf(p) === 'village');
 // The app must never infer a role it has not been told. Anything it computes
 // from cards has to check this first, or it will answer confidently and wrongly.
 // The badge is a title, not a card. Miller’s Hollow weights it at a flat double;
@@ -647,7 +658,10 @@ function registerDeaths(chain){
       // Miller’s Hollow says he fires whatever the cause. Matched on the cause CODE:
       // it used to be /poison/ against the sentence, so renaming the potion — or
       // translating it — would have turned the rule off with nothing failing.
-      if (!hunterFiresPoisoned() && c.cause === 'poison'){
+      if (powerGone(c.p)){
+        log(c.p.name + ' was the Hunter, but the village killed the Elder \u2014 the gun is ' +
+            'as dead as every other villager power. No shot.');
+      } else if (!hunterFiresPoisoned() && c.cause === 'poison'){
         log(c.p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
             'Change that under House rules if your table plays otherwise.');
       } else {
@@ -686,7 +700,11 @@ function applyDawn(){
     if (!d.on) continue;
     const p = byId(d.id);
     if (!p || !p.alive) continue;
-    if (p.role === 'knight' && d.cause === 'wolves') knightDied = p;
+    // the rust is a villager power too, so the Elder's revenge takes it with the rest
+    if (p.role === 'knight' && d.cause === 'wolves'){
+      if (powerGone(p)) log(p.name + ' was the Knight, but the sword lost its bite with every other villager power. No rust.');
+      else knightDied = p;
+    }
     registerDeaths(kill(p, d.cause));
   }
   if (knightDied){
@@ -1321,7 +1339,7 @@ function rNight(){
     return;
   }
 
-  const lg = liveWith('littlegirl');
+  const lg = liveWith('littlegirl').filter(p => !powerGone(p));
   if (s.role === 'wolf' && lg.length)
     B.appendChild(el('div','alert','The Little Girl (' + lg.map(p=>p.name).join(', ') + ') may be peeking. Watch her.'));
 
@@ -1563,7 +1581,7 @@ function rDawn(){
   const un = unassigned();
   if (un.length) B.appendChild(el('div','alert','Still unknown: ' + un.map(p=>p.name).join(', ') +
     '. Set their cards from the Roster when you learn them.'));
-  for (const b of liveWith('beartamer')){
+  for (const b of liveWith('beartamer').filter(p => !powerGone(p))){
     const nb = neighbours(b);
     if (!wolfSideKnown()){
       B.appendChild(el('div','alert','Bear Tamer <b>' + b.name + '</b> \u2014 ' + unplacedWolfCards() +
@@ -1677,7 +1695,7 @@ function rDay(){
       log('The village declined to elect a Sheriff.'); render(); } }]);
     return;
   }
-  const jd = liveWith('judge');
+  const jd = liveWith('judge').filter(p => !powerGone(p));
   if (jd.length && !G.judgeUsed){
     B.appendChild(el('div','alert','Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.'));
     /* G.judgeUsed was written nowhere: initialised, read here, never set. So the alert
@@ -1690,16 +1708,30 @@ function rDay(){
   } else if (jd.length){
     B.appendChild(el('p','note','The Stuttering Judge has spent his second vote \u2014 once per game, and it is gone.'));
   }
-  const sc = liveWith('scapegoat');
+  const sc = liveWith('scapegoat').filter(p => !powerGone(p));
   if (sc.length) B.appendChild(el('div','alert','If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.'));
   if (scapegoatBinds()) B.appendChild(el('div','alert','Only these may vote today: <b>' +
     G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b><p class="note">The Scapegoat named them as he died yesterday. Tomorrow the whole village speaks again.</p>'));
   if (G.powersLost){
     // name the route, because "by the village" covers the vote, the poison and the shot
     const eld = G.players.find(p => p.role === 'elder' && !p.alive);
+    /* Name what is actually gone. "Every villager loses their power" is easy to read as
+       "the night calls stop", which is how the rule came to be half-implemented in the
+       first place — the Hunter kept firing and the Idiot kept surviving the rope. */
+    const stripped = [
+      liveWith('hunter').length   && 'the Hunter does not fire',
+      liveWith('idiot').length    && 'the Idiot is hanged like anyone else',
+      liveWith('scapegoat').length&& 'the Scapegoat no longer dies for a tie',
+      liveWith('beartamer').length&& 'the Bear Tamer does not growl',
+      liveWith('knight').length   && 'the Knight’s rust does not spread',
+      liveWith('judge').length    && 'the Judge cannot call a second vote',
+      liveWith('littlegirl').length && 'the Little Girl cannot peek',
+    ].filter(Boolean);
     B.appendChild(el('div','alert no','The Elder died by ' +
       (eld && eld.cause ? causeLabel(eld.cause) : 'the village') +
-      '. Every villager has lost their power — no village card is called again.'));
+      '. <b>Every villager power is gone</b> — no village card is called at night' +
+      (stripped.length ? ', and ' + stripped.join(', ') : '') + '.' +
+      '<p class="note">The Sheriff’s badge is a title, not a card, so whoever holds it keeps it.</p>'));
   }
 
   const sh = A.find(p => p.sheriff);
@@ -1841,11 +1873,15 @@ function rDay(){
 }
 function resolveVote(p, tie){
   snap();
-  if (p.role === 'idiot' && !p.revealed){
+  /* Surviving the rope is the Idiot's power, so the Elder's revenge takes it too \u2014 after
+     that he is hanged like anybody else. */
+  if (p.role === 'idiot' && !p.revealed && !powerGone(p)){
     p.revealed = true; p.voteless = true;
     log(p.name + ' is the Village Idiot \u2014 revealed, spared, silenced for good. The vote is spent.');
     toNight(); return;
   }
+  if (p.role === 'idiot' && !p.revealed && powerGone(p))
+    log(p.name + ' is the Village Idiot, but the village killed the Elder \u2014 nothing saves him now.');
   if (p.role === 'angel' && G.day === 1){
     kill(p, 'vote');
     return finish({ who:'The Angel', why: p.name + ' wanted exactly this and got it on day one.' });

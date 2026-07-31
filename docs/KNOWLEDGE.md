@@ -446,6 +446,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 
 | # | Bug | Root cause |
 |---|---|---|
+| B-57 | The Elder took only the powers that **wake at night** | Reported from a real table: the village hanged the Elder and the other village roles still had their spell. They did. `G.powersLost` was read in exactly one behavioural place — the night call list — so every villager power triggered anywhere else carried on working: the Hunter still fired, the Idiot still walked away from the rope, the Scapegoat still died in place of a tie, the Bear Tamer still growled, the Knight’s rust still spread, the Judge could still demand a second vote and the Little Girl could still peek. Six of the seven change who wins. One predicate, `powerGone(p)`, is now asked at every trigger, and the day alert names what is actually gone rather than saying "every villager loses their power" — the sentence that was easy to read as "the night calls stop", which is how it came to be half-implemented. Reads `teamOf`, so a turned Wild Child or a Hound who joined the pack keeps what being a wolf gives him, and the Sheriff’s badge is untouched because it is a title the village votes on, not a card. |
 | B-53 | The mixed-Lovers test read an **unlearned card as a different side** | Fixing B-39 to compare the two sides re-opened the same hole one layer down: `teamOf` returns `'none'` for a card nobody identified, so a village lover beside an unidentified one compared `'village'` against `'none'`, read as mixed, and handed Cupid the win a second way. The app was not guessing — `checkWin` returns early unless `wolfSideKnown()`, and that predicate's whole argument is that once every wolf-side card is placed, anybody still unidentified is **provably not a wolf**. A local `sideOf()` resolves an unknown card to the village side, declared *below* the gate so the licence is structural. The general shape: the remaining bugs live in the gap between what is true and what the code has been told, and the fix is to name the predicate that licenses the answer. |
 | B-54 | Lost powers **dropped** the call, the one place the hush rule was not applied | Four lines above the code that invented hushing, `buildNight` still did `if (G.powersLost && r.team === 'village') continue`. The comment reasoned that the loss is publicly known — true — but that is not what the night leaks. The table hears *how many calls disappeared*, and the delta counts the powered village cards the deck held. Two rules in one loop, reaching opposite conclusions from the same premise. Now a third hush kind, `powerless`, so the night keeps its length. |
 | B-55 | The Thief's swap **did not reconcile `G.counts`**, and the new night reads `G.counts` | The Thief is the only move that changes which cards are at the table mid-game: his own goes back to the spares and one comes in. That was merely untidy while the night was built from live holders — the Roster listed the Thief as unplaced forever. It became a disappearing card the moment B-35 made `G.counts` the record of what is in play: a Thief who took a spare Fox was never called again, because no Fox was ever in the deck. Exactly the bug the deck-driven night was written to end, re-entering through the one path that moves a card without saying so. `thiefTakes()` now decrements the old and increments the new. **The fourth-pass review assessed this as safe by luck; it was not safe at all.** |
@@ -553,7 +554,7 @@ icons/                  favicon, touch icon, PWA icons
 fonts/                  Be Vietnam Pro + Lora, latin & vietnamese woff2 subsets
 tests/
   run-all.sh            tests/run-all.sh
-  *-test.js             24 suites, no dependencies beyond node
+  *-test.js             25 suites, no dependencies beyond node
 docs/
   KNOWLEDGE.md          this file
   CONTRIBUTING.md       how to work on it
@@ -563,7 +564,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   590 assertions across 24 suites, 0 failing
+#   619 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -702,6 +703,12 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
 17. **Mutation-test the wiring, not just the helper.** The Thief tests all called
     `thiefTakes()` directly and passed with the call site removed. A test that exercises
     a function proves the function; only a test that reads the call site proves it runs.
+
+18. **Implementing a rule is not implementing the sentence that states it.** "Every
+    villager loses their power" was built as one condition in the night-call loop, which
+    is only the powers that happen to wake (B-57). Enumerate what the rule actually
+    reaches — here, seven cards with six different trigger points — and gate them through
+    one predicate, so the eighth cannot be added without meeting it.
 
 ---
 
