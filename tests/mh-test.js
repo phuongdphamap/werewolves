@@ -274,9 +274,11 @@ t('no cause is passed as the display sentence any more', () => {
   return prose.length === 0 ? true : 'a sentence is still being used as a cause: ' + prose.join(' / ');
 });
 t('the poisoned Hunter is decided on the code, not on /poison/', () => {
-  const rd = grab('registerDeaths');
-  return /c\.cause === 'poison'/.test(rd) && !/\/poison\/\.test/.test(rd)
-    ? true : 'still matching the prose: ' + rd;
+  // the decision lives in hunterWouldFire now, so registerDeaths and the pre-dawn night
+  // check cannot answer it differently
+  const fn = grab('hunterWouldFire');
+  return /cause === 'poison'/.test(fn) && !/\/poison\/\.test/.test(fn)
+    ? true : 'still matching the prose: ' + fn;
 });
 t('a code with no label still renders as something, for an old save', () =>
   (causeLabel('the tie') === 'the tie' && causeLabel(null) === 'dead')

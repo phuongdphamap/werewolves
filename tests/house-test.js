@@ -22,6 +22,8 @@ eval(src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','global
 eval(src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'));
 eval(src.match(/function teamOf\(p\)\{[\s\S]*?\n\}/)[0].replace('function teamOf','globalThis.teamOf = function'));
 eval(src.match(/const powerGone = [^;]*;/)[0].replace('const powerGone','globalThis.powerGone'));
+eval(src.match(/function hunterWouldFire\(p, cause\)\{[\s\S]*?\n\}/)[0]
+  .replace('function hunterWouldFire','globalThis.hunterWouldFire = function'));
 eval(src.match(/function registerDeaths\(chain\)\{[\s\S]*?\n\}/)[0]
   .replace('function registerDeaths','globalThis.registerDeaths = function'));
 
@@ -145,7 +147,7 @@ t('and at the vote, before the button that commits it', () => {
 });
 t('and on the Hunter screen, which is where it was asked about', () => {
   const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  return /if \(hp\) B\.appendChild\(el\('p','note', revealNote\(\[hp\]\)/.test(fn)
+  return /if \(hp\) B\.appendChild\(el\('div','card tight', priv/.test(fn) && /revealNote\(\[hp\]\)/.test(fn)
     ? true : 'the death that most needs it says nothing, or the call is unreachable';
 });
 t('no branch in the app is switched off with a literal', () => {

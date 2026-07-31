@@ -186,7 +186,7 @@ is pinned by tests in `fox-test.js`.
 
 ### The disputed rules are settable
 
-Four rules are genuinely argued about between tables, so they are **house rules** with
+Five rules are genuinely argued about between tables, so they are **house rules** with
 three states rather than hard-coded:
 
 ```js
@@ -194,10 +194,12 @@ G.selfHeal      // null = follow the published rule, true, false
 G.hunterPoison  // null = ...
 G.hunterElder   // null = ...
 G.showCards     // null = ...
+G.hunterNight   // null = ...
 witchMaySaveSelf()     // null ? rules !== 'vn' : G.selfHeal
 hunterFiresPoisoned()  // null ? rules !== 'vn' : G.hunterPoison
 hunterFiresPowerless() // null ? false            : G.hunterElder
 cardsShownOnDeath()    // null ? rules !== 'vn' : G.showCards
+hunterShootsInTheNight() // null ? false          : G.hunterNight
 ```
 
 `null` is **distinct from `false`** and must stay that way — a test asserts it. An
@@ -502,6 +504,9 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 
 | # | Bug | Root cause |
 |---|---|---|
+| B-62 | The Hunter screen never said **how** the shot happens | Asked at a table: "when does the Hunter fire, in his call to open eyes or after moderator told him die? If after, how to fire — he'll point to someone or what?" He has no `every` value, so there is no call to fire in: the shot is triggered by his death. But the screen said only *"tap whoever he points at"*, which assumes the moderator already knows they are meant to ask a dead player to point, out loud, in front of everybody, and that the Hunter chooses rather than they do. Now stated, both for the public shot and for the private one. |
+| B-63 | "His card stays down" implied the Hunter could be **kept secret** | Copy I added one commit earlier. True about the card and wrong about the secret: a dead player points and somebody drops, which identifies him whatever the reveal rule says — and a Hunter voted out fires in daylight, where nothing can hide it. The screen now says so, and points at the one arrangement that does hide him: take the shot in the night. |
+| B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
 | B-61 | `#nHush` shipped as an **unclassed container** | The container added for B-58 had no spacing mechanism — its single `.alert` child happened to carry a margin, so it looked right and I measured it as right. Found by fixing the spacing suite's discovery, not by looking: it now carries `.stack` like every other container the app appends into, plus `.preSay` for the block margin `.stack` makes children surrender. A second block in there would have shipped flush. |
 | B-59 | A component inside a collapsible **lost its own spacing** | Reported as "why is the content paragraph tight with the header above". A collapsible body holds either prose or a component that arrives with its own spacing tokens. The prose rule was a bare descendant, `.expBody p` — a class **plus a type**, so it outranks `.note`, which is a class alone. Every note inside every collapsible therefore had its top margin flattened to 0 and sat against whatever was above it, while the identical grp/chips/note pattern in a plain `.card` kept its 10px. Scoped to `.expBody > p`: a string body's paragraphs are direct children and still get it, a node body's are grandchildren and keep their own. Measured rather than eyeballed — 0px against 10px for the same three elements. |
@@ -586,7 +591,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   656 assertions across 25 suites, 0 failing
+#   672 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -755,6 +760,16 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     `if (on.length) …revealNote(…)` mutated to `if (false)` still contains the string
     `revealNote`, so two tests passed against a disabled call. Assert the guard, and keep
     a blanket check that no branch is switched off with a literal.
+
+23. **Count the routes, not the occurrences.** A test asserting `G.nightShotTaken = true`
+    appears in a function passed while a mutation deleted the one that mattered, because a
+    second copy in an escape hatch still matched (B-64). When several branches must all do
+    something, assert the branch count and the action count together.
+
+24. **A "how" question is a documentation bug in the UI.** Two of the last three reports
+    were not wrong logic — the rule fired correctly and the screen simply never said what
+    the moderator was supposed to do with it (B-58, B-62). A rule the moderator cannot
+    carry out is not implemented either.
 
 ---
 
