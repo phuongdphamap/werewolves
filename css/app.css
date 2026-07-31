@@ -349,8 +349,14 @@
   .exp[open] > summary{border-bottom:1px solid var(--line)}
   .expBody{padding:var(--s3) var(--s4) var(--s4);font-size:13px;color:var(--txt2);line-height:1.65}
   .expBody b{color:var(--txt70)}
-  .expBody p{margin:0 0 var(--s2)}
-  .expBody p:last-child{margin-bottom:0}
+  /* Direct children only. A collapsible's body is either prose — a string of <p>, which
+     this spaces — or a component that brings its own spacing tokens, like the house-rules
+     panel. Unscoped, this reached into that component and beat `.note` on specificity
+     (`.expBody p` is a class plus a type; `.note` is a class alone), so every note inside
+     a collapsible silently lost its top margin and sat flush against the chips above it,
+     while the identical grp/chips/note pattern in a plain .card kept its 10px. */
+  .expBody > p{margin:0 0 var(--s2)}
+  .expBody > p:last-child{margin-bottom:0}
 
   .deal{display:flex;flex-direction:column;gap:var(--s2)}
   .dl{display:flex;align-items:center;gap:var(--s3);background:var(--surf);border:1px solid var(--line);
