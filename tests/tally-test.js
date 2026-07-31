@@ -67,9 +67,14 @@ t('the stepper is clamped the same way', () =>
   /Math\.min\(voters\.length, Math\.round\(v\) \|\| 0\)/.test(src) ? true : 'stepper unclamped');
 
 console.log('\nTYPING DOES NOT DESTROY THE BOX');
-t('rows are built once and only the numbers refresh', () =>
-  /function refresh\(\)\{/.test(src) && /cells\.push\(\{ p, power, minus, plus, box \}\)/.test(src)
-    ? true : 'no refresh/cells split, so a keystroke would rebuild the row');
+t('rows are built once and only the numbers refresh', () => {
+  // Pins the split, not the exact field list — refresh() may need more handles on a
+  // row over time, and a keystroke rebuilding the row is the thing to catch.
+  const push = (src.match(/cells\.push\(\{[^}]*\}\)/) || [''])[0];
+  if (!/function refresh\(\)\{/.test(src)) return 'no refresh(), so a keystroke rebuilds the row';
+  const need = ['p','power','minus','plus','box'].filter(k => !new RegExp('\\b' + k + '\\b').test(push));
+  return need.length === 0 ? true : 'refresh has no handle on: ' + need.join(', ');
+});
 t('the box being edited is left alone by refresh', () =>
   /if \(document\.activeElement !== c\.box\) c\.box\.value/.test(src)
     ? true : 'refresh would overwrite the caret position');

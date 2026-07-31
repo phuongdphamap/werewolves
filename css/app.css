@@ -1,7 +1,17 @@
   :root{
     --bg:#0C0A12; --surf:#1B1729; --surf2:#241F35;
     --line:rgba(237,233,224,.13); --line2:rgba(237,233,224,.24);
-    --txt:#EDE9E0; --txt70:rgba(237,233,224,.72); --txt45:rgba(237,233,224,.46); --txt25:rgba(237,233,224,.26);
+    /* Text alphas, measured against the card surface #1B1729. A moderator reads this
+       at 30% brightness in a dark garden, so body text is held at AAA, not AA.
+         --txt   1.0  14.4:1   primary
+         --txt70 .72   8.0:1   emphasis
+         --txt2  .67   7.0:1   body secondary — rules, role names, helper lines
+         --micro .46   4.0:1   bold uppercase micro-labels ONLY. Below AA for body
+                               copy; the tracking and weight carry it at label size.
+         --txt25 .26   2.1:1   NOT for text. Dot fills and rules only.
+       Anything you would read a sentence from belongs at --txt2 or above. */
+    --txt:#EDE9E0; --txt70:rgba(237,233,224,.72); --txt2:rgba(237,233,224,.67);
+    --micro:rgba(237,233,224,.46); --txt25:rgba(237,233,224,.26);
     --moon:#E8DFC8; --wolf:#D0554A; --vil:#6FB3A6; --solo:#B98BD9; --warn:#E0A94C;
     /* Both faces carry the full Vietnamese range. Cinzel did not — every ả ệ ườ
        fell back to a different font per glyph, which is why it looked mixed. */
@@ -26,7 +36,12 @@
     background:radial-gradient(90% 55% at 50% -8%, rgba(232,223,200,.09), transparent 62%),
                linear-gradient(180deg,#0C0A12,#14101F 60%,#0A0810)}
   .wrap{position:relative;z-index:1;max-width:var(--col);margin:0 auto;min-height:100dvh;
-    display:flex;flex-direction:column;padding:0 var(--pad) 152px}
+    display:flex;flex-direction:column;
+    /* Clearance is the bar's measured height, not a guess — the bar grows when a
+       label wraps or a step counter appears, and the old fixed 152px left the last
+       row under it. measureBar() keeps --barh in step. */
+    padding:0 var(--pad) calc(var(--barh, 152px) + var(--s5));
+    scroll-padding-bottom:calc(var(--barh, 152px) + var(--s5))}
   /* on anything wider than the column, hairlines make it read as a deliberate
      panel rather than a box floating in the middle of the page */
   @media (min-width:560px){
@@ -42,18 +57,21 @@
   header .ttl{font-family:var(--disp);font-size:15px;font-weight:600;letter-spacing:.01em;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   header .ph{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
-    color:var(--txt45);margin-top:3px}
+    color:var(--micro);margin-top:3px}
   .ico{background:none;border:1px solid var(--line);color:var(--txt70);border-radius:9px;
     font:inherit;font-size:11.5px;font-weight:600;padding:9px 13px;cursor:pointer;white-space:nowrap}
   .ico:hover{border-color:var(--line2);color:var(--txt)}
   .ico:disabled{opacity:.28;cursor:default}
   /* a repeated destructive action should recede until it is wanted */
-  .ico.quiet{border-color:transparent;color:var(--txt45);font-weight:500;padding:9px 11px}
+  .ico.quiet{border-color:transparent;color:var(--txt2);font-weight:500;padding:9px 11px}
   .ico.quiet:hover,.ico.quiet:focus-visible{border-color:var(--line2);color:var(--txt)}
 
   h2{font-family:var(--disp);font-weight:600;font-size:22px;line-height:1.35;
     margin:var(--s2) 0 var(--s2);letter-spacing:0}
-  .sub{color:var(--txt45);font-size:13.5px;margin:0 0 var(--s5);line-height:1.6}
+  /* On a night call the role name is what the moderator already knows; the sentence
+     below it is what they have to say. The heading yields so the line can lead. */
+  #nTitle{font-size:18px}
+  .sub{color:var(--txt2);font-size:13.5px;margin:0 0 var(--s5);line-height:1.6}
   section{display:none;flex:1;padding-top:var(--s2)}
   /* Spacing by structure, not by a list of ids. Anything that renders a stack of
      blocks carries .stack and gets uniform gaps; children surrender their own
@@ -72,9 +90,20 @@
     border-left:3px solid var(--moon);border-radius:10px;
     padding:var(--s4);margin:0 0 var(--s5)}
   .say .lbl{font-size:9px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;
-    color:var(--txt45);margin-bottom:var(--s1)}
-  .say p{margin:0;font-family:var(--disp);font-weight:500;font-size:17.5px;line-height:1.7;color:var(--moon)}
-  .note{font-size:13px;color:var(--txt45);line-height:1.6;margin:var(--s2) 0 0}
+    color:var(--micro);margin-bottom:var(--s1)}
+  /* The sentence being spoken is the largest thing on the screen. It used to be third,
+     behind a heading the moderator already knows — read in the dark at arm's length,
+     that is the wrong order. */
+  .say p{margin:0;font-family:var(--disp);font-weight:500;font-size:21px;line-height:1.6;color:var(--moon)}
+  /* One language at a time during a night call. The other is one tap away. */
+  .say .alt{display:none;margin-top:var(--s2);font-family:var(--ui);font-size:13.5px;
+    line-height:1.55;color:var(--txt2)}
+  .say .alt.on{display:block}
+  .altBtn{margin-top:var(--s3);background:none;border:0;padding:4px 0;cursor:pointer;
+    font:inherit;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--micro);border-bottom:1px solid var(--line)}
+  .altBtn:hover,.altBtn:focus-visible{color:var(--txt);border-bottom-color:var(--line2)}
+  .note{font-size:13px;color:var(--txt2);line-height:1.6;margin:var(--s2) 0 0}
   .note b{color:var(--txt70)}
 
   .row{display:flex;gap:var(--s2);align-items:center}
@@ -109,12 +138,14 @@
     min-height:44px;transition:border-color .15s,background .15s}
   .chip:hover{border-color:var(--line2)}
   .chip.sel{border-color:var(--moon);background:rgba(232,223,200,.16)}
-  .chip.dead{opacity:.32;text-decoration:line-through;cursor:not-allowed}
+  /* Disabled, not destroyed. At .32 this measured 2.6:1 and the strikethrough made it
+     unreadable rather than unavailable; .5 is ~4.4:1, dim but legible. */
+  .chip.dead{opacity:.5;cursor:not-allowed}
   .chip .bd{font-size:10.5px;opacity:.8}
   /* role icons: fixed width so rows line up whether a card is known or not */
   .ic{width:22px;display:inline-flex;justify-content:center;align-items:center;
     font-size:16px;line-height:1;flex:0 0 auto}
-  .ic i{font-style:normal;font-size:12px;color:var(--txt25)}
+  .ic i{font-style:normal;font-size:12px;color:var(--txt2)}
   /* Nerd Font glyphs sit in the Private Use Area, so they need the font declared */
   .nf{font-family:"Symbols Nerd Font Mono","Symbols Nerd Font","Hack Nerd Font",
     "JetBrainsMono Nerd Font","FiraCode Nerd Font","Iosevka Nerd Font",monospace;
@@ -126,8 +157,11 @@
   .p.dead{opacity:.44}
   .p .nm{flex:1;min-width:0;font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .p.dead .nm{text-decoration:line-through}
-  .p .rl{font-size:12px;color:var(--txt45);white-space:nowrap}
-  .p .seat{font-size:11px;color:var(--txt25);min-width:18px}
+  .p .rl{font-size:12px;color:var(--txt2);white-space:nowrap}
+  /* Seat order is data the Bear Tamer, the Fox and the Knight all resolve against,
+     so it reads at full text weight in a tabular face, not as decoration. */
+  .p .seat{font-size:12px;color:var(--txt70);min-width:18px;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
   .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
   .t-village{background:var(--vil)} .t-wolf{background:var(--wolf)} .t-solo{background:var(--solo)}
   .t-none{background:var(--txt25)}
@@ -151,7 +185,7 @@
   .r.set-Characters{border-left:3px solid rgba(224,169,76,.6)}
   .dl.set-Base{border-left:3px solid rgba(111,179,166,.55)}
   .dl.set-Characters{border-left:3px solid rgba(224,169,76,.6)}
-  .legend{display:flex;gap:var(--s4);font-size:11px;color:var(--txt45);margin:0}
+  .legend{display:flex;gap:var(--s4);font-size:11px;color:var(--txt2);margin:0}
   /* inside a gapped list a heading must not add its own bottom margin as well */
   /* A heading's separation is its own margin PLUS the list's flex gap — except for
      the first one, which has no preceding item and so receives no gap. It carries
@@ -164,10 +198,33 @@
   .legend b{display:inline-block;width:12px;height:3px;border-radius:2px}
   .r .info{flex:1;min-width:0;cursor:pointer}
   .r .rn{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .r .rn .vi{font-weight:500;font-size:11.5px;color:var(--txt45)}
-  .r .rd{font-size:12px;color:var(--txt45);margin-top:4px;line-height:1.5;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* Vietnamese needs room for stacked diacritics — ả ệ ườ lose them below 13px. */
+  .r .rn .vi{font-weight:500;font-size:13px;color:var(--txt2)}
+  .r .rd{font-size:12.5px;color:var(--txt2);margin-top:4px;line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .r.open .rd{-webkit-line-clamp:unset}
+  /* Counting the vote. Nine identical rows of "− [ ] +" gave the moderator no answer
+     without reading every digit aloud, so each row now carries its own share as a
+     proportional fill and anyone past half is promoted to the top and marked. */
+  #dyVotes{display:flex;flex-direction:column;gap:var(--s2)}
+  .p.vote{position:relative;overflow:hidden}
+  .p.vote > *{position:relative;z-index:1}
+  .p.vote .fill{position:absolute;left:0;top:0;bottom:0;width:0;z-index:0;pointer-events:none;
+    background:rgba(111,179,166,.15);border-right:1px solid rgba(111,179,166,.45);
+    transition:width .18s ease-out}
+  .p.vote.lead .fill{background:rgba(232,223,200,.13);border-right-color:var(--moon)}
+  /* Past half the vote carries, which is a different kind of fact from "in front". */
+  .p.vote.over{border-color:var(--wolf)}
+  .p.vote.over .fill{background:rgba(208,85,74,.20);border-right-color:var(--wolf)}
+  .p.vote.over .nm{color:var(--wolf)}
+  .p.vote .carries{font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--wolf);white-space:nowrap}
+  /* The threshold used to sit in a card above the list and scroll away exactly when
+     the count got interesting. It lives in the bar now, so it cannot leave. */
+  .barnote{font-size:12px;color:var(--txt2);text-align:center;margin-bottom:var(--s2);
+    line-height:1.4}
+  .barnote b{color:var(--txt);font-variant-numeric:tabular-nums}
+  .barnote .hit{color:var(--wolf)}
   .stp{display:flex;align-items:center;gap:var(--s1);flex:0 0 auto}
   .stp button{width:36px;height:36px;border-radius:9px;background:var(--surf2);border:1px solid var(--line);
     color:var(--txt);font:inherit;font-size:17px;font-weight:600;cursor:pointer;line-height:1}
@@ -183,7 +240,7 @@
   .stp input[type=text]:focus{outline:none;border-color:var(--moon);background:rgba(232,223,200,.08)}
   .stp .n{min-width:24px;text-align:center;font-weight:700;font-size:15px}
   .grp{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--txt45);margin:var(--s6) 0 var(--s3);padding-bottom:var(--s2);
+    color:var(--micro);margin:var(--s6) 0 var(--s3);padding-bottom:var(--s2);
     border-bottom:1px solid var(--line)}
   .grp:first-child{margin-top:0}
 
@@ -192,7 +249,7 @@
     padding:var(--s3) var(--s2);text-align:center}
   .tl .v{font-family:var(--disp);font-size:22px;font-weight:600;line-height:1.1}
   .tl .k{font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--txt45);margin-top:5px}
+    color:var(--micro);margin-top:5px}
   .tl.bad .v{color:var(--wolf)}
 
   .alert{border-radius:10px;padding:var(--s3) var(--s3);font-size:13px;line-height:1.55;
@@ -207,11 +264,11 @@
     font-size:12.5px;font-weight:700;letter-spacing:.03em;color:var(--txt70);
     display:flex;align-items:center;gap:10px}
   .exp > summary::-webkit-details-marker{display:none}
-  .exp > summary::after{content:'+';margin-left:auto;font-size:17px;font-weight:600;color:var(--txt45)}
+  .exp > summary::after{content:'+';margin-left:auto;font-size:17px;font-weight:600;color:var(--txt2)}
   .exp[open] > summary::after{content:'\2212'}
   .exp > summary:hover{color:var(--txt)}
   .exp[open] > summary{border-bottom:1px solid var(--line)}
-  .expBody{padding:var(--s3) var(--s4) var(--s4);font-size:13px;color:var(--txt45);line-height:1.65}
+  .expBody{padding:var(--s3) var(--s4) var(--s4);font-size:13px;color:var(--txt2);line-height:1.65}
   .expBody b{color:var(--txt70)}
   .expBody p{margin:0 0 var(--s2)}
   .expBody p:last-child{margin-bottom:0}
@@ -225,48 +282,64 @@
   .log{display:flex;flex-direction:column}
   .le{display:flex;gap:var(--s3);padding:var(--s3) 0;border-bottom:1px solid rgba(237,233,224,.08);
     font-size:13.5px;line-height:1.55}
-  .le .w{font-size:9px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--txt25);
+  /* A tracked uppercase label, so --micro carries it — but at 9px it was the one
+     place --txt25 was still colouring text, at 2.1:1. */
+  .le .w{font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--micro);
     min-width:52px;padding-top:3px}
   .le b{color:var(--moon);font-weight:600}
 
   /* The old ramp started fully transparent, so rows and the legend showed through
      behind the buttons. It now reaches near-opaque well above them, with a blur
      where supported, and starts higher so there is a clean band to sit on. */
+  /* A defined surface, not a fog. The old gradient faded in over ~90px, so the last
+     row of every list sat permanently half-erased — legible enough to notice, not to
+     read, and on the vote screen it hid a candidate. An opaque plate with a hairline
+     top edge reads as depth; the blur is only for what scrolls under the edge. */
   .bar{position:fixed;bottom:0;left:0;right:0;z-index:6;
-    padding:var(--s6) var(--pad) var(--s4);
-    background:linear-gradient(180deg,
-      rgba(10,8,16,0) 0%, rgba(10,8,16,.72) 34%,
-      rgba(10,8,16,.94) 62%, rgba(10,8,16,.99) 100%);
-    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+    padding:var(--s4) var(--pad) var(--s4);
+    background:rgba(10,8,16,.96);border-top:1px solid var(--line);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .bar{background:#0A0810}
+  }
   .bar .in{max-width:calc(var(--col) - 2 * var(--pad));margin:0 auto;
     display:flex;gap:var(--s2);align-items:stretch}
   /* a long label must never break the row: it truncates instead */
   .bar .in .btn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .steps{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--txt45);text-align:center;margin-bottom:var(--s2)}
-  .modal{position:fixed;inset:0;z-index:20;background:rgba(8,6,14,.94);display:none;
+    color:var(--micro);text-align:center;margin-bottom:var(--s2)}
+  /* Opaque, not 94%. The reveal is the only moment this phone is pointed at another
+     player, and at .94 the header, the phase and the roster behind it stayed faintly
+     legible — a leak on the screen whose whole job is not leaking. */
+  .modal{position:fixed;inset:0;z-index:20;background:#0A0810;display:none;
     padding:var(--s5) var(--pad) var(--s6);overflow-y:auto}
   .modal.on{display:block}
   .modal.seer{display:none;place-items:center;text-align:center}
   .modal.seer.on{display:grid}
   .skick{font-size:10px;font-weight:700;letter-spacing:.19em;text-transform:uppercase;
-    color:var(--txt45);margin-bottom:var(--s5)}
-  .swho{font-size:13px;color:var(--txt45);margin-bottom:var(--s1)}
+    color:var(--micro);margin-bottom:var(--s5)}
+  .swho{font-size:13px;color:var(--txt2);margin-bottom:var(--s1)}
   .sname{font-family:var(--disp);font-size:34px;line-height:1.25;margin-bottom:var(--s2)}
   .steam{font-size:11px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;
     margin-bottom:var(--s6)}
+  /* The answer is not on screen when the overlay opens — a mis-tap would otherwise
+     expose it. visibility, not display, so revealing cannot shift the layout under
+     the thumb that is holding it. */
+  .secret{visibility:hidden}
+  .secret.on{visibility:visible}
+  .btn.hold{margin-bottom:var(--s2);touch-action:none;user-select:none;-webkit-user-select:none}
   .modal .in{max-width:calc(var(--col) - 2 * var(--pad));margin:0 auto}
 
   /* resume prompt after an unexpected reload */
   .veil{position:fixed;inset:0;z-index:40;display:none;place-items:center;text-align:center;
-    background:rgba(8,6,14,.97);padding:var(--s5) var(--pad);overflow-y:auto}
+    background:#0A0810;padding:var(--s5) var(--pad);overflow-y:auto}
   .veil.on{display:grid}
   .veil > *{max-width:calc(var(--col) - 2 * var(--pad));margin:0 auto}
   .veil .kicker{font-size:10px;font-weight:700;letter-spacing:.19em;text-transform:uppercase;
-    color:var(--txt45);margin-bottom:var(--s4)}
+    color:var(--micro);margin-bottom:var(--s4)}
   .veil h1{font-family:var(--disp);font-weight:600;font-size:30px;line-height:1.25;margin:0 0 var(--s3)}
   .veil p{margin:0 0 var(--s3);font-size:15px;color:var(--txt70);line-height:1.6}
-  .veil p.dim{font-size:13px;color:var(--txt45)}
+  .veil p.dim{font-size:13px;color:var(--txt2)}
   .veil .go{display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s5)}
   .btn.ghost{background:none;border:1px solid var(--line2);color:var(--txt70)}
   .btn.ghost:hover:not(:disabled){border-color:var(--moon);color:var(--txt);filter:none}

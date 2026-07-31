@@ -11,7 +11,9 @@ for f in *-test.js; do
   n=$(printf '%s' "$out" | grep -oE '[0-9]+ passed' | tail -1 | grep -oE '^[0-9]+')
   total=$((total + ${n:-0}))
   line=$(printf '%s' "$out" | grep -E '[0-9]+ passed, [0-9]+ failed|no illegal deck' | tail -1)
-  if [ $rc -ne 0 ] || printf '%s' "$out" | grep -q 'FAIL'; then
+  # Anchored to the exact line a failing assertion prints. A bare 'FAIL' also matched
+  # prose — a suite with a heading containing "FAILING" was reported as broken.
+  if [ $rc -ne 0 ] || printf '%s' "$out" | grep -q '^  FAIL '; then
     bad=$((bad+1)); printf '  %-22s %s\n' "$f" "${line:-CRASHED}"
     printf '%s\n' "$out" | grep -E 'FAIL|Error' | head -5 \
       || printf '%s\n' "$out" | head -3   # nothing matched — show why it died

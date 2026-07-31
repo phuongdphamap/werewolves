@@ -80,7 +80,8 @@
     <div class="steps" id="nStep">—</div>
     <h2 id="nTitle">—</h2>
     <p class="sub" id="nSub"></p>
-    <div class="say" id="nSay"><div class="lbl">Read aloud</div><p id="nSayT"></p></div>
+    <div class="say" id="nSay"><div class="lbl">Read aloud</div><p id="nSayT"></p>
+      <button type="button" class="altBtn" id="bAltLang" hidden>Show English</button></div>
     <div class="stack" id="nBody"></div>
   </section>
 
@@ -107,15 +108,18 @@
     <div class="log" id="enLog"></div>
   </section>
 
-  <div class="bar"><div class="in" id="bar"></div></div>
+  <div class="bar"><div class="barnote" id="barNote" hidden></div><div class="in" id="bar"></div></div>
 </div>
 
 <div class="modal seer" id="mSeer"><div class="in seerin">
   <div class="skick" id="revKick">Turn the screen</div>
   <div class="swho" id="seerWho">—</div>
-  <div class="sname" id="seerName">—</div>
-  <div class="steam" id="seerTeam">—</div>
-  <button type="button" class="btn wide" id="bSeerDone">Hide</button>
+  <div class="secret" id="revSecret" aria-hidden="true">
+    <div class="sname" id="seerName">—</div>
+    <div class="steam" id="seerTeam">—</div>
+  </div>
+  <button type="button" class="btn wide hold" id="bReveal">Hold to see it</button>
+  <button type="button" class="btn sec wide" id="bSeerDone">Done</button>
 </div></div>
 
 <div class="modal" id="mRoster"><div class="in">
