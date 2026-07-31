@@ -77,5 +77,36 @@ t('.exp carries a bottom margin like .card', () => {
 t('inside a stack that margin is zeroed, so it is 20px not 34px', () =>
   /\.stack > \*\{margin-bottom:0\}/.test(src) ? true : 'would compound');
 
+/* A collapsible's body holds one of two things: prose, which it spaces itself, or a
+   component that arrives with its own spacing tokens — the house-rules panel. The prose
+   rule was written as a bare descendant, `.expBody p`, which is a class PLUS a type and
+   therefore outranks `.note` (a class alone). So every note inside every collapsible lost
+   its top margin and sat flush against whatever was above it, while the identical
+   grp/chips/note pattern in a plain .card kept its 10px. Reported as "why is the content
+   paragraph tight with the header above". */
+console.log('\nA COMPONENT INSIDE A COLLAPSIBLE KEEPS ITS OWN SPACING');
+t('the prose rule is scoped to direct children', () =>
+  /\.expBody > p\{/.test(src)
+    ? true : 'a bare .expBody p outranks .note and flattens it');
+t('so does its last-child exception', () =>
+  /\.expBody > p:last-child\{/.test(src)
+    ? true : 'the unscoped version would zero a nested note’s bottom margin too');
+t('no unscoped .expBody descendant selector targets a spacing property', () => {
+  const bad = [...src.matchAll(/\.expBody ([a-z]+)\{([^}]*)\}/g)]
+    .filter(m => /margin|padding/.test(m[2]))
+    .map(m => '.expBody ' + m[1]);
+  return bad.length === 0
+    ? true : 'reaches into nested components and beats their class: ' + bad.join(', ');
+});
+t('.note still declares the top margin the panel relies on', () =>
+  /\.note\{[^}]*margin:var\(--s2\) 0 0\}/.test(src)
+    ? true : 'the note has no own spacing left to win with');
+t('the house-rules panel is a node body, which is why it was exposed', () => {
+  // a string body's <p> are direct children; this one's are grandchildren
+  const c = (src.match(/function collapsible\(key, title, body\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /b\.appendChild\(body\)/.test(c) && /houseRulesUI\(\)/.test(src)
+    ? true : 'the two body shapes are no longer distinguishable';
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

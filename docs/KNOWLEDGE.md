@@ -184,20 +184,36 @@ So moving them after the pack is informationally neutral for players and lets th
 answer from the screen instead of asking the moderator to lift a card. That reasoning
 is pinned by tests in `fox-test.js`.
 
-### #5 and #6 are settable
+### The disputed rules are settable
 
-Both are genuinely disputed between tables, so they are **house rules** with three
-states rather than hard-coded:
+Three rules are genuinely argued about between tables, so they are **house rules** with
+three states rather than hard-coded:
 
 ```js
-G.selfHeal      // null = follow ruleset, true, false
-G.hunterPoison  // null = follow ruleset, true, false
-witchMaySaveSelf()    // null ? rules !== 'vn' : G.selfHeal
-hunterFiresPoisoned() // null ? rules !== 'vn' : G.hunterPoison
+G.selfHeal      // null = follow the published rule, true, false
+G.hunterPoison  // null = ...
+G.hunterElder   // null = ...
+witchMaySaveSelf()     // null ? rules !== 'vn' : G.selfHeal
+hunterFiresPoisoned()  // null ? rules !== 'vn' : G.hunterPoison
+hunterFiresPowerless() // null ? false            : G.hunterElder
 ```
 
 `null` is **distinct from `false`** and must stay that way — a test asserts it. An
 explicit ruling survives switching ruleset.
+
+**The third is not a tradition split, and that distinction is load-bearing.** The first
+two really do differ between Miller’s Hollow and Ma Sói Việt Nam, so their default reads
+the chosen ruleset. No ruleset addresses whether the Hunter still shoots once the Elder’s
+revenge has taken every villager power, so its default is the same under both. That is
+why `byRule` is a property of each row rather than one shared `G.rules !== 'vn'` — the
+shared version labelled the third row's default "có" under Miller’s Hollow, which is the
+opposite of what it does.
+
+The question exists because the two cards read past each other: the Elder cancels the
+villagers' powers and names no exception, while the Hunter's card says he fires "if he is
+killed by any reason". The app defaults to no shot — the shot is a power, and the power is
+gone — and says so on the panel, with the counter-argument, so a table can overrule it
+knowing what it is overruling.
 
 ### The Sheriff (Trưởng Làng / Capitaine / 警长)
 
@@ -305,7 +321,7 @@ crash recovery cheap.
 players counts night day phase log steps si n dawn pending
 witchHeal witchPoison foxPower elderLife powersLost judgeUsed
 houndSide sheriffDone infectNext over scapegoatVoters assignTo
-knewDeal rules lastGuard selfHeal hunterPoison resume votes
+knewDeal rules lastGuard selfHeal hunterPoison hunterElder resume votes
 sheriffVote showAllRoles scope dawnWhy dawnSure dawnEdit
 ```
 
@@ -484,6 +500,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 
 | # | Bug | Root cause |
 |---|---|---|
+| B-59 | A component inside a collapsible **lost its own spacing** | Reported as "why is the content paragraph tight with the header above". A collapsible body holds either prose or a component that arrives with its own spacing tokens. The prose rule was a bare descendant, `.expBody p` — a class **plus a type**, so it outranks `.note`, which is a class alone. Every note inside every collapsible therefore had its top margin flattened to 0 and sat against whatever was above it, while the identical grp/chips/note pattern in a plain `.card` kept its 10px. Scoped to `.expBody > p`: a string body's paragraphs are direct children and still get it, a node body's are grandchildren and keep their own. Measured rather than eyeballed — 0px against 10px for the same three elements. |
 | B-42 | One chip tap cost **two full-page reflows under a live blur** | Five things on the same click path: `snap()` serialised all of `G`; `render()` rebuilt every chip and `bar()` the action row; `measureBar()` read `offsetHeight`, forcing layout on a document just invalidated; it wrote `--barh` onto `documentElement`, invalidating style for the whole tree and waking the `ResizeObserver` watching `.bar`, which measured again; and all of it sat under `backdrop-filter: blur(14px)` over a region the rebuild had just dirtied. Chromium hands that to the compositor; Firefox largely does not, which is where the lag was reported. The blur was acting on **four percent** of the backdrop — the plate was already `.96` opaque, and the `@supports` fallback shipped alongside it was an opaque plate, which is proof the design never needed it. Blur deleted, fallback promoted to the rule, `--barh` moved to `.wrap`, and the measurement coalesced into one deferred read. |
 | B-43 | Deduplicating the measurement on its **value** still wrote twice per tap | Only visible by instrumenting `.wrap` in a browser: one render calls `measureBar()` three times — `bar()` clears the pinned note, builds the buttons, then the caller pins a new note — and those are genuinely three different heights, so a `if (h === barh) return` guard deduplicated nothing. Coalesced with a queue flag so three calls cost one. |
 | B-44 | The coalesced measurement **never ran in a hidden tab** | The first fix used `requestAnimationFrame` alone. A hidden tab never runs one, and the app can do its entire first render in a hidden tab — a phone that loaded the page and was switched away from. `--barh` then stayed unwritten and clearance fell back to the CSS default of 152px, against a bar that with a wrapped label and a pinned note measures more. Backed with a `setTimeout`; whichever fires first does the work. Found by measuring, not by reading the diff — the same way B-19 was. |
@@ -565,7 +582,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   626 assertions across 25 suites, 0 failing
+#   644 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -716,6 +733,12 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     powers really were gone. What the screen showed was a role name and an instruction to
     act. When a state changes what somebody should DO with the next sentence they read,
     it belongs above that sentence, not below it.
+
+20. **A type selector inside a component reaches further than it looks.** `.expBody p`
+    is a class plus a type, so it silently outranks any single-class rule the nested
+    content brings with it (B-59). Scope structural spacing with `>` when a container
+    can hold both prose and components, or the component's own tokens lose a fight
+    nobody knew was on.
 
 ---
 

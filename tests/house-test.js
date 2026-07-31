@@ -82,6 +82,29 @@ for (const cause of ['wolves','vote','tie','grief','white','rust','shot']){
 t('a poison override does not disturb the other causes', () =>
   shoots('vn', false, 'wolves').fired ? true : 'forcing no broke a normal death');
 
+console.log('\nTHREE RULES, NOT TWO');
+t('the panel offers all three disputed rules', () => {
+  const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
+  const want = ['selfHeal','hunterPoison','hunterElder'];
+  const missing = want.filter(k => !keys.includes(k));
+  return missing.length === 0 ? true : 'not offered: ' + missing.join(', ');
+});
+t('every rule in the panel has a live accessor', () => {
+  const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
+  const dead = keys.filter(k => !new RegExp('G\\.' + k + '\\s*== null').test(src));
+  return dead.length === 0 ? true : 'a chip writes a flag nothing reads: ' + dead.join(', ');
+});
+t('and every accessor is offered in the panel', () => {
+  // an accessor with no chip is a rule the table cannot actually set
+  const accessors = [...src.matchAll(/G\.(\w+)\s*== null \?/g)].map(m => m[1]);
+  const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
+  const hidden = accessors.filter(a => !keys.includes(a));
+  return hidden.length === 0 ? true : 'settable in code but not in the UI: ' + hidden.join(', ');
+});
+t('each row labels its own default, rather than sharing one', () =>
+  /byRule:byTradition/.test(src) && /byRule:false/.test(src) && /r\.byRule \? /.test(src)
+    ? true : 'one shared default would mislabel any rule that is not a tradition split');
+
 console.log('\nTHE SETTINGS ARE REACHABLE AND EXPLAINED');
 t('a House rules panel exists on the deck screen', () =>
   /collapsible\('house', 'Luật nhà/.test(src) ? true : 'no panel');
