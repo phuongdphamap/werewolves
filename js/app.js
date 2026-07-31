@@ -292,6 +292,17 @@ function teamOf(p){
   return R[p.role].team;
 }
 const isWolf = p => teamOf(p) === 'wolf';
+/* "Every villager loses their power" means EVERY power, not only the ones that wake at
+   night. G.powersLost used to gate the night call list and nothing else, so after the
+   village killed the Elder the Hunter still fired, the Idiot still walked away from the
+   vote, the Scapegoat still died in place of a tie, the Bear Tamer still growled, the
+   Knight's rust still spread and the Judge could still demand a second vote — six powers
+   the village had just been stripped of, all of them triggered somewhere other than a
+   night step. Read teamOf, not the card, so a Wild Child who has already turned keeps
+   what being a wolf gives him.
+   The Sheriff's badge is deliberately NOT covered: it is a title the village votes on,
+   not a card, and it survives everything else too. */
+const powerGone = p => !!(G.powersLost && p && teamOf(p) === 'village');
 // The app must never infer a role it has not been told. Anything it computes
 // from cards has to check this first, or it will answer confidently and wrongly.
 // The badge is a title, not a card. Miller’s Hollow weights it at a flat double;
@@ -474,8 +485,16 @@ function buildNight(){
     for (const r of ord()){
       if (r.every == null) continue;
       if (!G.counts[r.id]) continue;                        // not in this deck at all
-      if (G.powersLost && r.team === 'village') continue;   // publicly known, so no leak
       if (r.alt && G.night % 2 !== 0) continue;
+      /* Powers lost is public — the Elder's death is announced — but the NUMBER of calls
+         that vanish with them is not. Dropping every village card at once tells the table
+         how many powered village cards the deck held, which is the same inference the hush
+         four lines below exists to deny. These two rules sat in one loop reaching opposite
+         conclusions from the same premise. Hushed, so the night keeps its shape. */
+      if (G.powersLost && r.team === 'village'){
+        steps.push({ role:r.id, hush:'powerless' });
+        continue;
+      }
       /* The step exists because the CARD is in play, not because the app happens to know
          who holds it. This used to be built from the identified holders, so a card nobody
          answered for at the roll call was dropped from every night that followed — not
@@ -499,6 +518,20 @@ function buildNight(){
     steps.sort((a,b) => everyOf(R[a.role]) - everyOf(R[b.role]));
   }
   G.steps = steps; G.si = 0; G.n = {};
+}
+/* The Thief is the one move that changes which cards are AT THE TABLE mid-game: his own
+   goes back to the spares and one of the two spares comes in. G.counts has to follow, and
+   it did not — which used to be merely untidy (the Roster listed the Thief as unplaced
+   forever) and became a real bug the moment buildNight started reading G.counts as the
+   record of what is in play. A Thief who took a spare Fox was then never called again,
+   because no Fox was ever in the deck: the same disappearance the deck-driven night was
+   written to end, re-entering through the one path that moves a card without saying so. */
+function thiefTakes(th, r){
+  if (G.counts.thief) G.counts.thief--;
+  if (!G.counts.thief) delete G.counts.thief;
+  G.counts[r.id] = (G.counts[r.id] || 0) + 1;
+  th.role = r.id;
+  log('The Thief became ' + r.name + '. That card is in play now, and the Thief is not.');
 }
 function stepInfo(s){
   if (s.role === '__lovers') return { name:'The Lovers', vi:'Cặp Đôi',  id:'__lovers',
@@ -625,7 +658,10 @@ function registerDeaths(chain){
       // Miller’s Hollow says he fires whatever the cause. Matched on the cause CODE:
       // it used to be /poison/ against the sentence, so renaming the potion — or
       // translating it — would have turned the rule off with nothing failing.
-      if (!hunterFiresPoisoned() && c.cause === 'poison'){
+      if (powerGone(c.p)){
+        log(c.p.name + ' was the Hunter, but the village killed the Elder \u2014 the gun is ' +
+            'as dead as every other villager power. No shot.');
+      } else if (!hunterFiresPoisoned() && c.cause === 'poison'){
         log(c.p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
             'Change that under House rules if your table plays otherwise.');
       } else {
@@ -664,7 +700,11 @@ function applyDawn(){
     if (!d.on) continue;
     const p = byId(d.id);
     if (!p || !p.alive) continue;
-    if (p.role === 'knight' && d.cause === 'wolves') knightDied = p;
+    // the rust is a villager power too, so the Elder's revenge takes it with the rest
+    if (p.role === 'knight' && d.cause === 'wolves'){
+      if (powerGone(p)) log(p.name + ' was the Knight, but the sword lost its bite with every other villager power. No rust.');
+      else knightDied = p;
+    }
     registerDeaths(kill(p, d.cause));
   }
   if (knightDied){
@@ -687,11 +727,21 @@ function checkWin(){
   // Counting the two sides needs only the wolf cards placed — not every villager
   // identified. Demanding the latter froze results for whole games.
   if (!wolfSideKnown()) return null;
+  /* The side a player is on, as far as this function is ENTITLED to say. teamOf reports
+     'none' for a card that was never learned, and comparing that against a real team
+     reads as a difference nothing has established.
+     Declared here, below the gate, because the gate is what licenses it: wolfSideKnown()
+     means every card that could put somebody on the wolf side is placed, so anybody still
+     unidentified is provably not a wolf — which on this board is the village side. Move
+     this above the return and the argument stops holding. */
+  const sideOf = p => teamOf(p) === 'none' ? 'village' : teamOf(p);
   /* The pair wins ALONE only when it is mixed — that is the whole of Cupid's card. Two
      villagers or two wolves who outlast everyone win with their own side, and this test
-     sat above the team checks, so Cupid was credited with the pack's victory. */
+     sat above the team checks, so Cupid was credited with the pack's victory. It then
+     read teamOf directly, so a village lover paired with an unlearned card compared
+     'village' against 'none', looked mixed, and handed Cupid the win a second way. */
   const lovers = a.filter(p => p.lover);
-  if (a.length === 2 && lovers.length === 2 && teamOf(lovers[0]) !== teamOf(lovers[1]))
+  if (a.length === 2 && lovers.length === 2 && sideOf(lovers[0]) !== sideOf(lovers[1]))
     return { who:'The Lovers', why: lovers.map(p=>p.name).join(' and ') +
       ' are the last two alive, they belong to each other, and they were never on the same side.' };
   const piper = a.find(p => p.role === 'piper');
@@ -858,9 +908,11 @@ function measureBar(){
      A hidden tab never runs one, and the app can perfectly well do its first render in a
      hidden tab — a phone that loaded the page and was switched away from — which would
      leave the clearance on the CSS fallback against a bar that may be taller than it.
-     So a timer backs it up. Forcing layout in a tab that is not painting costs nothing. */
-  requestAnimationFrame(run);
-  setTimeout(run, 60);
+     So a timer backs it up. Forcing layout in a tab that is not painting costs nothing.
+     The frame callback cancels the timer rather than leaving it to wake and find the work
+     done, so the common path leaves nothing pending. */
+  const backstop = setTimeout(run, 60);
+  requestAnimationFrame(() => { clearTimeout(backstop); run(); });
 }
 if (typeof ResizeObserver === 'function'){
   const ro = new ResizeObserver(measureBar);
@@ -1247,11 +1299,17 @@ function rNight(){
   /* A hushed call: read the line, wait, move on. Nobody wakes, and nothing is asked —
      but from the table it sounds identical to a real call, which is the point. */
   if (s.hush){
-    B.appendChild(el('div','alert','<b>Nobody will open their eyes.</b> ' +
-      (s.hush === 'dead'
-        ? 'This card is out of the game. Read the line, leave the same pause you always do, then carry on.'
-        : 'This card has nothing left to spend. Read the line, leave the same pause, then carry on.') +
-      '<p class="note">Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.</p>'));
+    const why = {
+      dead:      'This card is out of the game.',
+      spent:     'This card has nothing left to spend.',
+      powerless: 'The Elder died by the village, so every villager power is gone.',
+    }[s.hush] || 'Nothing will happen on this call.';
+    B.appendChild(el('div','alert','<b>Nobody will open their eyes.</b> ' + why +
+      ' Read the line, leave the same pause you always do, then carry on.' +
+      '<p class="note">' + (s.hush === 'powerless'
+        ? 'The lost powers are public, but how many calls vanish with them is not — that would tell the table how many powered village cards the deck held.'
+        : 'Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.') +
+      '</p>'));
     bar([{ t:'Next →', wide:true, on:() => { G.si++; render(); } }]);
     return;
   }
@@ -1281,7 +1339,7 @@ function rNight(){
     return;
   }
 
-  const lg = liveWith('littlegirl');
+  const lg = liveWith('littlegirl').filter(p => !powerGone(p));
   if (s.role === 'wolf' && lg.length)
     B.appendChild(el('div','alert','The Little Girl (' + lg.map(p=>p.name).join(', ') + ') may be peeking. Watch her.'));
 
@@ -1354,7 +1412,7 @@ function rNight(){
     for (const r of ROLES){
       if (r.id === 'thief') continue;
       const b = el('div','chip', '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name));
-      b.onclick = () => { snap(); if (th){ th.role = r.id; log('The Thief became ' + r.name + '.'); } G.si++; render(); };
+      b.onclick = () => { snap(); if (th) thiefTakes(th, r); G.si++; render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
@@ -1523,7 +1581,7 @@ function rDawn(){
   const un = unassigned();
   if (un.length) B.appendChild(el('div','alert','Still unknown: ' + un.map(p=>p.name).join(', ') +
     '. Set their cards from the Roster when you learn them.'));
-  for (const b of liveWith('beartamer')){
+  for (const b of liveWith('beartamer').filter(p => !powerGone(p))){
     const nb = neighbours(b);
     if (!wolfSideKnown()){
       B.appendChild(el('div','alert','Bear Tamer <b>' + b.name + '</b> \u2014 ' + unplacedWolfCards() +
@@ -1637,7 +1695,7 @@ function rDay(){
       log('The village declined to elect a Sheriff.'); render(); } }]);
     return;
   }
-  const jd = liveWith('judge');
+  const jd = liveWith('judge').filter(p => !powerGone(p));
   if (jd.length && !G.judgeUsed){
     B.appendChild(el('div','alert','Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.'));
     /* G.judgeUsed was written nowhere: initialised, read here, never set. So the alert
@@ -1650,16 +1708,30 @@ function rDay(){
   } else if (jd.length){
     B.appendChild(el('p','note','The Stuttering Judge has spent his second vote \u2014 once per game, and it is gone.'));
   }
-  const sc = liveWith('scapegoat');
+  const sc = liveWith('scapegoat').filter(p => !powerGone(p));
   if (sc.length) B.appendChild(el('div','alert','If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.'));
   if (scapegoatBinds()) B.appendChild(el('div','alert','Only these may vote today: <b>' +
     G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b><p class="note">The Scapegoat named them as he died yesterday. Tomorrow the whole village speaks again.</p>'));
   if (G.powersLost){
     // name the route, because "by the village" covers the vote, the poison and the shot
     const eld = G.players.find(p => p.role === 'elder' && !p.alive);
+    /* Name what is actually gone. "Every villager loses their power" is easy to read as
+       "the night calls stop", which is how the rule came to be half-implemented in the
+       first place — the Hunter kept firing and the Idiot kept surviving the rope. */
+    const stripped = [
+      liveWith('hunter').length   && 'the Hunter does not fire',
+      liveWith('idiot').length    && 'the Idiot is hanged like anyone else',
+      liveWith('scapegoat').length&& 'the Scapegoat no longer dies for a tie',
+      liveWith('beartamer').length&& 'the Bear Tamer does not growl',
+      liveWith('knight').length   && 'the Knight’s rust does not spread',
+      liveWith('judge').length    && 'the Judge cannot call a second vote',
+      liveWith('littlegirl').length && 'the Little Girl cannot peek',
+    ].filter(Boolean);
     B.appendChild(el('div','alert no','The Elder died by ' +
       (eld && eld.cause ? causeLabel(eld.cause) : 'the village') +
-      '. Every villager has lost their power — no village card is called again.'));
+      '. <b>Every villager power is gone</b> — no village card is called at night' +
+      (stripped.length ? ', and ' + stripped.join(', ') : '') + '.' +
+      '<p class="note">The Sheriff’s badge is a title, not a card, so whoever holds it keeps it.</p>'));
   }
 
   const sh = A.find(p => p.sheriff);
@@ -1801,11 +1873,15 @@ function rDay(){
 }
 function resolveVote(p, tie){
   snap();
-  if (p.role === 'idiot' && !p.revealed){
+  /* Surviving the rope is the Idiot's power, so the Elder's revenge takes it too \u2014 after
+     that he is hanged like anybody else. */
+  if (p.role === 'idiot' && !p.revealed && !powerGone(p)){
     p.revealed = true; p.voteless = true;
     log(p.name + ' is the Village Idiot \u2014 revealed, spared, silenced for good. The vote is spent.');
     toNight(); return;
   }
+  if (p.role === 'idiot' && !p.revealed && powerGone(p))
+    log(p.name + ' is the Village Idiot, but the village killed the Elder \u2014 nothing saves him now.');
   if (p.role === 'angel' && G.day === 1){
     kill(p, 'vote');
     return finish({ who:'The Angel', why: p.name + ' wanted exactly this and got it on day one.' });

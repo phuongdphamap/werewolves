@@ -446,6 +446,10 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 
 | # | Bug | Root cause |
 |---|---|---|
+| B-57 | The Elder took only the powers that **wake at night** | Reported from a real table: the village hanged the Elder and the other village roles still had their spell. They did. `G.powersLost` was read in exactly one behavioural place — the night call list — so every villager power triggered anywhere else carried on working: the Hunter still fired, the Idiot still walked away from the rope, the Scapegoat still died in place of a tie, the Bear Tamer still growled, the Knight’s rust still spread, the Judge could still demand a second vote and the Little Girl could still peek. Six of the seven change who wins. One predicate, `powerGone(p)`, is now asked at every trigger, and the day alert names what is actually gone rather than saying "every villager loses their power" — the sentence that was easy to read as "the night calls stop", which is how it came to be half-implemented. Reads `teamOf`, so a turned Wild Child or a Hound who joined the pack keeps what being a wolf gives him, and the Sheriff’s badge is untouched because it is a title the village votes on, not a card. |
+| B-53 | The mixed-Lovers test read an **unlearned card as a different side** | Fixing B-39 to compare the two sides re-opened the same hole one layer down: `teamOf` returns `'none'` for a card nobody identified, so a village lover beside an unidentified one compared `'village'` against `'none'`, read as mixed, and handed Cupid the win a second way. The app was not guessing — `checkWin` returns early unless `wolfSideKnown()`, and that predicate's whole argument is that once every wolf-side card is placed, anybody still unidentified is **provably not a wolf**. A local `sideOf()` resolves an unknown card to the village side, declared *below* the gate so the licence is structural. The general shape: the remaining bugs live in the gap between what is true and what the code has been told, and the fix is to name the predicate that licenses the answer. |
+| B-54 | Lost powers **dropped** the call, the one place the hush rule was not applied | Four lines above the code that invented hushing, `buildNight` still did `if (G.powersLost && r.team === 'village') continue`. The comment reasoned that the loss is publicly known — true — but that is not what the night leaks. The table hears *how many calls disappeared*, and the delta counts the powered village cards the deck held. Two rules in one loop, reaching opposite conclusions from the same premise. Now a third hush kind, `powerless`, so the night keeps its length. |
+| B-55 | The Thief's swap **did not reconcile `G.counts`**, and the new night reads `G.counts` | The Thief is the only move that changes which cards are at the table mid-game: his own goes back to the spares and one comes in. That was merely untidy while the night was built from live holders — the Roster listed the Thief as unplaced forever. It became a disappearing card the moment B-35 made `G.counts` the record of what is in play: a Thief who took a spare Fox was never called again, because no Fox was ever in the deck. Exactly the bug the deck-driven night was written to end, re-entering through the one path that moves a card without saying so. `thiefTakes()` now decrements the old and increments the new. **The fourth-pass review assessed this as safe by luck; it was not safe at all.** |
 | B-35 | A card nobody was ever identified for was **dropped from the whole game** | `buildNight()` composed night 2+ from the known holders, so a role nobody answered for at the roll call was never scheduled again — not skipped for a night, gone. A Bodyguard asleep during his own call never shielded anybody; the Witch kept both potions to the end. And `computeDawn()` reported those nights fully resolved, because it only counts what it was told. The Skip button even promised "you can set it later from the Roster", which could not work: nothing rebuilt the script. Now built from `G.counts` — what is in play — and an unidentified card gets the identification panel night one already has. |
 | B-36 | Four of the five Skip buttons never recorded the skip | `noteSkip()` exists so dawn can be honest about gaps, and it was wired to exactly one caller. The roll call, the Witch, the Wolf Hound and the Thief all advanced `G.si` on their own, so skipping the Bodyguard left `G.n.skipped` empty, `dawnSure` stayed true, and the moderator read out a death the app had no standing to be sure about. **A missing entry in a gap list looks exactly like no gap.** All of them route through one `skipStep()` now, and a structural test walks every bar item labelled Skip. Two kinds are recorded separately: an action not taken, and a card nobody would answer for. |
 | B-37 | The Scapegoat silenced the village **permanently** | The rule is one day — "as he dies he decides who may vote tomorrow". `G.scapegoatVoters` was cleared in exactly one place: the "Everyone may vote" button on the screen that set it. Nothing in `toNight()`, `proceed()` or `rDay()` reset it. It compounds: `eligibleVoters()` feeds `totalPower()`, which sets the threshold, so a tie on day 2 permanently shrank the electorate and every later vote was measured against the wrong arithmetic. Now scoped by the day it governs (`G.scapegoatDay`), the same shape as `G.lastGuard`. |
@@ -482,6 +486,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-42 | One chip tap cost **two full-page reflows under a live blur** | Five things on the same click path: `snap()` serialised all of `G`; `render()` rebuilt every chip and `bar()` the action row; `measureBar()` read `offsetHeight`, forcing layout on a document just invalidated; it wrote `--barh` onto `documentElement`, invalidating style for the whole tree and waking the `ResizeObserver` watching `.bar`, which measured again; and all of it sat under `backdrop-filter: blur(14px)` over a region the rebuild had just dirtied. Chromium hands that to the compositor; Firefox largely does not, which is where the lag was reported. The blur was acting on **four percent** of the backdrop — the plate was already `.96` opaque, and the `@supports` fallback shipped alongside it was an opaque plate, which is proof the design never needed it. Blur deleted, fallback promoted to the rule, `--barh` moved to `.wrap`, and the measurement coalesced into one deferred read. |
 | B-43 | Deduplicating the measurement on its **value** still wrote twice per tap | Only visible by instrumenting `.wrap` in a browser: one render calls `measureBar()` three times — `bar()` clears the pinned note, builds the buttons, then the caller pins a new note — and those are genuinely three different heights, so a `if (h === barh) return` guard deduplicated nothing. Coalesced with a queue flag so three calls cost one. |
 | B-44 | The coalesced measurement **never ran in a hidden tab** | The first fix used `requestAnimationFrame` alone. A hidden tab never runs one, and the app can do its entire first render in a hidden tab — a phone that loaded the page and was switched away from. `--barh` then stayed unwritten and clearance fell back to the CSS default of 152px, against a bar that with a wrapped label and a pinned note measures more. Backed with a `setTimeout`; whichever fires first does the work. Found by measuring, not by reading the diff — the same way B-19 was. |
+| B-56 | Both schedulers were armed and neither cancelled the other | Every render left a timer that woke only to find the work already done. Harmless and cheap, but it reads as a leak. The frame callback clears the backstop, so the visible path leaves nothing pending. |
 | B-45 | `.chip` — the most-tapped control in the app — had **no pressed state** | Every night target, every role assignment and every house rule is a chip, and it had only `:hover`, which a phone never fires. So nothing acknowledged the touch until the rebuild in B-42 finished. Its `transition: border-color .15s, background .15s` had also never run once: `innerHTML = ''` destroys the node the transition would animate and the replacement mounts already carrying `.sel`, so there was no state change to interpolate. Added `:active` and `touch-action: manipulation` (both land on finger-down, before any JavaScript), plus an optimistic `.sel` on the tapped node — which is what finally gives the transition something to animate. `.ico` had the same gap, found by a test that went looking for the others. |
 | B-46 | The rain **restarted its 1.1-second ramp on every tap** | `render()` calls `ambience()` unconditionally, so with sound on a burst of night-call taps meant the rain never reached its target level. Audible, not merely wasteful, and the entire point of the rain is that it should be unremarkable. Now a no-op when the requested state matches the current one. |
 | B-47 | The undo buffer was bounded by **count only** | 80 snapshots of a state that grows all game: at a 20-player table with a full chronicle that is megabytes held live on a phone awake for an hour. Bounded by bytes as well, oldest first, always keeping one. Undo stays per-tap — a mis-tap needs one step back, not a whole phase — which is a deliberate departure from the review's suggestion. `saveSoon` cannot reuse `snap()`'s string either: `snap()` captures `G` *before* the mutation, by design, so reusing it would persist the state as of one tap ago. A test pins that ordering so the idea is not revisited wrongly. |
@@ -549,7 +554,7 @@ icons/                  favicon, touch icon, PWA icons
 fonts/                  Be Vietnam Pro + Lora, latin & vietnamese woff2 subsets
 tests/
   run-all.sh            tests/run-all.sh
-  *-test.js             24 suites, no dependencies beyond node
+  *-test.js             25 suites, no dependencies beyond node
 docs/
   KNOWLEDGE.md          this file
   CONTRIBUTING.md       how to work on it
@@ -559,7 +564,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   571 assertions across 24 suites, 0 failing
+#   619 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -682,6 +687,28 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     render left no way to close it, because the close control only existed in the other
     branch (B-51). Moving the reveal's Done button exposed a column that resized with its
     own content (B-52). Look at the screen after changing it.
+
+15. **Ask which predicate licenses the answer.** Not "does this handle an unknown card"
+    but "what has been established, and by what". `wolfSideKnown()` is the sharpest tool
+    in the file for exactly that reason, and B-53 was a site that should have been asking
+    it and was not. Where a resolution depends on a guard, declare it *below* the guard so
+    the dependency cannot be moved by accident.
+
+16. **A fix that establishes a new source of truth must sweep every writer.** B-35 made
+    `G.counts` the record of what is in play. The Thief mutates a role without touching
+    it, so the same disappearing-card bug walked straight back in through the one path
+    nobody re-read (B-55). When you promote a field to authoritative, grep every write to
+    the thing it now governs.
+
+17. **Mutation-test the wiring, not just the helper.** The Thief tests all called
+    `thiefTakes()` directly and passed with the call site removed. A test that exercises
+    a function proves the function; only a test that reads the call site proves it runs.
+
+18. **Implementing a rule is not implementing the sentence that states it.** "Every
+    villager loses their power" was built as one condition in the night-call loop, which
+    is only the powers that happen to wake (B-57). Enumerate what the rule actually
+    reaches — here, seven cards with six different trigger points — and gate them through
+    one predicate, so the eighth cannot be added without meeting it.
 
 ---
 

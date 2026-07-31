@@ -65,6 +65,14 @@ t('a chip with no handler is not made to look tappable', () => {
   return /if \(!o\.dead && o\.on\)/.test(c) ? true : 'a display-only chip would toggle on tap';
 });
 
+t('the visible path leaves nothing pending behind it', () => {
+  // both schedulers are armed on every call; the frame callback cancels the timer rather
+  // than leaving it to wake and find the work done
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /clearTimeout\(backstop\)/.test(fn)
+    ? true : 'every render leaves a stray timer, which reads as a leak to the next person';
+});
+
 /* render() calls ambience() unconditionally, so with sound on every night-call tap issued
    a fresh linearRampToValueAtTime over 1.1 seconds — during a burst of tapping the rain
    never reached its target level. Audible, not merely wasteful, and the entire point of

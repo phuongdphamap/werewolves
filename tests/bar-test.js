@@ -131,11 +131,14 @@ t('the measurement is coalesced, so three calls per render cost one', () => {
 });
 t('and it never reads synchronously, against a document render() just dirtied', () => {
   const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  // the read lives in the deferred callback, and nothing calls that callback directly
+  // the read lives in the deferred callback, and every call to it is inside a scheduler
   const deferred = (fn.match(/const run = \(\) => \{[\s\S]*?\n  \};/) || [''])[0];
-  const direct = fn.replace(deferred, '');
-  return (/offsetHeight/.test(deferred) && !/offsetHeight/.test(direct) && !/\brun\(\)/.test(direct))
-    ? true : 'offsetHeight is forced on the tap path: ' + direct;
+  const rest = fn.replace(deferred, '');
+  const calls = rest.split('\n').filter(l => /\brun\(\)/.test(l));
+  const unscheduled = calls.filter(l => !/requestAnimationFrame|setTimeout/.test(l));
+  return (/offsetHeight/.test(deferred) && !/offsetHeight/.test(rest)
+          && calls.length > 0 && unscheduled.length === 0)
+    ? true : 'offsetHeight is forced on the tap path: ' + unscheduled.join(' // ');
 });
 t('the CSS still has a fallback for the frame before the first measurement', () => {
   const wrap = rule(/\.wrap\{[^}]*\}/);
@@ -148,8 +151,14 @@ t('the CSS still has a fallback for the frame before the first measurement', () 
    against a bar that, with a wrapped label and a pinned note, can be taller than it. */
 t('a tab that never gets a frame is still measured', () => {
   const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  return /requestAnimationFrame\(run\)/.test(fn) && /setTimeout\(run, *\d+\)/.test(fn)
+  return /requestAnimationFrame\(/.test(fn) && /setTimeout\(run, *\d+\)/.test(fn)
     ? true : 'no fallback scheduler, so a first render in a hidden tab is never measured';
+});
+// The common path is the visible one, and it should leave nothing pending behind it.
+t('the frame callback cancels the backstop rather than letting it wake for nothing', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /requestAnimationFrame\(\(\) => \{ clearTimeout\(backstop\); run\(\); \}\)/.test(fn)
+    ? true : 'every render leaves a timer that wakes only to find the work already done';
 });
 t('and whichever scheduler wins, the work happens once', () => {
   const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];

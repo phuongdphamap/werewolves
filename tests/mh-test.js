@@ -40,6 +40,7 @@ const blocks = [
   grab('buildNight').replace('function buildNight','globalThis.buildNight = function'),
   grab('kill').replace('function kill','globalThis.kill = function'),
   grab('noteSkip').replace('function noteSkip','globalThis.noteSkip = function'),
+  grab('thiefTakes').replace('function thiefTakes','globalThis.thiefTakes = function'),
   'globalThis.withRole = id => G.players.filter(p => p.role === id);',
   src.match(/function unplacedWolfCards\(\)\{[\s\S]*?\n\}/)[0].replace('function unplacedWolfCards','globalThis.unplacedWolfCards = function'),
   src.match(/function wolfSideKnown\(\)\{[\s\S]*?\n\}/)[0].replace('function wolfSideKnown','globalThis.wolfSideKnown = function'),
@@ -198,11 +199,39 @@ t('a powerless Fox is still called, hushed', () => {
   const s = G.steps.find(x => x.role === 'fox');
   return (s && s.hush === 'spent') ? true : JSON.stringify(s);
 });
+/* This used to assert that lost powers make the village calls DISAPPEAR, which is the one
+   place the hush rule was not applied — four lines above the code that invented it. That
+   the powers are gone is public; how many calls vanish with them is not, and the delta
+   tells the table how many powered village cards the deck held. Same premise as the hush,
+   opposite conclusion, same loop. */
 t('Elder killed by village silences every village power', () => {
   mk(['seer','witch','fox','wolf','wolf','elder']);
   G.night = 2; G.powersLost = true; buildNight();
-  const n = names();
-  return (n.length === 1 && n[0] === 'Werewolf') ? true : n.join(' | ');
+  const acting = G.steps.filter(s => !s.hush).map(s => R[s.role].name);
+  return (acting.length === 1 && acting[0] === 'Werewolf') ? true : acting.join(' | ');
+});
+t('but the village cards are still called, so the night keeps its length', () => {
+  mk(['seer','witch','fox','wolf','wolf','elder']);
+  G.night = 2; buildNight();
+  const before = G.steps.length;
+  G.powersLost = true; buildNight();
+  return G.steps.length === before
+    ? true : 'the night went from ' + before + ' calls to ' + G.steps.length +
+             ', which counts the powered village cards out loud';
+});
+t('and each of them says why nobody wakes', () => {
+  mk(['seer','witch','fox','wolf','wolf','elder']);
+  G.night = 2; G.powersLost = true; buildNight();
+  const village = G.steps.filter(s => R[s.role].team === 'village');
+  return (village.length === 3 && village.every(s => s.hush === 'powerless'))
+    ? true : JSON.stringify(village);
+});
+t('a wolf-side card is never hushed for lost powers', () => {
+  mk(['seer','wolf','wolf','whitewolf','elder']);
+  G.night = 2; G.powersLost = true; buildNight();
+  const wolves = G.steps.filter(s => R[s.role].team === 'wolf');
+  return wolves.every(s => s.hush !== 'powerless')
+    ? true : 'the pack lost its powers too: ' + JSON.stringify(wolves);
 });
 
 /* The consequence above was already right; the TRIGGER was not. powersLost was set at
@@ -442,6 +471,71 @@ t('poison and fangs on one night kill two', () => {
    advanced the step on their own — so skipping the Bodyguard left the gap list empty,
    dawnSure stayed true, and the moderator read out a death the app had no standing to be
    sure about. A missing entry in a gap list looks exactly like no gap. */
+/* The Thief is the only move that changes which cards are at the table mid-game, and it
+   moved a role without telling G.counts. That was untidy while the night was built from
+   the live holders; it became a disappearing card the moment buildNight started reading
+   G.counts as the record of what is in play. */
+console.log('\nTHE THIEF’S SWAP CHANGES THE DECK');
+const thiefSwap = to => {
+  mk(['thief','seer','wolf','wolf','villager']);
+  thiefTakes(G.players[0], R[to]);
+  return G;
+};
+t('the card he took is in the deck afterwards', () => {
+  thiefSwap('fox');
+  return G.counts.fox === 1 ? true : 'counts.fox=' + G.counts.fox;
+});
+t('and the card he put back is not', () => {
+  thiefSwap('fox');
+  return G.counts.thief === undefined ? true : 'counts.thief=' + G.counts.thief;
+});
+t('the table still holds exactly as many cards as before', () => {
+  mk(['thief','seer','wolf','wolf','villager']);
+  const before = Object.values(G.counts).reduce((a,b) => a+b, 0);
+  thiefTakes(G.players[0], R.fox);
+  const after = Object.values(G.counts).reduce((a,b) => a+b, 0);
+  return before === after ? true : before + ' -> ' + after;
+});
+t('so the card he took is called on later nights', () => {
+  // this is the whole point: the deck-driven night must see the swap
+  thiefSwap('fox');
+  G.night = 2; buildNight();
+  return names().includes('The Fox')
+    ? true : 'the Thief-as-Fox never wakes again: ' + names().join(' | ');
+});
+t('taking a second copy of a card already in the deck counts both', () => {
+  thiefSwap('wolf');
+  return G.counts.wolf === 3 ? true : 'counts.wolf=' + G.counts.wolf;
+});
+t('the Roster no longer reports the Thief as an unplaced card', () => {
+  thiefSwap('fox');
+  const need = {}; for (const k in G.counts) need[k] = G.counts[k];
+  for (const p of G.players) if (p.role && need[p.role] != null) need[p.role]--;
+  const missing = Object.keys(need).filter(k => need[k] > 0);
+  return missing.length === 0 ? true : 'still listed as missing: ' + missing.join(', ');
+});
+t('a swap onto the wolf side keeps the wolf question answerable', () => {
+  thiefSwap('whitewolf');
+  return wolfSideKnown() ? true : 'the app can no longer say who is a wolf';
+});
+t('the Thief step is wired to it, not to a bare role assignment', () => {
+  // the tests above exercise thiefTakes directly, so they pass even if nothing calls it
+  const step = (src.match(/if \(info\.special === 'thief'\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return (/thiefTakes\(th, r\)/.test(step) && !/th\.role = /.test(step))
+    ? true : 'the swap bypasses the helper: ' + step;
+});
+t('nothing else moves a card without telling the deck', () => {
+  /* Every other assignment records a card the deck already counts — identifying a holder
+     (r.id / s.role), clearing one (null), the forced last card (short[0], read straight
+     out of G.counts), and the villager fill, which only runs when the leftover seats
+     exactly equal G.counts.villager. The Thief was the one that did not. */
+  const safe = /= *(?:r\.id|s\.role|null|short\[0\]|'villager')/;
+  const assigns = [...src.matchAll(/\b[\w[\]]+\.role = [^;)]+/g)].map(m => m[0]);
+  const unaccounted = assigns.filter(a => !safe.test(a));
+  return unaccounted.length === 0
+    ? true : 'a role is set by a route that may not be in G.counts: ' + unaccounted.join(' // ');
+});
+
 console.log('\nEVERY SKIP IS RECORDED');
 t('every Skip button in the app reaches skipStep', () => {
   const skips = [...src.matchAll(/\{ t:'[^']*[Ss]kip[^']*'[^}]*on:([^}]*(?:\}[^}]*)??)\}/g)]
@@ -569,6 +663,49 @@ t('two lovers on the village side win as the village', () => {
   G.players[2].alive = G.players[3].alive = false;
   const w = checkWin();
   return w && w.who === 'The Village' ? true : JSON.stringify(w);
+});
+/* Fixing the pair to test the two sides re-opened the same hole one layer down: teamOf
+   reports 'none' for a card that was never learned, so a village lover beside an
+   unidentified one compared 'village' against 'none' and read as mixed. The app is not
+   guessing when it calls that pair matched — checkWin has already returned early unless
+   wolfSideKnown(), and that predicate's whole argument is that anybody still
+   unidentified is provably not a wolf. */
+t('an unlearned card does not make a village pair look mixed', () => {
+  mk(['villager','seer','wolf','wolf']);
+  G.players[1].role = null;                          // never identified, provably not a wolf
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;   // both wolf cards placed, both dead
+  const w = checkWin();
+  return w && w.who === 'The Village' ? true : JSON.stringify(w);
+});
+t('two unlearned cards are a matched pair, not a mixed one', () => {
+  mk(['villager','seer','wolf','wolf']);
+  G.players[0].role = G.players[1].role = null;
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;
+  const w = checkWin();
+  return w && w.who === 'The Village' ? true : JSON.stringify(w);
+});
+t('an unlearned card beside a WOLF is still mixed', () => {
+  // the wolf is known, the other provably is not one, so the sides really do differ
+  mk(['wolf','villager','seer','wolf']);
+  G.players[1].role = null;
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;
+  const w = checkWin();
+  return w && w.who === 'The Lovers' ? true : JSON.stringify(w);
+});
+t('and none of that is decided while a wolf card is still loose', () => {
+  mk(['villager','seer','wolf','wolf']);
+  G.players[1].role = null; G.players[3].role = null;   // a wolf card unaccounted for
+  G.players[0].lover = G.players[1].lover = true;
+  G.players[2].alive = G.players[3].alive = false;
+  return checkWin() === null ? true : 'judged the pair without knowing the wolf side';
+});
+t('the resolution is declared below the gate that licenses it', () => {
+  const fn = grab('checkWin');
+  return fn.indexOf('wolfSideKnown()') < fn.indexOf('const sideOf')
+    ? true : 'sideOf treats an unknown card as village before that has been established';
 });
 t('a turned Wild Child makes a pair mixed that started matched', () => {
   // he was on the village side when Cupid joined them, and is not any more
