@@ -12,7 +12,7 @@
        Anything you would read a sentence from belongs at --txt2 or above. */
     --txt:#EDE9E0; --txt70:rgba(237,233,224,.72); --txt2:rgba(237,233,224,.67);
     --micro:rgba(237,233,224,.46); --txt25:rgba(237,233,224,.26);
-    --moon:#E8DFC8; --wolf:#D0554A; --vil:#6FB3A6; --solo:#B98BD9; --warn:#E0A94C;
+    --moon:#E8DFC8; --wolf:#D0554A; --vil:#6FB3A6; --solo:#B98BD9;
     /* Both faces carry the full Vietnamese range. Cinzel did not — every ả ệ ườ
        fell back to a different font per glyph, which is why it looked mixed. */
     --disp:"Lora",Georgia,serif; --ui:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
@@ -65,6 +65,7 @@
   /* a repeated destructive action should recede until it is wanted */
   .ico.quiet{border-color:transparent;color:var(--txt2);font-weight:500;padding:9px 11px}
   .ico.quiet:hover,.ico.quiet:focus-visible{border-color:var(--line2);color:var(--txt)}
+  .ico.on{color:var(--moon);border-color:var(--moon);background:rgba(232,223,200,.10)}
 
   h2{font-family:var(--disp);font-weight:600;font-size:22px;line-height:1.35;
     margin:var(--s2) 0 var(--s2);letter-spacing:0}
@@ -168,9 +169,11 @@
   .tags{display:flex;gap:5px;flex-wrap:wrap}
   .tag{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
     border:1px solid var(--line2);border-radius:5px;padding:3px 6px;color:var(--txt70)}
-  .tag.s{border-color:var(--warn);color:var(--warn)}
-  .tag.l{border-color:#D9799A;color:#D9799A}
-  .tag.c{border-color:var(--solo);color:var(--solo)}
+  /* State tags are monochrome: the word already says which state it is, and colouring
+     them stole hues that mean "team" elsewhere in the same row. --wolf stays reserved
+     for the one urgent case — a player who cannot vote at all. */
+  .tag.s,.tag.l,.tag.c{border-color:var(--line2);color:var(--txt2)}
+  .tag.urgent{border-color:var(--wolf);color:var(--wolf)}
 
   .roles{display:flex;flex-direction:column;gap:var(--s3)}
   .r{display:flex;align-items:center;gap:var(--s2);background:var(--surf);border:1px solid var(--line);
@@ -181,11 +184,12 @@
   /* a card that is in the deck reads as promoted, not merely highlighted */
   .r.picked{background:var(--surf2);border-color:rgba(232,223,200,.28)}
   .r.picked .rn{color:var(--moon)}
-  .r.set-Base{border-left:3px solid rgba(111,179,166,.55)}
-  .r.set-Characters{border-left:3px solid rgba(224,169,76,.6)}
-  .dl.set-Base{border-left:3px solid rgba(111,179,166,.55)}
-  .dl.set-Characters{border-left:3px solid rgba(224,169,76,.6)}
-  .legend{display:flex;gap:var(--s4);font-size:11px;color:var(--txt2);margin:0}
+  /* Which box a card came from is a fact about the physical deck, not about the game,
+     so it is a word. It used to be a coloured edge, which meant teal spoke for both
+     "village" and "base game" and amber for both "expansion" and "Sheriff" six pixels
+     apart. Hues now mean exactly one thing each; provenance is typography. */
+  .prov{font-size:9px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--micro);white-space:nowrap;margin-left:auto;padding-left:var(--s2)}
   /* inside a gapped list a heading must not add its own bottom margin as well */
   /* A heading's separation is its own margin PLUS the list's flex gap — except for
      the first one, which has no preceding item and so receives no gap. It carries
@@ -194,8 +198,6 @@
      leaving it alone left it 14px short. */
   .roles > .grp{margin:var(--s5) 0 0}
   .roles > .grp:first-child{margin-top:calc(var(--s5) + var(--s3))}
-  .legend i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
-  .legend b{display:inline-block;width:12px;height:3px;border-radius:2px}
   .r .info{flex:1;min-width:0;cursor:pointer}
   .r .rn{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   /* Vietnamese needs room for stacked diacritics — ả ệ ườ lose them below 13px. */

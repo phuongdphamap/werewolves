@@ -113,6 +113,10 @@ const TEAM_NAME = { village:'Village', wolf:'Werewolves', solo:'Alone' };
 // One icon per role, read straight off the role table so there is a single
 // source of truth. It follows the CARD: assign a role and the icon appears,
 // correct a role and the icon changes with it.
+/* Which physical box a card came from, in the language the table is playing in. */
+const provLabel = set => G && G.rules === 'vn'
+  ? (set === 'Characters' ? 'Mở rộng' : 'Cơ bản')
+  : (set === 'Characters' ? 'Expansion' : 'Base');
 const icOf  = id => (R[id] && R[id].ic) || '';
 const pIcon = p => p.role ? icOf(p.role) : '<i>?</i>';
 // The Vietnamese public order differs from the French original in one place:
@@ -664,7 +668,9 @@ function playerRow(p, i, onTap){
   if (p.sheriff) tags.push('<span class="tag s">Sheriff</span>');
   if (p.lover) tags.push('<span class="tag l">Lover</span>');
   if (p.charmed) tags.push('<span class="tag c">Charmed</span>');
-  if (p.voteless) tags.push('<span class="tag">No vote</span>');
+  // The one state that changes what the moderator must do right now, so it keeps the
+  // accent while the standing states go monochrome.
+  if (p.voteless) tags.push('<span class="tag urgent">No vote</span>');
   if (p.model) tags.push('<span class="tag">Model</span>');
   if (p.turned) tags.push('<span class="tag">Turned</span>');
   if (!p.alive) tags.push('<span class="tag">' + (p.cause || 'dead') + '</span>');
@@ -742,11 +748,24 @@ function render(){
   saveSoon();
   $('bUndo').disabled = !undoStack.length;
   ambience(soundOn && G.phase === 'night');
-  $('hTtl').textContent = G.over ? 'Game over' : 'Miller’s Hollow';
-  $('hPh').textContent = { players:'Seats', roles:'Deck', deal:'Deal the cards', learn:'Collect the deal',
-    night: G.night === 1 ? 'First night \u00b7 roll call' : 'Night ' + G.night,
+  /* The header carries position, not a wordmark. It used to spend the most valuable
+     band on the screen on a fixed title plus a caption the h2 repeated word for word
+     ("SEATS" over "Who is at the table?"). It now answers "where am I in the game",
+     which is the one thing nothing else on the screen says. */
+  const pos = G.over ? 'Game over' : {
+    players:'Setup', roles:'Setup', deal:'Setup', learn:'Setup',
+    night: G.night === 1 ? 'First night' : 'Night ' + G.night,
     dawn:'Dawn ' + G.night, day:'Day ' + G.day, hunter:'Day ' + G.day,
-    sheriff:'Day ' + G.day, scapegoat:'Day ' + G.day, end:'Result' }[G.phase] || 'Moderator';
+    sheriff:'Day ' + G.day, scapegoat:'Day ' + G.day, end:'Result' }[G.phase] || 'Setup';
+  const prog = G.over ? '' : {
+    players:'Who is playing', roles:'Building the deck', deal:'Dealing the cards',
+    learn:'Collecting the deal',
+    night: (G.steps && G.steps.length) ? 'Roll call \u00b7 ' + (G.si+1) + ' of ' + G.steps.length : '',
+    day:'The vote', sheriff:'Electing the badge', hunter:'The Hunter fires',
+    scapegoat:'The Scapegoat chooses' }[G.phase] || '';
+  $('hTtl').textContent = pos;
+  $('hPh').textContent = prog;
+  $('hPh').hidden = !prog;
   const views = { players:rPlayers, roles:rRoles, deal:rDeal, learn:rLearn, night:rNight, dawn:rDawn,
     day:rDay, end:rEnd, hunter:renderHunter, sheriff:renderSheriff, scapegoat:renderScapegoat };
   (views[G.phase] || rPlayers)();
@@ -863,10 +882,8 @@ function rRoles(){
 
   L.appendChild(el('div','grp', 'Trong bộ \u00b7 in your deck \u00b7 ' +
     totalCards() + ' of ' + n + ' cards \u00b7 thứ tự gọi'));
-  // the legend belongs directly under the heading it explains, not orphaned above it
-  L.appendChild(el('div','legend',
-    '<i><b style="background:rgba(111,179,166,.7)"></b>cơ bản</i>' +
-    '<i><b style="background:rgba(224,169,76,.8)"></b>mở rộng</i>'));
+  // No legend: the rows say "Cơ bản" / "Mở rộng" in words now, so a colour key would
+  // be explaining a code that no longer exists.
   if (inDeck.length) for (const r of inDeck) L.appendChild(roleRow(r, true));
   else L.appendChild(el('div','card tight',
     'Chưa chọn lá nào. Bấm <b>+</b> ở danh sách bên dưới, hoặc dùng <b>Xáo bộ mới</b>.'));
@@ -887,7 +904,8 @@ function rRoles(){
       '<div class="rn"><span class="ic">' + icOf(r.id) + '</span><span class="dot t-'+r.team+'"></span>' +
         (G.rules==='vn' ? r.vi : r.name) +
         '<span class="vi">' + (G.rules==='vn' ? r.name : r.vi) + '</span>' +
-        (off ? '<span class="tag">not in this box</span>' : '') + '</div>' +
+        (off ? '<span class="tag">not in this box</span>' : '') +
+        '<span class="prov">' + provLabel(r.set) + '</span></div>' +
       '<div class="rd">' + r.d + '</div>');
     info.onclick = () => row.classList.toggle('open');
     const stp = el('div','stp');
@@ -1844,7 +1862,9 @@ $('bRoster').onclick = () => { G.assignTo = null; openRoster(); };
 $('bCloseR').onclick = () => { G.assignTo = null; $('mRoster').classList.remove('on'); render(); };
 function paintSound(){
   $('bSound').innerHTML = icon('music') + (soundOn ? 'On' : 'Off');
-  $('bSound').style.color = soundOn ? 'var(--warn)' : '';
+  // --moon is "this control is on" everywhere else in the app; amber used to mean
+  // that here and "expansion card" elsewhere, which is the hue collision in full.
+  $('bSound').classList.toggle('on', soundOn);
 }
 $('bSound').onclick = () => {
   soundOn = !soundOn;

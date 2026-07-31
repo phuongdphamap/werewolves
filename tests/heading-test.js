@@ -58,9 +58,11 @@ t('the heading adds no bottom margin, so the gap is the only spacing below it', 
   const r = (src.match(/\.roles > \.grp\{[^}]*\}/) || [''])[0];
   return /margin:var\(--s\d\) 0 0\}/.test(r) ? true : r;
 });
-t('the legend below it carries no margin of its own either', () => {
+t('nothing between the heading and the list adds a margin', () => {
+  // The colour legend used to sit here and needed margin:0. It is gone; if anything
+  // is ever put back in that slot it must not reintroduce the gap.
   const r = (src.match(/\.legend\{[^}]*\}/) || [''])[0];
-  return /margin:0\}/.test(r) ? true : r;
+  return r === '' ? true : 'the legend rule is back: ' + r;
 });
 
 console.log('\nNOTHING ABOVE THE LIST ADDS A HIDDEN GAP');

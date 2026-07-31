@@ -54,16 +54,21 @@ t('solo roles sort to the bottom', () => {
   const { inDeck } = partition({ seer:1, wolf:2, piper:1 });
   return inDeck[inDeck.length-1].team === 'solo' ? true : inDeck.map(r => r.team).join(',');
 });
-t('the deck zone mixes both boxes, so it still needs the colour legend', () => {
+t('the deck zone mixes both boxes, so each row must say which it is', () => {
   const { inDeck } = partition({ wolf:2, seer:1, fox:1 });
   const sets = new Set(inDeck.map(r => r.set));
   return sets.size === 2 ? true : 'only ' + [...sets].join(',');
 });
 
 console.log('\nTHE SCREEN REFLECTS THAT');
-t('the legend is emitted once, above the zone', () => {
-  const c = (src.match(/class="legend"|'legend'/g) || []).length;
-  return c === 1 ? true : c + ' legends';
+t('provenance rides on the row, not a colour key above the zone', () => {
+  if (/class="legend"|'legend'/.test(src)) return 'the colour legend is back';
+  return /class="prov"/.test(src) ? true : 'rows carry no provenance label';
+});
+t('no hue means two different things', () => {
+  // teal was village AND base; amber was expansion AND Sheriff. Both edges are gone.
+  const edges = (src.match(/border-left:3px solid rgba\((?:111,179,166|224,169,76)/g) || []).length;
+  return edges === 0 ? true : edges + ' provenance edge(s) still colliding with a team hue';
 });
 t('the zone heading counts against the table size', () =>
   /in your deck[^']*' \+\s*totalCards\(\) \+ ' of ' \+ n/.test(src)
