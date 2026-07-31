@@ -184,20 +184,36 @@ So moving them after the pack is informationally neutral for players and lets th
 answer from the screen instead of asking the moderator to lift a card. That reasoning
 is pinned by tests in `fox-test.js`.
 
-### #5 and #6 are settable
+### The disputed rules are settable
 
-Both are genuinely disputed between tables, so they are **house rules** with three
-states rather than hard-coded:
+Three rules are genuinely argued about between tables, so they are **house rules** with
+three states rather than hard-coded:
 
 ```js
-G.selfHeal      // null = follow ruleset, true, false
-G.hunterPoison  // null = follow ruleset, true, false
-witchMaySaveSelf()    // null ? rules !== 'vn' : G.selfHeal
-hunterFiresPoisoned() // null ? rules !== 'vn' : G.hunterPoison
+G.selfHeal      // null = follow the published rule, true, false
+G.hunterPoison  // null = ...
+G.hunterElder   // null = ...
+witchMaySaveSelf()     // null ? rules !== 'vn' : G.selfHeal
+hunterFiresPoisoned()  // null ? rules !== 'vn' : G.hunterPoison
+hunterFiresPowerless() // null ? false            : G.hunterElder
 ```
 
 `null` is **distinct from `false`** and must stay that way — a test asserts it. An
 explicit ruling survives switching ruleset.
+
+**The third is not a tradition split, and that distinction is load-bearing.** The first
+two really do differ between Miller’s Hollow and Ma Sói Việt Nam, so their default reads
+the chosen ruleset. No ruleset addresses whether the Hunter still shoots once the Elder’s
+revenge has taken every villager power, so its default is the same under both. That is
+why `byRule` is a property of each row rather than one shared `G.rules !== 'vn'` — the
+shared version labelled the third row's default "có" under Miller’s Hollow, which is the
+opposite of what it does.
+
+The question exists because the two cards read past each other: the Elder cancels the
+villagers' powers and names no exception, while the Hunter's card says he fires "if he is
+killed by any reason". The app defaults to no shot — the shot is a power, and the power is
+gone — and says so on the panel, with the counter-argument, so a table can overrule it
+knowing what it is overruling.
 
 ### The Sheriff (Trưởng Làng / Capitaine / 警长)
 
@@ -305,7 +321,7 @@ crash recovery cheap.
 players counts night day phase log steps si n dawn pending
 witchHeal witchPoison foxPower elderLife powersLost judgeUsed
 houndSide sheriffDone infectNext over scapegoatVoters assignTo
-knewDeal rules lastGuard selfHeal hunterPoison resume votes
+knewDeal rules lastGuard selfHeal hunterPoison hunterElder resume votes
 sheriffVote showAllRoles scope dawnWhy dawnSure dawnEdit
 ```
 
@@ -565,7 +581,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   626 assertions across 25 suites, 0 failing
+#   632 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.

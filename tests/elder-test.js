@@ -44,6 +44,8 @@ const blocks = [
   src.match(/const witchMaySaveSelf[\s\S]*?hunterPoison;/)[0]
     .replace('const witchMaySaveSelf','globalThis.witchMaySaveSelf')
     .replace('const hunterFiresPoisoned','globalThis.hunterFiresPoisoned'),
+  src.match(/const hunterFiresPowerless = [^;]*;/)[0]
+    .replace('const hunterFiresPowerless','globalThis.hunterFiresPowerless'),
   grab('kill').replace('function kill','globalThis.kill = function'),
   grab('registerDeaths').replace('function registerDeaths','globalThis.registerDeaths = function'),
   grab('buildNight').replace('function buildNight','globalThis.buildNight = function'),
@@ -111,6 +113,79 @@ t('but he still fires while the Elder lives', () => {
   table(['elder','hunter','wolf','wolf']);
   registerDeaths(kill(G.players[1], 'wolves'));
   return !!G.pending.hunterId ? true : 'the gate fires when it should not';
+});
+
+/* Asked at a real table: "the Hunter is still has spell when Elder die, right?" The two
+   cards read past each other — the Elder's revenge cancels every villager power and names
+   no exception, while the Hunter's own card says he fires "if he is killed by any reason".
+   No ruleset addresses the interaction, so this is a house rule rather than a tradition
+   split, and the default is the app's reading: the shot is a power, and the power is gone. */
+console.log('\nTHE HUNTER AFTER THE ELDER IS A HOUSE RULE');
+const hunterShoots = () => {
+  table(['elder','hunter','wolf','wolf']);
+  hangTheElder();
+  registerDeaths(kill(G.players[1], 'wolves'));
+  return !!G.pending.hunterId;
+};
+t('the default is no shot, under both rulesets', () => {
+  const vn = (table(['elder','hunter','wolf','wolf']), G.rules = 'vn', hunterShoots());
+  table(['elder','hunter','wolf','wolf']); G.rules = 'mh';
+  hangTheElder(); registerDeaths(kill(G.players[1], 'wolves'));
+  const mh = !!G.pending.hunterId;
+  return (!vn && !mh) ? true : 'vn=' + vn + ' mh=' + mh;
+});
+t('a table that says yes gets the shot back', () => {
+  table(['elder','hunter','wolf','wolf']);
+  G.hunterElder = true;
+  hangTheElder();
+  registerDeaths(kill(G.players[1], 'wolves'));
+  return !!G.pending.hunterId ? true : 'the override was ignored';
+});
+t('and saying no explicitly behaves like the default', () => {
+  table(['elder','hunter','wolf','wolf']);
+  G.hunterElder = false;
+  hangTheElder();
+  registerDeaths(kill(G.players[1], 'wolves'));
+  return !G.pending.hunterId ? true : 'he fired';
+});
+t('null means follow the published rule, and is distinct from true', () => {
+  table(['elder','hunter','wolf','wolf']); G.hunterElder = null;
+  const follow = hunterFiresPowerless();
+  G.hunterElder = true;
+  return (follow === false && hunterFiresPowerless() === true)
+    ? true : 'null and true behave alike';
+});
+t('the ruling survives switching ruleset, like the other two', () => {
+  table(['elder','hunter','wolf','wolf']);
+  G.hunterElder = true; G.rules = 'vn';
+  const a = hunterFiresPowerless();
+  G.rules = 'mh';
+  return (a && hunterFiresPowerless()) ? true : 'the ruling was lost on switching';
+});
+t('it does not claim a tradition it has not got', () => {
+  // the other two label their default from the ruleset; this one must not, or Miller's
+  // Hollow would advertise "có" for a rule whose default is no shot under both
+  const ui = grab('houseRulesUI');
+  return (/byRule:false/.test(ui) && /r\.byRule \? /.test(ui) && !/const byRule = G\.rules/.test(ui))
+    ? true : 'the shared ruleset default is still labelling this row: ' + ui.slice(0, 300);
+});
+t('overruling it also stops the day screen claiming the gun is gone', () => {
+  const day = grab('rDay');
+  return /the Hunter does not fire/.test(day) && /!hunterFiresPowerless\(\)[^\n]*the Hunter does not fire/.test(day)
+    ? true : 'the alert would contradict the house rule the table just set';
+});
+t('the other powers are unaffected by this ruling', () => {
+  table(['elder','idiot','beartamer','wolf','wolf']);
+  G.hunterElder = true;                      // the Hunter keeps his gun...
+  hangTheElder();
+  return (powerGone(G.players[1]) && powerGone(G.players[2]))
+    ? true : '...and the Idiot and Bear Tamer wrongly kept theirs too';
+});
+t('and it changes nothing while the Elder lives', () => {
+  table(['elder','hunter','wolf','wolf']);
+  G.hunterElder = false;                     // the strictest setting
+  registerDeaths(kill(G.players[1], 'wolves'));
+  return !!G.pending.hunterId ? true : 'the ruling suppressed a shot it does not govern';
 });
 
 t('the Knight’s rust does not spread', () => {

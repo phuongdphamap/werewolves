@@ -229,7 +229,7 @@ function blank(){
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
     infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
-    selfHeal:null, hunterPoison:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
+    selfHeal:null, hunterPoison:null, hunterElder:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
     dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
 G = blank();
@@ -309,11 +309,18 @@ const powerGone = p => !!(G.powersLost && p && teamOf(p) === 'village');
 // Vietnamese and 狼人杀 tables usually use 1.5 so it cannot outvote two people alone.
 const SHERIFF_WEIGHT = () => G.rules === 'vn' ? '1.5 votes' : '2 votes';
 
-/* Two points the traditions genuinely disagree on, and that tables argue about.
-   null means "follow whichever ruleset is selected"; true or false is a deliberate
-   house ruling that survives switching ruleset. */
+/* Three points tables argue about. null means "follow the published rule"; true or false
+   is a deliberate house ruling that survives switching ruleset. */
 const witchMaySaveSelf   = () => G.selfHeal     == null ? G.rules !== 'vn' : G.selfHeal;
 const hunterFiresPoisoned = () => G.hunterPoison == null ? G.rules !== 'vn' : G.hunterPoison;
+/* Does the Hunter still shoot once the village has killed the Elder and taken every
+   villager power with it? Unlike the two above, this is NOT a split between the
+   traditions — no ruleset I can find addresses the interaction, so the default is the
+   same under both. It is here because the two cards read past each other: the Elder's
+   revenge cancels the villagers' powers and names no exception, while the Hunter's own
+   card says he fires "if he is killed by any reason", which sounds absolute. Default is
+   no shot — the shot is a power, and the power is gone. */
+const hunterFiresPowerless = () => G.hunterElder == null ? false : G.hunterElder;
 const fmtN = n => (Math.round(n * 100) / 100).toString();
 
 /* The two UI controls use the same monochrome sprite as the roles. This replaced a
@@ -658,9 +665,10 @@ function registerDeaths(chain){
       // Miller’s Hollow says he fires whatever the cause. Matched on the cause CODE:
       // it used to be /poison/ against the sentence, so renaming the potion — or
       // translating it — would have turned the rule off with nothing failing.
-      if (powerGone(c.p)){
+      if (powerGone(c.p) && !hunterFiresPowerless()){
         log(c.p.name + ' was the Hunter, but the village killed the Elder \u2014 the gun is ' +
-            'as dead as every other villager power. No shot.');
+            'as dead as every other villager power. No shot. ' +
+            'Change that under House rules if your table plays otherwise.');
       } else if (!hunterFiresPoisoned() && c.cause === 'poison'){
         log(c.p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
             'Change that under House rules if your table plays otherwise.');
@@ -1171,26 +1179,36 @@ function rDeal(){
   A.appendChild(extra);
 }
 
-/* The two disputed rules, each as three chips: follow the ruleset, or overrule it
-   one way or the other. Written as a node rather than a string so the chips work. */
+/* The disputed rules, each as three chips: follow the published rule, or overrule it one
+   way or the other. Written as a node rather than a string so the chips work.
+   byRule is PER ROW. The first two really are a split between the traditions, so theirs
+   tracks the chosen ruleset; the third is not — no ruleset addresses it — so it must not
+   claim a tradition it does not have. The single shared `G.rules !== 'vn'` would have
+   labelled the third row's default "có" under Miller’s Hollow, the opposite of what it does. */
 function houseRulesUI(){
   const wrap = el('div', null, '');
+  const byTradition = G.rules !== 'vn';
   const rows = [
     { key:'selfHeal', q:'Phù Thuỷ tự cứu mình?',
       en:'May the Witch use her cure on herself?',
-      now:witchMaySaveSelf(),
+      now:witchMaySaveSelf(), byRule:byTradition,
       note:'Miller’s Hollow cho phép. Ma Sói Việt Nam thì không.' },
     { key:'hunterPoison', q:'Thợ Săn bị thuốc độc có bắn được?',
       en:'Does the Hunter still fire when the Witch poisons him?',
-      now:hunterFiresPoisoned(),
+      now:hunterFiresPoisoned(), byRule:byTradition,
       note:'Miller’s Hollow: bắn, vì luật nói \u201cchết vì bất cứ lý do gì\u201d. Ma Sói Việt Nam theo 狼人杀: thuốc độc thì không kịp giương súng.' },
+    { key:'hunterElder', q:'Trưởng Lão bị dân giết \u2014 Thợ Săn còn bắn được?',
+      en:'Does the Hunter still fire after the village kills the Elder?',
+      now:hunterFiresPowerless(), byRule:false,
+      note:'Hai lá bài nói khác nhau: Trưởng Lão xoá <b>toàn bộ</b> phép của dân làng và không trừ ai, ' +
+           'còn bài Thợ Săn nói bắn khi \u201cchết vì bất cứ lý do gì\u201d. Không bộ luật nào xử vụ này, ' +
+           'nên mặc định là <b>không bắn</b> \u2014 phát súng là một phép, và phép đã mất. ' +
+           'Bàn nào coi súng là vật chứ không phải phép thì chọn \u201cCó\u201d.' },
   ];
   for (const r of rows){
     wrap.appendChild(el('div','grp', r.q + ' \u00b7 ' + r.en));
     const c = el('div','chips');
-    // both of these default the same way: the French rules allow, the Vietnamese do not
-    const byRule = G.rules !== 'vn';
-    const opts = [[null, 'Theo luật \u00b7 ' + (byRule ? 'có' : 'không')],
+    const opts = [[null, 'Theo luật \u00b7 ' + (r.byRule ? 'có' : 'không')],
                   [true, 'Có \u00b7 yes'], [false, 'Không \u00b7 no']];
     for (const [val, lab] of opts){
       const b = el('div','chip' + (G[r.key] === val ? ' sel' : ''), lab);
@@ -1728,7 +1746,7 @@ function rDay(){
        "the night calls stop", which is how the rule came to be half-implemented in the
        first place — the Hunter kept firing and the Idiot kept surviving the rope. */
     const stripped = [
-      liveWith('hunter').length   && 'the Hunter does not fire',
+      liveWith('hunter').length && !hunterFiresPowerless() && 'the Hunter does not fire',
       liveWith('idiot').length    && 'the Idiot is hanged like anyone else',
       liveWith('scapegoat').length&& 'the Scapegoat no longer dies for a tie',
       liveWith('beartamer').length&& 'the Bear Tamer does not growl',
