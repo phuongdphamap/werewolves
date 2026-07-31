@@ -1,6 +1,7 @@
-// The bottom bar had two problems: buttons sized to their text so the row was
-// left half empty, and the backdrop started fully transparent so role rows and
-// the legend showed through behind them. These tests pin both fixes.
+// The bottom bar had three problems: buttons sized to their text so the row was left
+// half empty, a backdrop that started fully transparent so role rows showed through,
+// and — once that was fixed with a gradient — a fade that half-erased the last row of
+// every list. It is now a flat plate with a hairline edge and measured clearance.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 const js  = fs.readFileSync('../js/app.js','utf8');
@@ -68,30 +69,39 @@ t('no bar has two competing primaries', () => {
   return true;
 });
 
-console.log('\nTHE BACKDROP ACTUALLY COVERS WHAT IS BEHIND IT');
+// The bar was a gradient fading in over ~90px, which left the last row of every list
+// permanently half-erased — legible enough to notice, not to read. It is now a defined
+// plate. These pin the plate, because the fog is the thing that must not come back.
+console.log('\nTHE BACKDROP IS A PLATE, NOT A FOG');
 const BAR = rule(/\.bar\{[^}]*\}/);
-t('the gradient reaches near-opaque, not just .95 at 30%', () =>
-  /rgba\(10,8,16,\.9\d\)/.test(BAR) ? true : BAR);
-t('it is opaque well above the buttons', () => {
-  const stops = [...BAR.matchAll(/rgba\(10,8,16,([.\d]+)\)\s+(\d+)%/g)]
-    .map(m => ({ a:parseFloat(m[1]), at:+m[2] }));
-  const mid = stops.find(s => s.at <= 40 && s.at > 0);
-  return (mid && mid.a >= 0.6) ? true
-    : 'at ' + (mid ? mid.at + '% opacity is only ' + mid.a : 'no early stop') ;
-});
+t('the fill is flat and near-opaque', () =>
+  /background:rgba\(10,8,16,\.9\d\)/.test(BAR) ? true : BAR);
+t('no gradient — a fade is what half-erased the row above it', () =>
+  !/linear-gradient/.test(BAR) ? true : 'the bar is fading again: ' + BAR);
+t('it has a hairline top edge, so it reads as a surface', () =>
+  /border-top:1px solid/.test(BAR) ? true : BAR);
 t('a blur is applied where supported, with the webkit prefix', () =>
   /-webkit-backdrop-filter:blur/.test(BAR) && /[^-]backdrop-filter:blur/.test(BAR)
     ? true : BAR);
-t('the bar starts higher so there is a clean band to sit on', () =>
-  /padding:var\(--s6\) var\(--pad\) var\(--s4\)/.test(BAR) ? true : BAR);
+t('there is an opaque fallback where backdrop-filter is unsupported', () =>
+  /@supports not \(\(backdrop-filter[\s\S]*?\.bar\{background:#0A0810\}/.test(
+    src.replace(/\s+/g,' ')) ? true : 'a translucent bar with no blur would show content through');
 
 console.log('\nNOTHING IS HIDDEN OR OVERFLOWS');
-t('page content clears the taller bar', () => {
+t('clearance is the measured bar height, not a constant', () => {
   const wrap = rule(/\.wrap\{[^}]*\}/);
-  const pb = (wrap.match(/padding:0 var\(--pad\) (\d+)px/) || [])[1];
-  // bar = 38 top + ~54 button + 20 bottom = ~112px
-  return (pb && +pb >= 130) ? true : 'bottom padding is ' + pb + 'px, bar is ~112px tall';
+  return /padding:0 var\(--pad\) calc\(var\(--barh/.test(wrap)
+    ? true : 'a fixed clearance goes stale when a label wraps: ' + wrap;
 });
+t('scroll-padding matches it, so the last row is reachable', () => {
+  const wrap = rule(/\.wrap\{[^}]*\}/);
+  return /scroll-padding-bottom:calc\(var\(--barh/.test(wrap) ? true : wrap;
+});
+t('something actually measures the bar and sets --barh', () =>
+  /setProperty\('--barh'/.test(js) && /offsetHeight/.test(js)
+    ? true : '--barh is referenced but never written, so the fallback always wins');
+t('the measurement re-runs when the bar is rebuilt', () =>
+  /measureBar\(\);\s*\}/.test(js) ? true : 'bar() does not re-measure, so a taller bar overlaps');
 t('a long label truncates instead of breaking the row', () => {
   const r = rule(/\.bar \.in \.btn\{[^}]*\}/);
   return (/min-width:0/.test(r) && /white-space:nowrap/.test(r) && /text-overflow:ellipsis/.test(r))

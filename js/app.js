@@ -209,6 +209,9 @@ function recommend(n, chars){
 
 /* ========================== state ========================== */
 let G = null;
+/* Which language the read-aloud card shows underneath. A view preference, not game
+   state, so it stays out of G and out of the save. */
+let altLang = false;
 const undoStack = [];
 function blank(){
   return { players:[], counts:{}, night:0, day:0, phase:'players', log:[],
@@ -693,7 +696,35 @@ function collapsible(key, title, body){
    The primary action now takes the room that is left; a secondary sits at its
    natural width beside it. When every option is secondary they share the row
    evenly, so the bar is always filled and the main action is always the widest. */
+/* The bar is fixed, so the column has to reserve exactly its height or the last row
+   sits under it. Its height changes with wrapped labels and the roll-call counter,
+   which is why this is measured rather than a constant. */
+/* The outer .bar plate, not #bar — #bar is only the button row inside it, and
+   measuring that misses the plate's padding and the pinned note. */
+const barEl = () => document.querySelector('.bar');
+const measureBar = () => {
+  const b = barEl();
+  if (b) document.documentElement.style.setProperty('--barh', b.offsetHeight + 'px');
+};
+if (typeof ResizeObserver === 'function'){
+  const ro = new ResizeObserver(measureBar);
+  addEventListener('DOMContentLoaded', () => { const b = barEl(); if (b) ro.observe(b); });
+}
+addEventListener('resize', measureBar);
+
+/* A line pinned above the buttons, for a fact that must not scroll away — the vote
+   threshold. Cleared by every bar() call, so a screen that does not set it cannot
+   inherit the previous screen's note. */
+function barNote(html){
+  const n = $('barNote');
+  if (!n) return;
+  n.innerHTML = html || '';
+  n.hidden = !html;
+  measureBar();
+}
+
 function bar(items){
+  barNote('');
   const b = $('bar'); b.innerHTML = '';
   const list = items.filter(Boolean);
   const hasPrimary = list.some(it => !it.sec);
@@ -705,6 +736,7 @@ function bar(items){
     btn.disabled = !!it.off; btn.onclick = it.on;
     b.appendChild(btn);
   }
+  measureBar();
 }
 function render(){
   saveSoon();
@@ -1027,14 +1059,17 @@ function rNight(){
   const tIc = info.id === '__lovers' ? '💘' : icOf(s.role);
   $('nTitle').innerHTML = (tIc ? '<span class="ic" style="font-size:22px;margin-right:8px">' + tIc + '</span>' : '') +
     ((vn && info.vi)
-    ? info.vi + ' <span style="font-size:14px;color:var(--txt45);font-family:var(--ui);font-weight:500">' + info.name + '</span>'
-    : info.name + (info.vi ? ' <span style="font-size:14px;color:var(--txt45);font-family:var(--ui);font-weight:500">' + info.vi + '</span>' : ''));
+    ? info.vi + ' <span style="font-size:14px;color:var(--txt2);font-family:var(--ui);font-weight:500">' + info.name + '</span>'
+    : info.name + (info.vi ? ' <span style="font-size:14px;color:var(--txt2);font-family:var(--ui);font-weight:500">' + info.vi + '</span>' : ''));
   const holders = s.role === '__lovers' ? G.players.filter(p => p.lover) : liveWith(s.role);
   $('nSub').textContent = (identified && holders.length ? holders.map(p=>p.name).join(', ') + ' \u2014 ' : '') + (info.d || '');
   const primary = (vn && info.sayVi) ? info.sayVi : info.say;
   const second  = (vn && info.sayVi) ? info.say : info.sayVi;
   $('nSayT').innerHTML = (primary || '') +
-    (second ? '<span style="display:block;margin-top:8px;font-family:var(--ui);font-size:12.5px;color:var(--txt45)">' + second + '</span>' : '');
+    (second ? '<span class="alt' + (altLang ? ' on' : '') + '">' + second + '</span>' : '');
+  const ab = $('bAltLang');
+  ab.hidden = !second;
+  ab.textContent = (altLang ? 'Hide ' : 'Show ') + (vn ? 'English' : 'Tiếng Việt');
   $('nSay').style.display = primary ? '' : 'none';
 
   const B = $('nBody'); B.innerHTML = '';
@@ -1319,7 +1354,7 @@ function rDawn(){
   if (G.dawnWhy && G.dawnWhy.length){
     const w = el('div','card tight');
     w.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:.16em;' +
-      'text-transform:uppercase;color:var(--txt45);margin-bottom:8px">How that follows</div>' +
+      'text-transform:uppercase;color:var(--txt2);margin-bottom:8px">How that follows</div>' +
       G.dawnWhy.map(t => '<div style="font-size:13px;line-height:1.6;color:var(--txt70)">\u00b7 ' + t + '</div>').join('');
     B.appendChild(w);
   }
@@ -1421,22 +1456,28 @@ function rDay(){
   const wt = G.rules === 'vn' ? 1.5 : 2;
   G.votes = G.votes || {};
   B.appendChild(el('div','grp','Count the vote'));
-  B.appendChild(el('div','card tight',
-    '<b>' + voters.length + '</b> may vote \u00b7 total weight <b>' + fmtN(TP) + '</b> \u00b7 ' +
-    'a name needs <b>more than ' + fmtN(thr) + '</b>' +
-    (sh ? '<p class="note">' + sh.name + ' holds the badge, so their hand counts ' + wt + '. ' +
-          'Tap the badge beside whoever they voted for.</p>' : '') +
-    (G.scapegoatVoters ? '<p class="note">The Scapegoat has silenced everyone else today.</p>' : '')));
+  // The threshold itself is pinned into the action bar by refresh(); this card keeps
+  // only the things you read once, at the start.
+  if (sh || G.scapegoatVoters)
+    B.appendChild(el('div','card tight',
+      (sh ? '<b>' + sh.name + '</b> holds the badge, so their hand counts ' + wt + '. ' +
+            'Tap the badge beside whoever they voted for.' : '') +
+      (G.scapegoatVoters ? (sh ? '<p class="note">' : '') +
+            'The Scapegoat has silenced everyone else today.' + (sh ? '</p>' : '') : '')));
 
   // Rows are built once and a light refresh updates only the derived numbers, so
   // typing in a box never rebuilds it and never loses the caret.
   const cells = [];
+  const list = el('div', null); list.id = 'dyVotes'; B.appendChild(list);
   for (const p of A){
-    const row = el('div','p');
-    row.innerHTML = icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
-      (p.voteless ? '<span class="tag">no vote</span>' : '');
-    const power = el('span','rl');
-    power.style.cssText = 'min-width:56px;text-align:right';
+    const row = el('div','p vote');
+    const fill = el('span','fill');
+    row.appendChild(fill);
+    row.insertAdjacentHTML('beforeend', icSpanD(p) + '<span class="nm">' + p.name + '</span>' +
+      (p.voteless ? '<span class="tag">no vote</span>' : ''));
+    // "Carries" replaces the old grey digit: the field below is the number, and this
+    // says the one thing the number could not.
+    const power = el('span','carries');
     row.appendChild(power);
     if (sh){
       const bg = el('button','ico', G.sheriffVote === p.id ? '\u2b50' : '\u2606');
@@ -1465,8 +1506,8 @@ function rDay(){
     plus.onclick = () => setVote(p, tallyOf(p) + 1);
     stp.append(minus, box, plus);
     row.appendChild(stp);
-    B.appendChild(row);
-    cells.push({ p, power, minus, plus, box });
+    list.appendChild(row);
+    cells.push({ p, power, minus, plus, box, row, fill });
   }
   const verdict = el('div','alert'); B.appendChild(verdict);
   const twice  = el('div','alert no'); B.appendChild(twice);
@@ -1483,10 +1524,19 @@ function rDay(){
       const pw = tallyOf(p) + extraOf(p);
       if (pw > best){ best = pw; lead = [p]; } else if (pw === best && pw > 0) lead.push(p);
     }
+    // Reordering while a box has focus would move the row out from under the thumb
+    // that is typing in it, so promotion waits until the field is released.
+    const typing = cells.some(c => document.activeElement === c.box);
     for (const c of cells){
       const extra = extraOf(c.p), pw = tallyOf(c.p) + extra;
-      c.power.textContent = fmtN(pw) + (extra ? ' \u2b50' : '');
-      c.power.style.color = pw > thr ? 'var(--vil)' : 'var(--txt45)';
+      const over = pw > thr;
+      // Share of the whole voting weight, so the bars are comparable to each other
+      // and to "half" \u2014 not normalised to the current leader.
+      c.fill.style.width = TP > 0 ? Math.min(100, (pw / TP) * 100) + '%' : '0';
+      c.row.classList.toggle('over', over);
+      c.row.classList.toggle('lead', !over && pw > 0 && pw === best && lead.length === 1);
+      c.power.textContent = over ? 'carries' : (extra ? '\u2b50' : '');
+      if (!typing) c.row.style.order = over ? -2 : (pw > 0 && pw === best ? -1 : 0);
       c.minus.disabled = !tallyOf(c.p);
       c.plus.disabled = tallyOf(c.p) >= voters.length;
       if (document.activeElement !== c.box) c.box.value = String(tallyOf(c.p));
@@ -1513,7 +1563,12 @@ function rDay(){
       snap(); log('The vote did not clear half. Nobody was hanged.');
       G.votes = {}; G.sheriffVote = null; G.resume = 'night'; proceed(); } });
     bar(opts);
+    // Pinned last: bar() clears the note, so this has to follow it.
+    barNote(fmtN(cast) + ' of <b>' + fmtN(TP) + '</b> cast · a name needs <b' +
+      (passing ? ' class="hit"' : '') + '>more than ' + fmtN(thr) + '</b>');
   }
+  // A blur can change the ordering that was held back while typing.
+  for (const c of cells) c.box.addEventListener('blur', () => refresh());
   refresh();
 }
 function resolveVote(p, tie){
@@ -1735,6 +1790,7 @@ function showReveal(kick, who, big, sub, tone){
   nm.style.color = tone === 'plain' ? 'var(--txt)' : col;
   tm.textContent = sub;
   tm.style.color = col;
+  holdShow(false);            // never open already-revealed
   $('mSeer').classList.add('on');
 }
 function showSeer(t){
@@ -1760,7 +1816,30 @@ function showFox(grp, hit){
         : (vn ? 'Cáo mất phép từ giờ' : 'the Fox loses his power'),
     hit ? 'wolf' : 'vil');
 }
-$('bSeerDone').onclick = () => $('mSeer').classList.remove('on');
+/* Press-and-hold, so the answer is visible only while the recipient is holding the
+   phone. Release hides it — including release outside the button, and any interruption
+   the browser reports, so it cannot be left showing on a phone that is handed back. */
+// A declaration, not a const: showReveal is defined above this point and would sit in
+// the temporal dead zone if anything ever revealed during start-up.
+function holdShow(on){
+  const s = $('revSecret');
+  if (!s) return;
+  s.classList.toggle('on', on);
+  s.setAttribute('aria-hidden', on ? 'false' : 'true');
+  $('bReveal').textContent = on ? 'Release to hide' : 'Hold to see it';
+};
+{
+  const b = $('bReveal');
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); holdShow(true); });
+  for (const ev of ['pointerup','pointercancel','pointerleave','lostpointercapture'])
+    b.addEventListener(ev, () => holdShow(false));
+  // keyboard: hold space or enter
+  b.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); holdShow(true); } });
+  b.addEventListener('keyup', () => holdShow(false));
+  b.addEventListener('blur', () => holdShow(false));
+}
+$('bAltLang').onclick = () => { altLang = !altLang; render(); };
+$('bSeerDone').onclick = () => { holdShow(false); $('mSeer').classList.remove('on'); };
 $('bRoster').onclick = () => { G.assignTo = null; openRoster(); };
 $('bCloseR').onclick = () => { G.assignTo = null; $('mRoster').classList.remove('on'); render(); };
 function paintSound(){
