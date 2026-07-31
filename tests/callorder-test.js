@@ -84,20 +84,20 @@ t('the catalogue still sorts wolves first, for setting counts', () =>
 t('both comparators exist and are used for different things', () =>
   /const byTeam =/.test(src) && /const byCall =/.test(src) ? true : 'a comparator is missing');
 
-console.log('\nTHE LEGEND SITS UNDER ITS HEADING');
-t('the heading is emitted before the legend', () => {
-  const hi = src.indexOf("'Trong bộ \\u00b7 in your deck");
-  const li = src.indexOf("class=\"legend\"") >= 0 ? src.indexOf("'legend'") : src.indexOf("'legend'");
-  return (hi > 0 && li > hi) ? true : 'legend at ' + li + ' still precedes heading at ' + hi;
+// The colour legend is gone. It keyed a teal/amber edge that meant "base/expansion",
+// while teal also meant "village" and amber also meant "Sheriff" — one hue, two jobs.
+// Provenance is a word on each row now, so there is no key to position or orphan.
+console.log('\nPROVENANCE IS A WORD, NOT A COLOUR KEY');
+t('no colour legend survives', () => {
+  const c = (src.match(/'legend'|class="legend"/g) || []).length;
+  return c === 0 ? true : c + ' legend(s) left, keying a colour that no longer exists';
 });
-t('there is still exactly one legend', () => {
-  const c = (src.match(/'legend'/g) || []).length;
-  return c === 1 ? true : c + ' legends';
-});
-t('the legend no longer carries its own bottom margin', () => {
-  const r = (src.match(/\.legend\{[^}]*\}/) || [''])[0];
-  return /margin:0\}/.test(r) ? true : r;
-});
+t('every role row states which box it came from', () =>
+  /<span class="prov">' \+ provLabel\(r\.set\)/.test(src)
+    ? true : 'the deck rows no longer say Base / Expansion');
+t('the label follows the table language', () =>
+  /Mở rộng/.test(src) && /Expansion/.test(src)
+    ? true : 'provLabel is not bilingual');
 t('headings inside the gapped list do not double their spacing', () => {
   const r = (src.match(/\.roles > \.grp\{[^}]*\}/) || [''])[0];
   return /margin:var\(--s5\) 0 0\}/.test(r) ? true : r || 'rule missing';

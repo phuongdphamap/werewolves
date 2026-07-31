@@ -22,11 +22,10 @@
 <div class="wrap">
   <header>
     <div style="flex:1;min-width:0">
-      <div class="ttl" id="hTtl">Miller’s Hollow</div>
-      <div class="ph" id="hPh">Moderator</div>
+      <div class="ttl" id="hTtl">Setup</div>
+      <div class="ph" id="hPh">Who is playing</div>
     </div>
-    <button type="button" class="ico" id="bSound" title="Night sounds"></button>
-  <button type="button" class="ico" id="bUndo">Undo</button>
+    <button type="button" class="ico quiet" id="bUndo">Undo</button>
     <button type="button" class="ico" id="bRoster">Roster</button>
   </header>
 
@@ -124,6 +123,9 @@
 
 <div class="modal" id="mRoster"><div class="in">
   <div class="row" style="margin-bottom:var(--s4)"><h2 style="flex:1;margin:0">Roster</h2>
+    <!-- Night sounds live here, not the header: used once a night, and the header's
+         strip is worth more than a control that rarely moves. -->
+    <button type="button" class="ico" id="bSound" title="Night sounds"></button>
     <button type="button" class="ico" id="bCloseR">Close</button></div>
   <p class="sub" style="margin-bottom:var(--s3)">Tap a player to set or correct their card.</p>
   <div class="stack" id="rosBody"></div>
