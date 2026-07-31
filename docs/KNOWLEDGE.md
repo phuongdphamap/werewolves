@@ -446,6 +446,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 
 | # | Bug | Root cause |
 |---|---|---|
+| B-58 | A hushed call **read as a live one** | Reported from the same table, right after B-57: "I see him die but the next night the villager team still have spell." The rule was firing correctly. The SCREEN said otherwise. B-54 kept village cards in the night so the length would not leak, and put the notice in `#nBody` — which the document places *after* the read-aloud block. So the order was: role name, what the card does each night, “Tiên Tri thức dậy. Chỉ vào người mà bạn muốn soi”, and only then, small and underneath, that nobody was going to. At the speed of a real night that is a live power. The notice moved above the line, into its own `#nHush`; the heading carries a `không ai thức · nobody wakes` tag in `--wolf`; and the description is replaced instead of explaining a power that is gone. The line itself still reads out verbatim — suppressing it would re-open the leak B-54 closed. |
 | B-57 | The Elder took only the powers that **wake at night** | Reported from a real table: the village hanged the Elder and the other village roles still had their spell. They did. `G.powersLost` was read in exactly one behavioural place — the night call list — so every villager power triggered anywhere else carried on working: the Hunter still fired, the Idiot still walked away from the rope, the Scapegoat still died in place of a tie, the Bear Tamer still growled, the Knight’s rust still spread, the Judge could still demand a second vote and the Little Girl could still peek. Six of the seven change who wins. One predicate, `powerGone(p)`, is now asked at every trigger, and the day alert names what is actually gone rather than saying "every villager loses their power" — the sentence that was easy to read as "the night calls stop", which is how it came to be half-implemented. Reads `teamOf`, so a turned Wild Child or a Hound who joined the pack keeps what being a wolf gives him, and the Sheriff’s badge is untouched because it is a title the village votes on, not a card. |
 | B-53 | The mixed-Lovers test read an **unlearned card as a different side** | Fixing B-39 to compare the two sides re-opened the same hole one layer down: `teamOf` returns `'none'` for a card nobody identified, so a village lover beside an unidentified one compared `'village'` against `'none'`, read as mixed, and handed Cupid the win a second way. The app was not guessing — `checkWin` returns early unless `wolfSideKnown()`, and that predicate's whole argument is that once every wolf-side card is placed, anybody still unidentified is **provably not a wolf**. A local `sideOf()` resolves an unknown card to the village side, declared *below* the gate so the licence is structural. The general shape: the remaining bugs live in the gap between what is true and what the code has been told, and the fix is to name the predicate that licenses the answer. |
 | B-54 | Lost powers **dropped** the call, the one place the hush rule was not applied | Four lines above the code that invented hushing, `buildNight` still did `if (G.powersLost && r.team === 'village') continue`. The comment reasoned that the loss is publicly known — true — but that is not what the night leaks. The table hears *how many calls disappeared*, and the delta counts the powered village cards the deck held. Two rules in one loop, reaching opposite conclusions from the same premise. Now a third hush kind, `powerless`, so the night keeps its length. |
@@ -564,7 +565,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   619 assertions across 25 suites, 0 failing
+#   626 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -709,6 +710,12 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     is only the powers that happen to wake (B-57). Enumerate what the rule actually
     reaches — here, seven cards with six different trigger points — and gate them through
     one predicate, so the eighth cannot be added without meeting it.
+
+19. **A rule the moderator cannot see is not implemented.** B-57 and B-58 came from one
+    table, one after the other, and neither was a logic error by the second report: the
+    powers really were gone. What the screen showed was a role name and an instruction to
+    act. When a state changes what somebody should DO with the next sentence they read,
+    it belongs above that sentence, not below it.
 
 ---
 
