@@ -474,8 +474,16 @@ function buildNight(){
     for (const r of ord()){
       if (r.every == null) continue;
       if (!G.counts[r.id]) continue;                        // not in this deck at all
-      if (G.powersLost && r.team === 'village') continue;   // publicly known, so no leak
       if (r.alt && G.night % 2 !== 0) continue;
+      /* Powers lost is public — the Elder's death is announced — but the NUMBER of calls
+         that vanish with them is not. Dropping every village card at once tells the table
+         how many powered village cards the deck held, which is the same inference the hush
+         four lines below exists to deny. These two rules sat in one loop reaching opposite
+         conclusions from the same premise. Hushed, so the night keeps its shape. */
+      if (G.powersLost && r.team === 'village'){
+        steps.push({ role:r.id, hush:'powerless' });
+        continue;
+      }
       /* The step exists because the CARD is in play, not because the app happens to know
          who holds it. This used to be built from the identified holders, so a card nobody
          answered for at the roll call was dropped from every night that followed — not
@@ -499,6 +507,20 @@ function buildNight(){
     steps.sort((a,b) => everyOf(R[a.role]) - everyOf(R[b.role]));
   }
   G.steps = steps; G.si = 0; G.n = {};
+}
+/* The Thief is the one move that changes which cards are AT THE TABLE mid-game: his own
+   goes back to the spares and one of the two spares comes in. G.counts has to follow, and
+   it did not — which used to be merely untidy (the Roster listed the Thief as unplaced
+   forever) and became a real bug the moment buildNight started reading G.counts as the
+   record of what is in play. A Thief who took a spare Fox was then never called again,
+   because no Fox was ever in the deck: the same disappearance the deck-driven night was
+   written to end, re-entering through the one path that moves a card without saying so. */
+function thiefTakes(th, r){
+  if (G.counts.thief) G.counts.thief--;
+  if (!G.counts.thief) delete G.counts.thief;
+  G.counts[r.id] = (G.counts[r.id] || 0) + 1;
+  th.role = r.id;
+  log('The Thief became ' + r.name + '. That card is in play now, and the Thief is not.');
 }
 function stepInfo(s){
   if (s.role === '__lovers') return { name:'The Lovers', vi:'Cặp Đôi',  id:'__lovers',
@@ -687,11 +709,21 @@ function checkWin(){
   // Counting the two sides needs only the wolf cards placed — not every villager
   // identified. Demanding the latter froze results for whole games.
   if (!wolfSideKnown()) return null;
+  /* The side a player is on, as far as this function is ENTITLED to say. teamOf reports
+     'none' for a card that was never learned, and comparing that against a real team
+     reads as a difference nothing has established.
+     Declared here, below the gate, because the gate is what licenses it: wolfSideKnown()
+     means every card that could put somebody on the wolf side is placed, so anybody still
+     unidentified is provably not a wolf — which on this board is the village side. Move
+     this above the return and the argument stops holding. */
+  const sideOf = p => teamOf(p) === 'none' ? 'village' : teamOf(p);
   /* The pair wins ALONE only when it is mixed — that is the whole of Cupid's card. Two
      villagers or two wolves who outlast everyone win with their own side, and this test
-     sat above the team checks, so Cupid was credited with the pack's victory. */
+     sat above the team checks, so Cupid was credited with the pack's victory. It then
+     read teamOf directly, so a village lover paired with an unlearned card compared
+     'village' against 'none', looked mixed, and handed Cupid the win a second way. */
   const lovers = a.filter(p => p.lover);
-  if (a.length === 2 && lovers.length === 2 && teamOf(lovers[0]) !== teamOf(lovers[1]))
+  if (a.length === 2 && lovers.length === 2 && sideOf(lovers[0]) !== sideOf(lovers[1]))
     return { who:'The Lovers', why: lovers.map(p=>p.name).join(' and ') +
       ' are the last two alive, they belong to each other, and they were never on the same side.' };
   const piper = a.find(p => p.role === 'piper');
@@ -858,9 +890,11 @@ function measureBar(){
      A hidden tab never runs one, and the app can perfectly well do its first render in a
      hidden tab — a phone that loaded the page and was switched away from — which would
      leave the clearance on the CSS fallback against a bar that may be taller than it.
-     So a timer backs it up. Forcing layout in a tab that is not painting costs nothing. */
-  requestAnimationFrame(run);
-  setTimeout(run, 60);
+     So a timer backs it up. Forcing layout in a tab that is not painting costs nothing.
+     The frame callback cancels the timer rather than leaving it to wake and find the work
+     done, so the common path leaves nothing pending. */
+  const backstop = setTimeout(run, 60);
+  requestAnimationFrame(() => { clearTimeout(backstop); run(); });
 }
 if (typeof ResizeObserver === 'function'){
   const ro = new ResizeObserver(measureBar);
@@ -1247,11 +1281,17 @@ function rNight(){
   /* A hushed call: read the line, wait, move on. Nobody wakes, and nothing is asked —
      but from the table it sounds identical to a real call, which is the point. */
   if (s.hush){
-    B.appendChild(el('div','alert','<b>Nobody will open their eyes.</b> ' +
-      (s.hush === 'dead'
-        ? 'This card is out of the game. Read the line, leave the same pause you always do, then carry on.'
-        : 'This card has nothing left to spend. Read the line, leave the same pause, then carry on.') +
-      '<p class="note">Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.</p>'));
+    const why = {
+      dead:      'This card is out of the game.',
+      spent:     'This card has nothing left to spend.',
+      powerless: 'The Elder died by the village, so every villager power is gone.',
+    }[s.hush] || 'Nothing will happen on this call.';
+    B.appendChild(el('div','alert','<b>Nobody will open their eyes.</b> ' + why +
+      ' Read the line, leave the same pause you always do, then carry on.' +
+      '<p class="note">' + (s.hush === 'powerless'
+        ? 'The lost powers are public, but how many calls vanish with them is not — that would tell the table how many powered village cards the deck held.'
+        : 'Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.') +
+      '</p>'));
     bar([{ t:'Next →', wide:true, on:() => { G.si++; render(); } }]);
     return;
   }
@@ -1354,7 +1394,7 @@ function rNight(){
     for (const r of ROLES){
       if (r.id === 'thief') continue;
       const b = el('div','chip', '<span class="ic">' + icOf(r.id) + '</span>' + (G.rules==='vn' ? r.vi : r.name));
-      b.onclick = () => { snap(); if (th){ th.role = r.id; log('The Thief became ' + r.name + '.'); } G.si++; render(); };
+      b.onclick = () => { snap(); if (th) thiefTakes(th, r); G.si++; render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
