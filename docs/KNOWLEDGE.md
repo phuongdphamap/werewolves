@@ -186,16 +186,18 @@ is pinned by tests in `fox-test.js`.
 
 ### The disputed rules are settable
 
-Three rules are genuinely argued about between tables, so they are **house rules** with
+Four rules are genuinely argued about between tables, so they are **house rules** with
 three states rather than hard-coded:
 
 ```js
 G.selfHeal      // null = follow the published rule, true, false
 G.hunterPoison  // null = ...
 G.hunterElder   // null = ...
+G.showCards     // null = ...
 witchMaySaveSelf()     // null ? rules !== 'vn' : G.selfHeal
 hunterFiresPoisoned()  // null ? rules !== 'vn' : G.hunterPoison
 hunterFiresPowerless() // null ? false            : G.hunterElder
+cardsShownOnDeath()    // null ? rules !== 'vn' : G.showCards
 ```
 
 `null` is **distinct from `false`** and must stay that way — a test asserts it. An
@@ -500,6 +502,8 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 
 | # | Bug | Root cause |
 |---|---|---|
+| B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
+| B-61 | `#nHush` shipped as an **unclassed container** | The container added for B-58 had no spacing mechanism — its single `.alert` child happened to carry a margin, so it looked right and I measured it as right. Found by fixing the spacing suite's discovery, not by looking: it now carries `.stack` like every other container the app appends into, plus `.preSay` for the block margin `.stack` makes children surrender. A second block in there would have shipped flush. |
 | B-59 | A component inside a collapsible **lost its own spacing** | Reported as "why is the content paragraph tight with the header above". A collapsible body holds either prose or a component that arrives with its own spacing tokens. The prose rule was a bare descendant, `.expBody p` — a class **plus a type**, so it outranks `.note`, which is a class alone. Every note inside every collapsible therefore had its top margin flattened to 0 and sat against whatever was above it, while the identical grp/chips/note pattern in a plain `.card` kept its 10px. Scoped to `.expBody > p`: a string body's paragraphs are direct children and still get it, a node body's are grandchildren and keep their own. Measured rather than eyeballed — 0px against 10px for the same three elements. |
 | B-42 | One chip tap cost **two full-page reflows under a live blur** | Five things on the same click path: `snap()` serialised all of `G`; `render()` rebuilt every chip and `bar()` the action row; `measureBar()` read `offsetHeight`, forcing layout on a document just invalidated; it wrote `--barh` onto `documentElement`, invalidating style for the whole tree and waking the `ResizeObserver` watching `.bar`, which measured again; and all of it sat under `backdrop-filter: blur(14px)` over a region the rebuild had just dirtied. Chromium hands that to the compositor; Firefox largely does not, which is where the lag was reported. The blur was acting on **four percent** of the backdrop — the plate was already `.96` opaque, and the `@supports` fallback shipped alongside it was an opaque plate, which is proof the design never needed it. Blur deleted, fallback promoted to the rule, `--barh` moved to `.wrap`, and the measurement coalesced into one deferred read. |
 | B-43 | Deduplicating the measurement on its **value** still wrote twice per tap | Only visible by instrumenting `.wrap` in a browser: one render calls `measureBar()` three times — `bar()` clears the pinned note, builds the buttons, then the caller pins a new note — and those are genuinely three different heights, so a `if (h === barh) return` guard deduplicated nothing. Coalesced with a queue flag so three calls cost one. |
@@ -582,7 +586,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   644 assertions across 25 suites, 0 failing
+#   656 assertions across 25 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -739,6 +743,18 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     content brings with it (B-59). Scope structural spacing with `>` when a container
     can hold both prose and components, or the component's own tokens lose a fight
     nobody knew was on.
+
+21. **A test whose discovery is a proximity heuristic stops being a test.** The spacing
+    suite found its subjects by requiring an `appendChild` within 80 characters of the
+    container lookup. Adding a comment between the two silently dropped a container from
+    the checked set — no failure, just less coverage (B-61). Follow the variable, not the
+    character distance. Widening it immediately surfaced two containers that had never
+    been checked at all, one of them mine.
+
+22. **A mutation that leaves the identifier in place beats a test that greps for it.**
+    `if (on.length) …revealNote(…)` mutated to `if (false)` still contains the string
+    `revealNote`, so two tests passed against a disabled call. Assert the guard, and keep
+    a blanket check that no branch is switched off with a literal.
 
 ---
 

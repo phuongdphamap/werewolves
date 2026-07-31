@@ -102,7 +102,7 @@ const ROLES = [
   say:'Scapegoat, show yourself to me only, then close your eyes.',
   sayVi:'Vật Tế Thần cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'servant',name:'Devoted Servant',vi:'Người Hầu Trung Thành',team:'village',set:'Characters',max:1,n1:96,
-  d:'Before an eliminated player\u2019s card is revealed, she may show her own and take their role instead.',
+  d:'At the moment somebody is eliminated \u2014 before their card is turned up, if your table turns them \u2014 she may show her own and take their role instead.',
   say:'Devoted Servant, show yourself to me only, then close your eyes.',
   sayVi:'Người Hầu Trung Thành cho tôi thấy mặt, rồi nhắm mắt lại.'},
 ];
@@ -229,7 +229,7 @@ function blank(){
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
     infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
-    selfHeal:null, hunterPoison:null, hunterElder:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
+    selfHeal:null, hunterPoison:null, hunterElder:null, showCards:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
     dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
 G = blank();
@@ -321,6 +321,26 @@ const hunterFiresPoisoned = () => G.hunterPoison == null ? G.rules !== 'vn' : G.
    card says he fires "if he is killed by any reason", which sounds absolute. Default is
    no shot — the shot is a power, and the power is gone. */
 const hunterFiresPowerless = () => G.hunterElder == null ? false : G.hunterElder;
+/* Is a dead player's card turned face up? Miller’s Hollow reveals every elimination,
+   night or day, with no exception — which is why the Devoted Servant's window is defined
+   as "before an eliminated player's card is revealed". Vietnamese tables commonly do not
+   (không lật bài), because hidden cards make the deduction harder.
+   The app used to say nothing either way, at any death, while shipping a Servant whose
+   card presupposed a reveal step that never happened. */
+const cardsShownOnDeath = () => G.showCards == null ? G.rules !== 'vn' : G.showCards;
+/* What to tell the moderator at the moment a death becomes public. The Idiot is the one
+   card that overrides the setting: being shown is HOW the village learns to spare him, so
+   a table that hides every other card still has to turn his. */
+function revealNote(dead){
+  const idiot = (dead || []).filter(p => p && p.role === 'idiot' && p.revealed);
+  const show = cardsShownOnDeath();
+  const parts = [];
+  if (show) parts.push('<b>Turn their card face up</b> so the table sees who they were.');
+  else parts.push('<b>Leave their card face down.</b> Announce the name only — this table does not reveal.');
+  if (idiot.length) parts.push((show ? '' : 'Except ') + idiot.map(p => p.name).join(', ') +
+    ': the Village Idiot must be shown either way, or the village has no reason to spare him.');
+  return parts.join(' ');
+}
 const fmtN = n => (Math.round(n * 100) / 100).toString();
 
 /* The two UI controls use the same monochrome sprite as the roles. This replaced a
@@ -1204,6 +1224,12 @@ function houseRulesUI(){
            'còn bài Thợ Săn nói bắn khi \u201cchết vì bất cứ lý do gì\u201d. Không bộ luật nào xử vụ này, ' +
            'nên mặc định là <b>không bắn</b> \u2014 phát súng là một phép, và phép đã mất. ' +
            'Bàn nào coi súng là vật chứ không phải phép thì chọn \u201cCó\u201d.' },
+    { key:'showCards', q:'Người chết có lật bài không?',
+      en:'Is a dead player\u2019s card turned face up?',
+      now:cardsShownOnDeath(), byRule:byTradition,
+      note:'Miller’s Hollow lật <b>mọi</b> lá \u2014 chết đêm hay bị treo, không trừ ai. ' +
+           'Nhiều bàn Ma Sói Việt Nam thì <b>không lật bài</b> cho khó đoán hơn. ' +
+           'Riêng Thằng Ngốc luôn phải lật, vì đó là cách dân làng biết mà tha.' },
   ];
   for (const r of rows){
     wrap.appendChild(el('div','grp', r.q + ' \u00b7 ' + r.en));
@@ -1629,6 +1655,9 @@ function rDawn(){
   const say = el('div','say');
   say.innerHTML = '<div class="lbl">Read aloud</div><p>' + head + '</p>';
   B.appendChild(say);
+  // What to do with the cards. Said here because this is the moment the deaths become
+  // public, and the app used to leave it entirely unstated.
+  if (on.length) B.appendChild(el('p','note', revealNote(on.map(d => byId(d.id)))));
 
   if (G.dawnWhy && G.dawnWhy.length){
     const w = el('div','card tight');
@@ -1872,7 +1901,9 @@ function rDay(){
     const passing = lead.length === 1 && best > thr;
     verdict.className = 'alert' + (passing ? ' ok' : '');
     verdict.innerHTML = passing
-      ? '<b>' + lead[0].name + '</b> has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.'
+      ? '<b>' + lead[0].name + '</b> has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.' +
+        // said before the button, not after: once it is tapped the screen has moved on
+        '<p class="note">' + revealNote([lead[0]]) + '</p>'
       : lead.length > 1 && best > 0
         ? 'Tied on ' + fmtN(best) + ': <b>' + lead.map(x=>x.name).join(', ') + '</b>. Nobody clears half.'
         : best === 0 ? 'No votes recorded yet.'
@@ -1932,6 +1963,14 @@ function renderHunter(){
   $('dySub').textContent = (hp ? hp.name + ' is dead \u2014 ' + cause + '. ' : '') +
     'The shot is not optional: he must take one living player with him.';
   const B = $('dyBody'); B.innerHTML = '';
+  /* The one death where the card matters most: the table is about to watch a second
+     person die, and under a revealing ruleset the open Hunter card is what explains it.
+     Under a hiding one, the shot is all they get — worth saying, so the moderator does
+     not improvise a reveal their table does not play with. */
+  if (hp) B.appendChild(el('p','note', revealNote([hp]) +
+    (cardsShownOnDeath()
+      ? ' Then he points — the open card is what tells the table why somebody else is dying.'
+      : ' The shot is the only thing the table sees; his card stays down.')));
   const targets = alive();
 
   if (!targets.length){
