@@ -47,6 +47,8 @@ const blocks = [
   src.match(/const hunterFiresPowerless = [^;]*;/)[0]
     .replace('const hunterFiresPowerless','globalThis.hunterFiresPowerless'),
   grab('kill').replace('function kill','globalThis.kill = function'),
+  grab('hunterWouldFire').replace('function hunterWouldFire','globalThis.hunterWouldFire = function'),
+  src.match(/const hunterShootsInTheNight = [^;]*;/)[0].replace('const hunterShootsInTheNight','globalThis.hunterShootsInTheNight'),
   grab('registerDeaths').replace('function registerDeaths','globalThis.registerDeaths = function'),
   grab('buildNight').replace('function buildNight','globalThis.buildNight = function'),
   grab('clockwiseWolfFrom').replace('function clockwiseWolfFrom','globalThis.clockwiseWolfFrom = function'),
@@ -79,6 +81,15 @@ function table(roles){
 }
 // the village hangs the Elder, which is what triggers the whole rule
 const hangTheElder = () => kill(G.players.find(p => p.role === 'elder'), 'vote');
+
+/* Slice exactly one role card. A lazy match to the next "\n }" runs past the card end and
+   swallows the ones that follow, which made an assertion about the Hunter fail on a pick:
+   belonging to some later role. */
+const card = id => {
+  const i = src.indexOf("{id:'" + id + "'");
+  const j = src.indexOf("\n {id:'", i);
+  return src.slice(i, j < 0 ? src.length : j);
+};
 
 console.log('THE TRIGGER STILL WORKS');
 t('hanging the Elder sets the flag', () => {
@@ -292,6 +303,103 @@ t('the line itself is still read aloud, which is the whole point', () => {
     ? true : 'the read-aloud line was suppressed, which re-opens the leak';
 });
 
+/* Asked at a table: "when does the Hunter fire, in his call to open eyes or after moderator
+   told him die? If after, how to fire — he'll point to someone or what?" He has no
+   recurring call at all, so the shot is triggered by his death; and the answer to "how" was
+   nowhere on the screen. A table that keeps cards face down can also take it privately in
+   the night, because the shot is the one power that identifies its holder by happening. */
+console.log('\nTHE SHOT IS TRIGGERED BY DEATH, NOT BY A CALL');
+t('the Hunter has no recurring night call to fire in', () => {
+  const c = card('hunter');
+  return !/every:/.test(c)
+    ? true : 'he wakes again, so the shot could be mistaken for a night action';
+});
+t('his night-one line only identifies him', () => {
+  const c = card('hunter');
+  return /show yourself to me only/.test(c) && !/pick:/.test(c)
+    ? true : 'his roll-call step asks him to do something';
+});
+t('the queue is what fires it, from registerDeaths', () => {
+  const rd = (src.match(/function registerDeaths\(chain\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /G\.pending\.hunterId = c\.p\.id/.test(rd) ? true : 'nothing queues the shot';
+});
+t('one predicate decides whether he fires, for both callers', () => {
+  // registerDeaths and the pre-dawn night check must not answer this differently
+  const uses = (src.match(/hunterWouldFire\(/g) || []).length;
+  return uses >= 3 ? true : 'only ' + uses + ' references; the answer can drift';
+});
+
+console.log('\nA PRIVATE NIGHT SHOT IS A HOUSE RULE');
+t('the default is public, under both rulesets', () => {
+  globalThis.G = { hunterNight:null, rules:'vn' };
+  const vn = hunterShootsInTheNight();
+  G.rules = 'mh';
+  return (!vn && !hunterShootsInTheNight())
+    ? true : 'a variant no ruleset describes became a default';
+});
+t('a table can turn it on, and the ruling survives switching ruleset', () => {
+  globalThis.G = { hunterNight:true, rules:'vn' };
+  const a = hunterShootsInTheNight(); G.rules = 'mh';
+  return (a && hunterShootsInTheNight()) ? true : 'the ruling was lost';
+});
+t('it is only reachable before the dawn announcement', () => {
+  const fn = (src.match(/if \(G\.si >= G\.steps\.length\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return /hunterShootsInTheNight\(\) && !G\.nightShotTaken/.test(fn) && /computeDawn\(\)/.test(fn)
+    ? true : 'the private shot is not wired into the end of the night: ' + fn;
+});
+t('it decides from the dawn plan, before anything is committed', () => {
+  const fn = (src.match(/if \(G\.si >= G\.steps\.length\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return /G\.dawn\.filter\(d => d\.on\)/.test(fn) && /hunterWouldFire\(/.test(fn)
+    ? true : 'it does not read the plan, so it cannot know a shot is owed';
+});
+t('the target joins the dawn list rather than being killed early', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /G\.dawn\.push\(\{ id:p\.id, cause:'shot', on:true \}\)/.test(fn)
+    ? true : 'killing it early would split one night into two announcements';
+});
+t('and the shot is marked taken, so dawn does not ask again', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  const rd = (src.match(/function registerDeaths\(chain\)\{[\s\S]*?\n\}/) || [''])[0];
+  /* EVERY private route out of this screen must mark it, not just the one that picks a
+     target: chose somebody, fired wide, and nobody left to hit. Asserting the string
+     appeared once let a mutation delete the main one and pass on the escape hatch. */
+  const routes = (fn.match(/if \(priv\)/g) || []).length;
+  const marks  = (fn.match(/G\.nightShotTaken = true/g) || []).length;
+  return (marks >= routes && marks >= 3 && /!G\.nightShotTaken/.test(rd))
+    ? true : marks + ' of ' + routes + ' private routes mark the shot taken';
+});
+t('the flag is cleared when the next night starts', () => {
+  const fn = (src.match(/function toNight\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /G\.nightShotTaken = false/.test(fn)
+    ? true : 'one private shot would suppress every later one';
+});
+t('a Hunter voted out is never routed to the private path', () => {
+  // it is decided at the end of the NIGHT; the vote path cannot reach it
+  const rv = (src.match(/function resolveVote\(p, tie\)\{[\s\S]*?\n\}/) || [''])[0];
+  return !/nightShot/.test(rv) ? true : 'a daylight hanging cannot be hidden';
+});
+
+console.log('\nTHE SCREEN EXPLAINS HOW HE ACTUALLY FIRES');
+t('it says to ask him out loud, and that he chooses', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /Say it out loud/.test(fn) && /He chooses, not you/.test(fn)
+    ? true : 'the moderator is still told only to "tap whoever he points at"';
+});
+t('the private variant says to wake him and nobody else', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /Wake him and nobody else/.test(fn) ? true : 'no procedure for the quiet shot';
+});
+t('and it admits the public shot identifies him whatever the card rule says', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /the shot identifies him whatever the card rule says/.test(fn)
+    ? true : '"his card stays down" would still read as "he stays secret"';
+});
+t('he is not offered as his own target', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /alive\(\)\.filter\(p => !hp \|\| p\.id !== hp\.id\)/.test(fn)
+    ? true : 'a dying Hunter could be tapped as his own victim';
+});
+
 console.log('\nWHAT THE RULE DOES NOT TAKE');
 t('the badge survives — it is a title, not a card', () => {
   table(['elder','villager','wolf','wolf']);
@@ -354,7 +462,9 @@ t('every village card with a trigger is gated somewhere', () => {
   const cards = ['hunter','knight','idiot','scapegoat','beartamer','judge','littlegirl'];
   const missing = cards.filter(id =>
     !new RegExp("liveWith\\('" + id + "'\\)[\\s\\S]{0,80}powerGone").test(CODE) &&
-    !new RegExp("role === '" + id + "'[\\s\\S]{0,120}powerGone").test(CODE));
+    !new RegExp("role === '" + id + "'[\\s\\S]{0,120}powerGone").test(CODE) &&
+    // the Hunter's gate moved into hunterWouldFire, shared with the pre-dawn night check
+    !new RegExp("role !== '" + id + "'[\\s\\S]{0,160}powerGone").test(CODE));
   return missing.length === 0 ? true : 'still fires after the Elder: ' + missing.join(', ');
 });
 

@@ -22,6 +22,8 @@ eval(src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','global
 eval(src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'));
 eval(src.match(/function teamOf\(p\)\{[\s\S]*?\n\}/)[0].replace('function teamOf','globalThis.teamOf = function'));
 eval(src.match(/const powerGone = [^;]*;/)[0].replace('const powerGone','globalThis.powerGone'));
+eval(src.match(/function hunterWouldFire\(p, cause\)\{[\s\S]*?\n\}/)[0]
+  .replace('function hunterWouldFire','globalThis.hunterWouldFire = function'));
 eval(src.match(/function registerDeaths\(chain\)\{[\s\S]*?\n\}/)[0]
   .replace('function registerDeaths','globalThis.registerDeaths = function'));
 
@@ -82,12 +84,81 @@ for (const cause of ['wolves','vote','tie','grief','white','rust','shot']){
 t('a poison override does not disturb the other causes', () =>
   shoots('vn', false, 'wolves').fired ? true : 'forcing no broke a normal death');
 
-console.log('\nTHREE RULES, NOT TWO');
-t('the panel offers all three disputed rules', () => {
+console.log('\nEVERY DISPUTED RULE IS OFFERED');
+t('the panel offers all four disputed rules', () => {
   const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
-  const want = ['selfHeal','hunterPoison','hunterElder'];
+  const want = ['selfHeal','hunterPoison','hunterElder','showCards'];
   const missing = want.filter(k => !keys.includes(k));
   return missing.length === 0 ? true : 'not offered: ' + missing.join(', ');
+});
+
+/* Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open
+   the card or not?" The app said nothing about the cards at any death — while shipping a
+   Devoted Servant whose own text defined her window as "before an eliminated player's card
+   is revealed", presupposing a step that never existed. */
+console.log('\nTHE CARD ON A DEATH');
+eval(src.match(/const cardsShownOnDeath = [^;]*;/)[0].replace('const cardsShownOnDeath','globalThis.cardsShownOnDeath'));
+eval(src.match(/function revealNote\(dead\)\{[\s\S]*?\n\}/)[0].replace('function revealNote','globalThis.revealNote = function'));
+const reveals = (rules, override) => {
+  globalThis.G = { rules, showCards:override, selfHeal:null, hunterPoison:null };
+  return cardsShownOnDeath();
+};
+t('Miller’s Hollow turns every card face up', () =>
+  reveals('mh', null) ? true : 'the published rule reveals every elimination, night or day');
+t('Ma Sói Việt Nam does not', () =>
+  !reveals('vn', null) ? true : 'không lật bài is the common Vietnamese practice');
+t('a table can overrule either way', () =>
+  (reveals('vn', true) && !reveals('mh', false)) ? true : 'the override is ignored');
+t('and the ruling survives switching ruleset', () => {
+  globalThis.G = { rules:'vn', showCards:true, selfHeal:null, hunterPoison:null };
+  const a = cardsShownOnDeath(); G.rules = 'mh';
+  return (a && cardsShownOnDeath()) ? true : 'the ruling was lost on switching';
+});
+t('the instruction says which way, in plain words', () => {
+  reveals('mh', null);
+  const up = revealNote([{ name:'An', role:'seer' }]);
+  reveals('vn', null);
+  const down = revealNote([{ name:'An', role:'seer' }]);
+  return (/face up/.test(up) && /face down/.test(down))
+    ? true : 'up=' + up + ' down=' + down;
+});
+t('the Village Idiot is shown even at a table that hides every other card', () => {
+  reveals('vn', null);
+  const note = revealNote([{ name:'Bình', role:'idiot', revealed:true }]);
+  return (/Bình/.test(note) && /must be shown/.test(note))
+    ? true : 'the village would have no reason to spare him: ' + note;
+});
+t('but an unrevealed Idiot is not called out', () => {
+  reveals('vn', null);
+  const note = revealNote([{ name:'Bình', role:'idiot', revealed:false }]);
+  return !/must be shown/.test(note) ? true : 'named him before his power triggered';
+});
+t('it is said at the dawn announcement', () => {
+  // the guard, not just the call: a disabled call still contains the word revealNote
+  const fn = (src.match(/function rDawn\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /if \(on\.length\) B\.appendChild\(el\('p','note', revealNote\(/.test(fn)
+    ? true : 'night deaths become public with nothing said, or the call is unreachable';
+});
+t('and at the vote, before the button that commits it', () => {
+  const day = (src.match(/function rDay\(\)\{[\s\S]*?\n  \}\n\}/) || [''])[0];
+  const iNote = day.indexOf('revealNote('), iHang = day.indexOf("t:'Hang '");
+  return (iNote > -1 && iHang > -1 && iNote < iHang)
+    ? true : 'said after the tap, by which time the screen has moved on';
+});
+t('and on the Hunter screen, which is where it was asked about', () => {
+  const fn = (src.match(/function renderHunter\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /if \(hp\) B\.appendChild\(el\('div','card tight', priv/.test(fn) && /revealNote\(\[hp\]\)/.test(fn)
+    ? true : 'the death that most needs it says nothing, or the call is unreachable';
+});
+t('no branch in the app is switched off with a literal', () => {
+  // a general catch: this is exactly how the two tests above used to pass while disabled
+  const dead = [...src.matchAll(/if \((?:false|true)\)/g)].map(m => m[0]);
+  return dead.length === 0 ? true : 'dead or forced branch: ' + dead.join(', ');
+});
+t('the Servant no longer presupposes a reveal that may not happen', () => {
+  const d = (src.match(/id:'servant'[\s\S]*?d:'([^']*)'/) || [,''])[1];
+  return /if your table turns them/.test(d)
+    ? true : 'her window is still defined by a step this app may not perform: ' + d;
 });
 t('every rule in the panel has a live accessor', () => {
   const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);

@@ -102,7 +102,7 @@ const ROLES = [
   say:'Scapegoat, show yourself to me only, then close your eyes.',
   sayVi:'Vật Tế Thần cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'servant',name:'Devoted Servant',vi:'Người Hầu Trung Thành',team:'village',set:'Characters',max:1,n1:96,
-  d:'Before an eliminated player\u2019s card is revealed, she may show her own and take their role instead.',
+  d:'At the moment somebody is eliminated \u2014 before their card is turned up, if your table turns them \u2014 she may show her own and take their role instead.',
   say:'Devoted Servant, show yourself to me only, then close your eyes.',
   sayVi:'Người Hầu Trung Thành cho tôi thấy mặt, rồi nhắm mắt lại.'},
 ];
@@ -229,7 +229,7 @@ function blank(){
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
     infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
-    selfHeal:null, hunterPoison:null, hunterElder:null, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
+    selfHeal:null, hunterPoison:null, hunterElder:null, showCards:null, hunterNight:null, nightShotTaken:false, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
     dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
 G = blank();
@@ -321,6 +321,35 @@ const hunterFiresPoisoned = () => G.hunterPoison == null ? G.rules !== 'vn' : G.
    card says he fires "if he is killed by any reason", which sounds absolute. Default is
    no shot — the shot is a power, and the power is gone. */
 const hunterFiresPowerless = () => G.hunterElder == null ? false : G.hunterElder;
+/* Is a dead player's card turned face up? Miller’s Hollow reveals every elimination,
+   night or day, with no exception — which is why the Devoted Servant's window is defined
+   as "before an eliminated player's card is revealed". Vietnamese tables commonly do not
+   (không lật bài), because hidden cards make the deduction harder.
+   The app used to say nothing either way, at any death, while shipping a Servant whose
+   card presupposed a reveal step that never happened. */
+const cardsShownOnDeath = () => G.showCards == null ? G.rules !== 'vn' : G.showCards;
+/* A Hunter eaten in the night: is the shot taken publicly at dawn, or privately while the
+   table still has its eyes shut? Public is the published flow and the default under both
+   rulesets \u2014 no ruleset describes the private variant, so this must not claim one.
+   It exists because the shot is the one power that cannot be hidden: a dead player points
+   and somebody drops, which tells the table who he was whatever the card rule says. A
+   table that keeps cards face down can take the target in the night and announce both
+   deaths together at dawn, explaining neither. Reachable only for a NIGHT death \u2014 a
+   Hunter voted out fires in daylight, and nothing hides that. */
+const hunterShootsInTheNight = () => G.hunterNight == null ? false : G.hunterNight;
+/* What to tell the moderator at the moment a death becomes public. The Idiot is the one
+   card that overrides the setting: being shown is HOW the village learns to spare him, so
+   a table that hides every other card still has to turn his. */
+function revealNote(dead){
+  const idiot = (dead || []).filter(p => p && p.role === 'idiot' && p.revealed);
+  const show = cardsShownOnDeath();
+  const parts = [];
+  if (show) parts.push('<b>Turn their card face up</b> so the table sees who they were.');
+  else parts.push('<b>Leave their card face down.</b> Announce the name only — this table does not reveal.');
+  if (idiot.length) parts.push((show ? '' : 'Except ') + idiot.map(p => p.name).join(', ') +
+    ': the Village Idiot must be shown either way, or the village has no reason to spare him.');
+  return parts.join(' ');
+}
 const fmtN = n => (Math.round(n * 100) / 100).toString();
 
 /* The two UI controls use the same monochrome sprite as the roles. This replaced a
@@ -656,26 +685,35 @@ function computeDawn(){
 /* A death can interrupt the flow: the Hunter fires, a dying Sheriff hands on the
    badge. Both can happen at night as well as by daylight, so the queue records
    them and `proceed` returns to wherever we were. */
+/* Will this Hunter fire, and if not, why not? TWO callers need the same answer: the
+   queueing below, once a death is committed, and the pre-dawn check that must know BEFORE
+   committing anything whether a private night shot is owed. Asking it in two places is how
+   two answers drift apart.
+
+   Vietnamese play (and 狼人杀 before it) holds that poison leaves no time to aim: the
+   Hunter fires when eaten or hanged, but not when poisoned. Miller’s Hollow says he fires
+   whatever the cause. Matched on the cause CODE \u2014 it used to be /poison/ against the
+   sentence, so renaming the potion, or translating it, would have switched the rule off
+   with nothing failing. */
+function hunterWouldFire(p, cause){
+  if (!p || p.role !== 'hunter') return { fires:false };
+  if (powerGone(p) && !hunterFiresPowerless())
+    return { fires:false, why: p.name + ' was the Hunter, but the village killed the Elder \u2014 the ' +
+      'gun is as dead as every other villager power. No shot. ' +
+      'Change that under House rules if your table plays otherwise.' };
+  if (!hunterFiresPoisoned() && cause === 'poison')
+    return { fires:false, why: p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no ' +
+      'shot. Change that under House rules if your table plays otherwise.' };
+  return { fires:true };
+}
 function registerDeaths(chain){
   for (const c of chain){
     log(c.p.name + ' died \u2014 ' + (c.cause === 'grief' ? 'of grief' : causeLabel(c.cause)) + '.');
-    if (c.p.role === 'hunter' && !G.pending.hunterId){
-      // Vietnamese play (and 狼人杀 before it) holds that poison leaves no time to
-      // aim: the Hunter fires when eaten or hanged, but not when poisoned.
-      // Miller’s Hollow says he fires whatever the cause. Matched on the cause CODE:
-      // it used to be /poison/ against the sentence, so renaming the potion — or
-      // translating it — would have turned the rule off with nothing failing.
-      if (powerGone(c.p) && !hunterFiresPowerless()){
-        log(c.p.name + ' was the Hunter, but the village killed the Elder \u2014 the gun is ' +
-            'as dead as every other villager power. No shot. ' +
-            'Change that under House rules if your table plays otherwise.');
-      } else if (!hunterFiresPoisoned() && c.cause === 'poison'){
-        log(c.p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
-            'Change that under House rules if your table plays otherwise.');
-      } else {
-        G.pending.hunterId = c.p.id;
-        G.pending.hunterCause = c.cause;
-      }
+    // a shot already taken privately in the night is not owed a second time at dawn
+    if (c.p.role === 'hunter' && !G.pending.hunterId && !G.nightShotTaken){
+      const v = hunterWouldFire(c.p, c.cause);
+      if (!v.fires) log(v.why);
+      else { G.pending.hunterId = c.p.id; G.pending.hunterCause = c.cause; }
     }
     if (c.p.sheriff) G.pending.badge = true;
   }
@@ -1204,6 +1242,19 @@ function houseRulesUI(){
            'còn bài Thợ Săn nói bắn khi \u201cchết vì bất cứ lý do gì\u201d. Không bộ luật nào xử vụ này, ' +
            'nên mặc định là <b>không bắn</b> \u2014 phát súng là một phép, và phép đã mất. ' +
            'Bàn nào coi súng là vật chứ không phải phép thì chọn \u201cCó\u201d.' },
+    { key:'showCards', q:'Người chết có lật bài không?',
+      en:'Is a dead player\u2019s card turned face up?',
+      now:cardsShownOnDeath(), byRule:byTradition,
+      note:'Miller’s Hollow lật <b>mọi</b> lá \u2014 chết đêm hay bị treo, không trừ ai. ' +
+           'Nhiều bàn Ma Sói Việt Nam thì <b>không lật bài</b> cho khó đoán hơn. ' +
+           'Riêng Thằng Ngốc luôn phải lật, vì đó là cách dân làng biết mà tha.' },
+    { key:'hunterNight', q:'Thợ Săn bị sói ăn \u2014 bắn ngay trong đêm?',
+      en:'Is a night-eaten Hunter\u2019s shot taken privately, during the night?',
+      now:hunterShootsInTheNight(), byRule:false,
+      note:'Mặc định là <b>không</b>: công bố người chết rồi Thợ Săn chỉ trước mặt cả bàn, ' +
+           'đúng như luật in. Chọn <b>Có</b> thì lấy mục tiêu lúc mọi người còn nhắm mắt, ' +
+           'rồi sáng ra đọc cả hai cái chết mà không giải thích \u2014 dành cho bàn không lật bài. ' +
+           'Chỉ áp dụng khi bị ăn đêm: bị treo ban ngày thì không cách nào giấu.' },
   ];
   for (const r of rows){
     wrap.appendChild(el('div','grp', r.q + ' \u00b7 ' + r.en));
@@ -1285,7 +1336,18 @@ function rNight(){
   show('sNight');
   if (G.si >= G.steps.length){
     if (G.night === 1) return finishRollCall();
-    G.phase = 'dawn'; computeDawn(); render(); return;
+    G.phase = 'dawn'; computeDawn();
+    /* A table that takes the shot privately needs it BEFORE the announcement, so both
+       deaths are read out together and neither is explained. computeDawn has produced the
+       plan but committed none of it, which is exactly the window: the Hunter is still
+       alive, so he can still be asked. */
+    if (hunterShootsInTheNight() && !G.nightShotTaken){
+      const doomed = G.dawn.filter(d => d.on).map(d => ({ d, p: byId(d.id) }));
+      const h = doomed.find(x => x.p && x.p.role === 'hunter' &&
+        hunterWouldFire(x.p, x.d.cause).fires);
+      if (h){ G.pending.nightShot = h.p.id; G.phase = 'hunter'; }
+    }
+    render(); return;
   }
   const s = G.steps[G.si], info = stepInfo(s);
   const roll = !!s.roll;
@@ -1629,6 +1691,9 @@ function rDawn(){
   const say = el('div','say');
   say.innerHTML = '<div class="lbl">Read aloud</div><p>' + head + '</p>';
   B.appendChild(say);
+  // What to do with the cards. Said here because this is the moment the deaths become
+  // public, and the app used to leave it entirely unstated.
+  if (on.length) B.appendChild(el('p','note', revealNote(on.map(d => byId(d.id)))));
 
   if (G.dawnWhy && G.dawnWhy.length){
     const w = el('div','card tight');
@@ -1872,7 +1937,9 @@ function rDay(){
     const passing = lead.length === 1 && best > thr;
     verdict.className = 'alert' + (passing ? ' ok' : '');
     verdict.innerHTML = passing
-      ? '<b>' + lead[0].name + '</b> has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.'
+      ? '<b>' + lead[0].name + '</b> has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.' +
+        // said before the button, not after: once it is tapped the screen has moved on
+        '<p class="note">' + revealNote([lead[0]]) + '</p>'
       : lead.length > 1 && best > 0
         ? 'Tied on ' + fmtN(best) + ': <b>' + lead.map(x=>x.name).join(', ') + '</b>. Nobody clears half.'
         : best === 0 ? 'No votes recorded yet.'
@@ -1924,26 +1991,70 @@ function resolveVote(p, tie){
   G.resume = 'night';
   proceed();
 }
+/* Two shapes, one screen. Publicly at dawn or after a vote, which is the published flow;
+   or privately before the announcement, for a table that keeps cards face down and does
+   not want the shot to identify him.
+
+   The private one commits nothing itself: it adds the target to G.dawn, which applyDawn
+   is about to walk anyway, so both deaths are announced together and the moderator
+   explains neither. */
 function renderHunter(){
   show('sDay');
-  const hp = byId(G.pending.hunterId);
+  const priv = !!G.pending.nightShot;
+  const hp = byId(priv ? G.pending.nightShot : G.pending.hunterId);
   const cause = causeLabel(G.pending.hunterCause) || 'his death';
-  $('dyTitle').textContent = 'The Hunter fires';
-  $('dySub').textContent = (hp ? hp.name + ' is dead \u2014 ' + cause + '. ' : '') +
-    'The shot is not optional: he must take one living player with him.';
+  $('dyTitle').textContent = priv ? 'The Hunter fires \u2014 quietly' : 'The Hunter fires';
+  $('dySub').textContent = priv
+    ? 'The pack took the Hunter tonight. Nobody has opened their eyes yet, so the shot is ' +
+      'taken now and both deaths are read out together at dawn.'
+    : (hp ? hp.name + ' is dead \u2014 ' + cause + '. ' : '') +
+      'The shot is not optional: he must take one living player with him.';
   const B = $('dyBody'); B.innerHTML = '';
-  const targets = alive();
+
+  /* How the shot physically happens \u2014 the thing the screen never said. "Tap whoever he
+     points at" assumed the moderator already knew they were meant to ask a dead player to
+     point, out loud, in front of everybody. */
+  if (hp) B.appendChild(el('div','card tight', priv
+    ? '<b>Wake him and nobody else.</b> Touch his shoulder, let him point at one living ' +
+      'player, then have him close his eyes again. Say nothing aloud.' +
+      '<p class="note">He is dead either way \u2014 this only decides whether the table learns ' +
+      'it was him. At dawn you will name two deaths and explain neither.</p>'
+    : '<b>Say it out loud: ' + hp.name + ' was the Hunter, and he takes somebody with him.</b>' +
+      '<p class="note">' + revealNote([hp]) +
+      ' He chooses, not you \u2014 let him point at a living player in front of everyone, then ' +
+      'tap that person below. He is already dead and out of the game, so there is nothing ' +
+      'left to keep from him.' +
+      (cardsShownOnDeath() ? '' :
+        ' Note that the shot identifies him whatever the card rule says: a dead player ' +
+        'points and somebody drops. If your table wants him hidden, take the shot in the ' +
+        'night instead \u2014 see House rules.') + '</p>'));
+
+  const targets = alive().filter(p => !hp || p.id !== hp.id);
 
   if (!targets.length){
     B.appendChild(el('div','card tight','There is nobody left for him to hit.'));
-    bar([{ t:'Continue \u2192', wide:true, on:() => { snap(); G.pending.hunterId = null; proceed(); } }]);
+    bar([{ t:'Continue \u2192', wide:true, on:() => { snap();
+      G.pending.hunterId = null; G.pending.nightShot = null;
+      // marked taken here too, or dawn would queue the same empty shot a second time
+      if (priv){ G.nightShotTaken = true; G.phase = 'dawn'; render(); } else proceed(); } }]);
     return;
   }
 
   B.appendChild(el('div','alert','He <b>must</b> choose somebody. The rules give him no option to spare the village \u2014 tap whoever he points at.'));
   const c = el('div','chips');
   for (const p of targets) c.appendChild(chip(p, { on:() => {
-    snap(); G.pending.hunterId = null; G.pending.hunterCause = null;
+    snap();
+    if (priv){
+      /* Not killed here: it goes on the dawn list applyDawn is about to walk, so the
+         grief chain, the Knight's rust and the announcement all treat it as one night. */
+      G.pending.nightShot = null;
+      G.nightShotTaken = true;
+      if (!G.dawn.some(d => d.id === p.id)) G.dawn.push({ id:p.id, cause:'shot', on:true });
+      G.dawnWhy = (G.dawnWhy || []).concat('The Hunter fired as he died. Announce both, explain neither.');
+      log('The Hunter was taken in the night and shot ' + p.name + ' before dawn.');
+      G.phase = 'dawn'; render(); return;
+    }
+    G.pending.hunterId = null; G.pending.hunterCause = null;
     registerDeaths(kill(p, 'shot'));
     proceed();
   }}));
@@ -1951,8 +2062,11 @@ function renderHunter(){
 
   // a moderator still needs an escape hatch, but it should be labelled honestly
   const esc = el('button','btn sec sm','House rule: he fired wide and hit nobody');
-  esc.onclick = () => { snap(); G.pending.hunterId = null; G.pending.hunterCause = null;
-    log('By house rule the Hunter\u2019s shot hit nobody.'); proceed(); };
+  esc.onclick = () => { snap();
+    G.pending.hunterId = null; G.pending.hunterCause = null;
+    log('By house rule the Hunter\u2019s shot hit nobody.');
+    if (priv){ G.pending.nightShot = null; G.nightShotTaken = true; G.phase = 'dawn'; render(); }
+    else proceed(); };
   B.appendChild(esc);
   bar([]);
 }
@@ -1992,7 +2106,7 @@ function renderScapegoat(){
 }
 function toNight(){
   const w = checkWin(); if (w) return finish(w);
-  G.night++; G.phase = 'night'; buildNight();
+  G.night++; G.phase = 'night'; G.nightShotTaken = false; buildNight();
   log('Night falls again.','Night ' + G.night);
   render();
 }

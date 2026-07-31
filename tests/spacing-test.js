@@ -28,12 +28,20 @@ t('an empty container adds no stray gap', () =>
   /:not\(:empty\)/.test(src) ? true : 'an empty #advice would still push the page down');
 
 console.log('\nEVERY CONTAINER THE APP WRITES INTO IS A STACK');
-// find every element the code appends children to, then check its markup
+/* Find every element the code appends children to, then check its markup.
+   Discovery used to require the appendChild within 80 characters of the lookup, which
+   made the test a proximity heuristic rather than a check: adding a comment between
+   `const B = $('dyBody')` and the first append silently dropped dyBody from the list and
+   stopped it being checked at all. It now follows the variable, wherever it is used. */
 const targets = new Set();
 for (const m of js.matchAll(/\$\('(\w+)'\)/g)) targets.add(m[1]);
-const written = [...targets].filter(id =>
-  new RegExp("(const \\w+ = )?\\$\\('" + id + "'\\)(\\.innerHTML = ''|\\.appendChild)").test(js) ||
-  new RegExp("\\b\\w+ = \\$\\('" + id + "'\\);[\\s\\S]{0,80}\\.appendChild").test(js));
+const written = [...targets].filter(id => {
+  // appended to directly: $('x').appendChild(...) — or cleared, which implies ownership
+  if (new RegExp("\\$\\('" + id + "'\\)(\\.innerHTML = ''|\\.appendChild)").test(js)) return true;
+  // or bound to a variable that is appended to somewhere
+  const bound = [...js.matchAll(new RegExp("(\\w+) = \\$\\('" + id + "'\\)", 'g'))].map(m => m[1]);
+  return bound.some(v => new RegExp('\\b' + v + '\\.appendChild').test(js));
+});
 t('at least eight write targets were discovered', () =>
   written.length >= 8 ? true : 'only found ' + written.join(', '));
 const notStack = [];
@@ -41,7 +49,8 @@ for (const id of written){
   const tag = (src.match(new RegExp('<div[^>]*id="' + id + '"[^>]*>')) || [''])[0];
   if (!tag) continue;                                    // built in JS, not static markup
   const isStack = /class="[^"]*\bstack\b/.test(tag);
-  const isOther = /class="[^"]*\b(roles|ros|deal|log|chips)\b/.test(tag);  // has its own gap
+  // `in` is the bar's button row — .bar .in is a flex row with its own gap
+  const isOther = /class="[^"]*\b(roles|ros|deal|log|chips|in)\b/.test(tag);  // has its own gap
   if (!isStack && !isOther) notStack.push(id + ' -> ' + tag);
 }
 t('none of them is missing its spacing mechanism', () =>
