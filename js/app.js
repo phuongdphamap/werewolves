@@ -1319,7 +1319,7 @@ function rRoles(){
   const reach = chars ? Object.keys(SHUF).filter(id =>
     R[id].set === 'Characters' && n >= SHUF[id][1]).map(id => R[id].vi) : [];
   rec.appendChild(el('div','grp', T('Bộ bài cho ' + n + ' người', 'A deck for ' + n)));
-  const rr = el('div','row'); rr.style.flexWrap = 'wrap';
+  const rr = el("div","row flow");
   const bS = el('button','btn sm', icon('shuffle') + T('Xáo bộ mới','Shuffle'));
   bS.onclick = () => { snap(); G.counts = shuffleDeck(n, chars); render(); };
   const bR = el('button','btn sm sec', T('Bộ đề xuất','Suggested'));
@@ -1788,12 +1788,15 @@ function rNight(){
       ? T('\u2713 \u0110ang c\u1ee9u ', '\u2713 Saving ') : T('C\u1ee9u ', 'Save ')) + v.name);
       b.disabled = blockSelf;
       b.onclick = () => { G.n.witchSave = !G.n.witchSave; render(); };
-      B.appendChild(b);
+      /* One row, so the two read as a choice rather than as one control with a tail. */
+      const row = el("div","row flow");
+      row.appendChild(b);
       if (blockSelf){
-        const allow = el('button','btn sm sec', T('B\u00e0n n\u00e0y cho t\u1ef1 c\u1ee9u','Our table allows self-rescue'));
+        const allow = el("button","btn sm sec", T('B\u00e0n n\u00e0y cho t\u1ef1 c\u1ee9u','Our table allows self-rescue'));
         allow.onclick = () => { snap(); G.selfHeal = true; render(); };
-        B.appendChild(allow);
+        row.appendChild(allow);
       }
+      B.appendChild(row);
     }
     if (G.witchPoison){
       B.appendChild(el('div','grp', T('\u0110\u1ea7u \u0111\u1ed9c ai \u0111\u00f3 (kh\u00f4ng b\u1eaft bu\u1ed9c)','Poison someone (optional)')));

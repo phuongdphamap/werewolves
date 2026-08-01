@@ -626,6 +626,8 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
 | B-74 | The long prose ignored the language switch entirely | Reported from screenshots: an English interface serving Vietnamese essays. The `.tell` sweep in v6 covered the short blocks but not the four collapsible bodies, the ruleset gloss (`Miller’s Hollow (bản gốc)` in both directions), or **role descriptions** — which the night call puts under every heading and the deck list puts in every row, so a Vietnamese moderator read an English paragraph on every single step. The `order` explainer was the worst shape: it chose its text by *ruleset*, so the language you got depended on which rules you were playing. Content per ruleset, language per `T()` — four texts, not two. All 26 cards now carry a `dVi`, reached through one `rDesc()` accessor that falls back to the English rather than to nothing. |
+| B-77 | Two buttons side by side had **no gap between them** | Reported from a screenshot: on the Witch screen the disabled "Save X" sat welded to "Our table allows self-rescue". Both were appended straight into `#nBody`, and a bare `.btn` is inline-block — so the stack handed each a *vertical* `margin-top` that does nothing to boxes laid out horizontally, and the horizontal gap measured **0**. They are one `.row.flow` now: a real flex row with the standard 10px gap, wrapping because two full labels do not fit a phone. |
+| B-78 | The fix for B-77 shipped as `.row.wrap`, which **inherited the root container** | `.wrap` is the app's top-level layout element — `display:flex; flex-direction:column`. A modifier named `.row.wrap` matched it too, so the pair stacked vertically instead of sitting side by side. Caught by measuring `flexDirection` and finding `column` where the row rule says `row`; renamed to `.row.flow`. A modifier that reuses a layout class name silently takes its declarations, and `spacing-test.js` now refuses any that do. |
 | B-76 | A stack that followed prose got **no gap at all** | Reported from a screenshot: the "Which route should I take?" collapsible sat flush against the deal note. The structural rule paired stack with stack — `.stack:not(:empty) + .stack:not(:empty)` — so `#dealAlt`, whose previous sibling is a plain `<p>`, was given nothing, and its first child gets no `* + *` either. Measured at **0px** where every other gap on that screen was 20. Generalised to `* + .stack:not(:empty)`; margins collapse, so a neighbour with its own bottom margin (`.sub` at 28) still wins and nothing compounds. |
 | B-75 | A collapsible body was **padded unevenly** | `14px 20px 20px`, so the prose sat visibly nearer the divider above it than the border below. Spotted in a screenshot, confirmed by measuring. The summary keeps its own 14/20 because it is a row; a body is a panel, and a panel is padded like `.card`. |
 | B-73 | The vote tallies could **sum past the electorate** | Reported from a game: nine players, five votes recorded on one name and nine on another — fourteen hands from nine people, and a leader the table never produced. Each box was clamped to `voters.length` **on its own**, with nothing bounding the total. The over-count warning fired but only warned; the vote still carried on impossible arithmetic. The cap is now what is *left*: `voters.length` minus the hands already on other names. It never falls below what a name already holds, so a tally that is somehow over — a resumed save, an electorate that shrank mid-count — can still be corrected downwards instead of every box locking to zero. |
@@ -720,7 +722,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   894 assertions across 30 suites, 0 failing
+#   899 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -752,7 +754,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**894 assertions plus 57,000 generated decks.**
+**899 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -976,6 +978,18 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     readout in the bar and pinned by a suite. Everything downstream was careful and the
     premise was never checked. When a rule is *this* load-bearing — every day phase of
     every game — the cheap step is reading the box.
+
+35. **A vertical margin does nothing to boxes laid out horizontally.** `.stack` hands every
+    child a `margin-top`, which is exactly right for blocks and useless for two inline-block
+    buttons that share a line: they get 20px above the line and 0px between them (B-77).
+    When two controls belong side by side, the container has to say so — a row with a gap,
+    not two children of a column.
+
+36. **Never name a modifier after a layout class.** `.row.wrap` looked like "a row that
+    wraps" and was also `.wrap`, the app's root container, so it inherited
+    `flex-direction:column` and did the opposite of its name (B-78). CSS has no namespaces;
+    a two-class selector matches anything carrying both. The check is cheap and now
+    automatic.
 
 ---
 

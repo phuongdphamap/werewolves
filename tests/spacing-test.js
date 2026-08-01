@@ -91,6 +91,58 @@ t('and every step the rhythm uses is one that exists', () => {
   return unknown.length === 0 ? true : 'undeclared step(s): ' + unknown.join(', ');
 });
 
+/* Two buttons side by side are a ROW, not two stack children. A bare .btn is inline-block,
+   so a stack hands it a vertical margin that does nothing horizontally and no gap at all —
+   the Witch's "Save X" rendered welded to "Our table allows self-rescue". Measured at 0px.
+   Reported from a screenshot. */
+console.log('\nSIDE-BY-SIDE BUTTONS ARE A ROW');
+t('no two buttons are appended straight into the same stack', () => {
+  /* Two .btn appended to the same container with nothing between them. An `} else {`
+     inside the span means they are alternatives — the dawn screen's adjust/hide pair —
+     and only one ever renders, so that is not the shape being caught. */
+  const bad = [...js.matchAll(/(\w+)\.appendChild\((\w+)\);([\s\S]{0,400}?)\1\.appendChild\((\w+)\);/g)]
+    .filter(m => {
+      if (/\}\s*else\s*\{/.test(m[3] === undefined ? '' : m[3])) return false;
+      const both = new RegExp("const " + m[2] + " = el\\('button','btn[\\s\\S]*?const " + m[4] + " = el\\('button','btn");
+      return m[1] === 'B' && both.test(js);
+    })
+    .map(m => m[2] + ' + ' + m[4]);
+  return bad.length === 0
+    ? true : 'buttons sharing a stack with no row between them: ' + bad.join(', ');
+});
+t('the row modifier exists and only adds wrapping', () => {
+  const r = (src.match(/\.row\.flow\{[^}]*\}/) || [''])[0];
+  return /^\.row\.flow\{flex-wrap:wrap\}$/.test(r.replace(/\s+/g, ''))
+    ? true : 'the modifier does more than wrap: ' + (r || 'rule missing');
+});
+t('the Witch pair uses it', () => {
+  const w = (js.match(/const blockSelf = selfVictim[\s\S]*?B\.appendChild\(row\);/) || [''])[0];
+  return /el\("div","row flow"\)/.test(w) && /row\.appendChild\(b\)/.test(w) && /row\.appendChild\(allow\)/.test(w)
+    ? true : 'the two buttons are not in one row';
+});
+t('and the shuffle pair does too, rather than an inline style', () =>
+  !/style\.flexWrap/.test(js) && (js.match(/el\("div","row flow"\)/g) || []).length >= 2
+    ? true : 'a row still sets its wrapping from JavaScript');
+
+/* .row.wrap was the first name tried, and it inherited flex-direction:column from .wrap —
+   the app's ROOT container — which stacked the pair instead of spacing it. A modifier that
+   reuses a layout class name silently takes its declarations. */
+t('no component modifier collides with a top-level layout class', () => {
+  // comments name the collision to explain it; the check is about selectors
+  const bare = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  const layout = ['wrap', 'bar', 'in', 'stack', 'group'];
+  const bad = [];
+  for (const name of layout){
+    const re = new RegExp('\\.[a-z][\\w-]*\\.' + name + '\\b(?![\\w-])', 'g');
+    for (const m of bare.match(re) || []){
+      if (/^\.(stack|group)\./.test(m)) continue;      // scoping, not a modifier
+      bad.push(m);
+    }
+  }
+  return bad.length === 0
+    ? true : 'modifier(s) inherit a layout class: ' + [...new Set(bad)].join(', ');
+});
+
 console.log('\nEVERY ELEMENT THE APP ADDRESSES EXISTS');
 t('no $() lookup is missing from the markup', () => {
   const ids = [...new Set([...js.matchAll(/\$\('(\w+)'\)/g)].map(m => m[1]))];
