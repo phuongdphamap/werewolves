@@ -533,8 +533,16 @@ language plus twenty untranslated blocks is worse than the bilingual noise it re
 (B-70). `lang-test.js` walks every `.tell` and `.alert` construction and fails on any prose
 literal not reached through `T()`; that scan found two blocks the hand sweep missed.
 
-Still English-only: the long explanatory essays behind the deck-screen collapsibles, and
-the chronicle log. Both are reference rather than instruction, and neither is read out.
+Everything a moderator reads on screen is paired: labels, headings, buttons, house-rule
+notes, the four collapsible essays, and all 26 role descriptions (`dVi`, reached through
+`rDesc()`, which falls back to the English so a card added without one still says
+something). The role description is the one that mattered most — the night call puts it
+under every heading and the deck list puts it in every row (B-74).
+
+**Still English-only: the chronicle.** Log entries are written once, at the moment they
+happen, and stored as finished strings — translating the writers would not retranslate a
+game already in progress, and a record of what was said is arguably not a label at all.
+It is the one surface left, and it is deliberate.
 
 ### The teaching layer retires itself
 
@@ -607,6 +615,8 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-63 | "His card stays down" implied the Hunter could be **kept secret** | Copy I added one commit earlier. True about the card and wrong about the secret: a dead player points and somebody drops, which identifies him whatever the reveal rule says — and a Hunter voted out fires in daylight, where nothing can hide it. The screen now says so, and points at the one arrangement that does hide him: take the shot in the night. |
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
+| B-74 | The long prose ignored the language switch entirely | Reported from screenshots: an English interface serving Vietnamese essays. The `.tell` sweep in v6 covered the short blocks but not the four collapsible bodies, the ruleset gloss (`Miller’s Hollow (bản gốc)` in both directions), or **role descriptions** — which the night call puts under every heading and the deck list puts in every row, so a Vietnamese moderator read an English paragraph on every single step. The `order` explainer was the worst shape: it chose its text by *ruleset*, so the language you got depended on which rules you were playing. Content per ruleset, language per `T()` — four texts, not two. All 26 cards now carry a `dVi`, reached through one `rDesc()` accessor that falls back to the English rather than to nothing. |
+| B-75 | A collapsible body was **padded unevenly** | `14px 20px 20px`, so the prose sat visibly nearer the divider above it than the border below. Spotted in a screenshot, confirmed by measuring. The summary keeps its own 14/20 because it is a row; a body is a panel, and a panel is padded like `.card`. |
 | B-73 | The vote tallies could **sum past the electorate** | Reported from a game: nine players, five votes recorded on one name and nine on another — fourteen hands from nine people, and a leader the table never produced. Each box was clamped to `voters.length` **on its own**, with nothing bounding the total. The over-count warning fired but only warned; the vote still carried on impossible arithmetic. The cap is now what is *left*: `voters.length` minus the hands already on other names. It never falls below what a name already holds, so a tally that is somehow over — a resumed save, an electorate that shrank mid-count — can still be corrected downwards instead of every box locking to zero. |
 | B-72 | The day vote required an **absolute majority**, which neither rulebook prints | Asked at a table: should the most votes hang, or must it clear half? Both boxes say the most votes — *"the player with the most fingers pointing at them is convicted"* — with a re-vote on a tie and nobody hanged if it holds. Vietnamese play agrees: người nhiều phiếu nhất bị treo. The app demanded `best > TP/2`, and that is not a harmless stricter reading: on eight voters a decisive **4/3/1** split offered the moderator no Hang button at all, while the bar asked for a fifth vote that did not exist. The bigger the table the more the votes spread, so it got worse exactly as it mattered more — and it applied to every day phase of every game. Now plurality by default, with the majority available as a house rule. |
 | B-68 | The haptics button shipped as an **empty bordered box on every iPhone** | Reported from a phone. Two v5 findings interacted: P4 gave `.ico` `display:inline-flex` for its 44px floor, and P3 added a button hidden with the `hidden` attribute. An author `display` beats the UA stylesheet's `[hidden]{display:none}` regardless of specificity — author origin outranks user-agent origin — so on any browser without `navigator.vibrate` the control was never hidden. And `paintHaptic` returned *before* setting the label, so what remained was a bordered box with nothing in it. Fixed with a global `[hidden]{display:none !important}`, and by labelling before hiding so a future failure is at least readable. |
@@ -699,7 +709,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   874 assertions across 30 suites, 0 failing
+#   885 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -731,7 +741,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**874 assertions plus 57,000 generated decks.**
+**885 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 

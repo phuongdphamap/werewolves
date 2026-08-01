@@ -162,6 +162,27 @@ t('the generic rule alone would lose to the component', () => {
    its top margin and sat flush against whatever was above it, while the identical
    grp/chips/note pattern in a plain .card kept its 10px. Reported as "why is the content
    paragraph tight with the header above". */
+/* The body was padded 14 top against 20 sides and 20 bottom, so the prose sat visibly
+   nearer the divider above it than the border below. Reported from a screenshot. */
+console.log('\nA COLLAPSIBLE BODY IS PADDED EVENLY');
+t('the body pads all four sides the same', () => {
+  const r = (src.match(/\.expBody\{[^}]*\}/) || [''])[0];
+  const pad = (r.match(/padding:([^;]+);/) || [,''])[1].trim();
+  return pad === 'var(--s4)'
+    ? true : 'padding is ' + pad + ', so the text hugs one edge';
+});
+t('...and it matches what a .card uses, since both are panels', () => {
+  const card = (src.match(/\n  \.card\{[^}]*\}/) || [''])[0];
+  const body = (src.match(/\.expBody\{[^}]*\}/) || [''])[0];
+  const p = r => ((r.match(/padding:([^;}]+)/) || [,''])[1] || '').trim();
+  return p(card) === p(body) ? true : 'card=' + p(card) + ' expBody=' + p(body);
+});
+t('the summary keeps its own row padding, which is a different job', () => {
+  const r = (src.match(/\.exp > summary\{[^}]*\}/) || [''])[0];
+  return /padding:var\(--s3\) var\(--s4\)/.test(r)
+    ? true : 'the summary is no longer a row: ' + r;
+});
+
 console.log('\nA COMPONENT INSIDE A COLLAPSIBLE KEEPS ITS OWN SPACING');
 t('the prose rule is scoped to direct children', () =>
   /\.expBody > p\{/.test(src)

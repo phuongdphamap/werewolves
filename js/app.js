@@ -8,101 +8,101 @@
 ========================================================================== */
 const ROLES = [
  {id:'villager',name:'Simple Villager',vi:'Dân làng',team:'village',set:'Base',max:24,
-  d:'No power. Never wakes. Assigned automatically to whoever is left after the roll call.'},
+  d:'No power. Never wakes. Assigned automatically to whoever is left after the roll call.', dVi:'Kh\u00f4ng c\u00f3 ph\u00e9p. Kh\u00f4ng bao gi\u1edd th\u1ee9c. T\u1ef1 \u0111\u1ed9ng chia cho nh\u1eefng ai c\u00f2n l\u1ea1i sau khi \u0111i\u1ec3m danh.'},
  {id:'thief',name:'Thief',vi:'Ăn trộm',team:'village',set:'Base',max:1,n1:10,
-  d:'Two extra cards are dealt. On the first night he may swap his card for one of them. If both spares are Werewolves he must take one.',
+  d:'Two extra cards are dealt. On the first night he may swap his card for one of them. If both spares are Werewolves he must take one.', dVi:'Chia d\u01b0 hai l\u00e1. \u0110\u00eam \u0111\u1ea7u ti\u00ean anh ta c\u00f3 th\u1ec3 \u0111\u1ed5i l\u00e1 c\u1ee7a m\u00ecnh l\u1ea5y m\u1ed9t trong hai. N\u1ebfu c\u1ea3 hai l\u00e1 d\u01b0 \u0111\u1ec1u l\u00e0 Ma S\u00f3i th\u00ec b\u1eaft bu\u1ed9c ph\u1ea3i l\u1ea5y m\u1ed9t.',
   say:'Thief, wake up. Here are the two spare cards. Take one, or keep your own.',
   sayVi:'Ăn trộm thức dậy. Đây là hai lá bài còn lại. Đổi một lá, hoặc giữ lá của mình.',special:'thief'},
  {id:'cupid',name:'Cupid',vi:'Thần Tình Yêu',team:'village',set:'Base',max:1,n1:20,
-  d:'On the first night, designates two Lovers. If one dies the other dies of grief. A mixed pair wins alone together.',
+  d:'On the first night, designates two Lovers. If one dies the other dies of grief. A mixed pair wins alone together.', dVi:'\u0110\u00eam \u0111\u1ea7u ti\u00ean, ch\u1ec9 \u0111\u1ecbnh hai ng\u01b0\u1eddi th\u00e0nh C\u1eb7p \u0110\u00f4i. M\u1ed9t ng\u01b0\u1eddi ch\u1ebft th\u00ec ng\u01b0\u1eddi kia ch\u1ebft theo v\u00ec \u0111au bu\u1ed3n. C\u1eb7p kh\u00e1c phe th\u1eafng ri\u00eang v\u1edbi nhau.',
   say:'Cupid, wake up and point to the two people you are joining in love.',
   sayVi:'Thần Tình Yêu thức dậy và chỉ vào hai người mà bạn muốn nối tình yêu.',pick:2},
  {id:'judge',name:'Stuttering Judge',vi:'Quan Toà Nói Lắp',team:'village',set:'Characters',max:1,n1:24,
-  d:'Once per game, by a secret sign agreed with the moderator, he forces a second vote the same day.',
+  d:'Once per game, by a secret sign agreed with the moderator, he forces a second vote the same day.', dVi:'M\u1ed9t l\u1ea7n m\u1ed7i v\u00e1n, b\u1eb1ng m\u1ed9t d\u1ea5u hi\u1ec7u b\u00ed m\u1eadt \u0111\u00e3 h\u1eb9n v\u1edbi qu\u1ea3n tr\u00f2, anh ta \u00e9p c\u1ea3 l\u00e0ng b\u1ecf phi\u1ebfu l\u1ea1i trong c\u00f9ng ng\u00e0y.',
   say:'Stuttering Judge, wake up and show me the sign you will use to demand a second vote.',
   sayVi:'Quan Toà Nói Lắp thức dậy và ra dấu hiệu bí mật để yêu cầu vòng bầu thứ hai.'},
  {id:'wolfhound',name:'The Wolf Hound',vi:'Sói Chó',team:'village',set:'Characters',max:1,n1:30,
-  d:'On the first night, secretly chooses to be a Villager or a Werewolf for the whole game.',
+  d:'On the first night, secretly chooses to be a Villager or a Werewolf for the whole game.', dVi:'\u0110\u00eam \u0111\u1ea7u ti\u00ean, b\u00ed m\u1eadt ch\u1ecdn l\u00e0m D\u00e2n l\u00e0ng hay Ma S\u00f3i cho c\u1ea3 v\u00e1n.',
   say:'Wolf Hound, wake up. Choose your side now: villager, or werewolf.',
   sayVi:'Sói Chó thức dậy. Chọn phe của mình ngay bây giờ: dân làng, hay ma sói.',special:'hound'},
  {id:'wildchild',name:'The Wild Child',vi:'Đứa Trẻ Hoang',team:'village',set:'Characters',max:1,n1:34,
-  d:'Chooses a model on the first night. If the model ever dies, he becomes a werewolf.',
+  d:'Chooses a model on the first night. If the model ever dies, he becomes a werewolf.', dVi:'\u0110\u00eam \u0111\u1ea7u ti\u00ean ch\u1ecdn m\u1ed9t h\u00ecnh m\u1eabu. N\u1ebfu h\u00ecnh m\u1eabu ch\u1ebft, c\u1eadu ta ho\u00e1 th\u00e0nh ma s\u00f3i.',
   say:'Wild Child, wake up and choose the player who will be your model.',
   sayVi:'Đứa Trẻ Hoang thức dậy và chọn một người làm hình mẫu của mình.',pick:1,special:'model'},
  {id:'sisters',name:'The Two Sisters',vi:'Hai Chị Em',team:'village',set:'Characters',min:2,max:2,exact:2,n1:40,every:42,
-  d:'Wake together to learn each other, and may wake briefly each night to confer in silence.',
+  d:'Wake together to learn each other, and may wake briefly each night to confer in silence.', dVi:'Th\u1ee9c c\u00f9ng nhau \u0111\u1ec3 nh\u1eadn m\u1eb7t, v\u00e0 m\u1ed7i \u0111\u00eam c\u00f3 th\u1ec3 th\u1ee9c m\u1ed9t ch\u00fat \u0111\u1ec3 b\u00e0n b\u1ea1c trong im l\u1eb7ng.',
   say:'Two Sisters, wake up and look at one another.',
   sayVi:'Hai Chị Em thức dậy và nhìn mặt nhau.'},
  {id:'brothers',name:'The Three Brothers',vi:'Ba Anh Em',team:'village',set:'Characters',min:3,max:3,exact:3,n1:44,every:46,
-  d:'Wake together to learn each other, and may wake briefly each night to confer in silence.',
+  d:'Wake together to learn each other, and may wake briefly each night to confer in silence.', dVi:'Th\u1ee9c c\u00f9ng nhau \u0111\u1ec3 nh\u1eadn m\u1eb7t, v\u00e0 m\u1ed7i \u0111\u00eam c\u00f3 th\u1ec3 th\u1ee9c m\u1ed9t ch\u00fat \u0111\u1ec3 b\u00e0n b\u1ea1c trong im l\u1eb7ng.',
   say:'Three Brothers, wake up and look at one another.',
   sayVi:'Ba Anh Em thức dậy và nhìn mặt nhau.'},
  {id:'guard',name:'Bodyguard',vi:'Bảo Vệ',team:'village',set:'Base',only:'vn',max:1,n1:47,every:47,
-  d:'Each night protects one player. If the werewolves attack that player, nobody dies. He may not protect the same person on two nights in a row. Standard in Vietnamese play; not in the original Miller’s Hollow box.',
+  d:'Each night protects one player. If the werewolves attack that player, nobody dies. He may not protect the same person on two nights in a row. Standard in Vietnamese play; not in the original Miller’s Hollow box.', dVi:'M\u1ed7i \u0111\u00eam che ch\u1edf m\u1ed9t ng\u01b0\u1eddi. N\u1ebfu ma s\u00f3i t\u1ea5n c\u00f4ng ng\u01b0\u1eddi \u0111\u00f3 th\u00ec kh\u00f4ng ai ch\u1ebft. Kh\u00f4ng \u0111\u01b0\u1ee3c che c\u00f9ng m\u1ed9t ng\u01b0\u1eddi hai \u0111\u00eam li\u1ec1n. Chu\u1ea9n trong l\u1ed1i ch\u01a1i Vi\u1ec7t Nam; h\u1ed9p g\u1ed1c Miller\u2019s Hollow kh\u00f4ng c\u00f3 l\u00e1 n\u00e0y.',
   say:'Bodyguard, wake up and choose one person to shield tonight.',
   sayVi:'Bảo Vệ thức dậy và chọn một người để che chở đêm nay.',pick:1,special:'guard'},
  {id:'littlegirl',name:'Little Girl',vi:'Bé Gái',team:'village',set:'Base',max:1,n1:48,
-  d:'May peek through her fingers while the werewolves are awake, at her own risk.',
+  d:'May peek through her fingers while the werewolves are awake, at her own risk.', dVi:'C\u00f3 th\u1ec3 h\u00e9 m\u1eaft nh\u00ecn tr\u1ed9m qua k\u1ebd tay khi ma s\u00f3i \u0111ang th\u1ee9c, v\u00e0 t\u1ef1 ch\u1ecbu r\u1ee7i ro.',
   say:'Little Girl, show yourself to me only, then close your eyes.',
   sayVi:'Bé Gái cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'fox',name:'The Fox',vi:'Cáo',team:'village',set:'Characters',max:1,n1:50,every:50,
-  d:'Each night sniffs a player and their two living neighbours. If no werewolf is among them, he loses his power.',
+  d:'Each night sniffs a player and their two living neighbours. If no werewolf is among them, he loses his power.', dVi:'M\u1ed7i \u0111\u00eam ng\u1eedi m\u1ed9t ng\u01b0\u1eddi c\u00f9ng hai ng\u01b0\u1eddi s\u1ed1ng b\u00ean c\u1ea1nh. N\u1ebfu trong ba ng\u01b0\u1eddi kh\u00f4ng c\u00f3 s\u00f3i, anh ta m\u1ea5t ph\u00e9p.',
   say:'Fox, wake up. Point to a player and I will tell you whether a werewolf hides among them and their neighbours.',
   sayVi:'Cáo thức dậy. Chỉ vào một người, tôi sẽ cho biết trong ba người đó có sói hay không.',pick:1,special:'fox'},
  {id:'actor',name:'The Actor',vi:'Diễn Viên',team:'village',set:'Characters',max:1,n1:52,every:52,
-  d:'Three character cards are placed face up. Each night he may use one of them, once each.',
+  d:'Three character cards are placed face up. Each night he may use one of them, once each.', dVi:'Ba l\u00e1 nh\u00e2n v\u1eadt \u0111\u01b0\u1ee3c l\u1eadt ng\u1eeda. M\u1ed7i \u0111\u00eam anh ta c\u00f3 th\u1ec3 d\u00f9ng m\u1ed9t l\u00e1, m\u1ed7i l\u00e1 m\u1ed9t l\u1ea7n.',
   say:'Actor, wake up. Choose which of your three characters you play tonight.',
   sayVi:'Diễn Viên thức dậy. Chọn nhân vật bạn sẽ dùng đêm nay.'},
  {id:'seer',name:'Seer',vi:'Tiên Tri',team:'village',set:'Base',max:1,n1:55,every:55,
-  d:'Each night, looks at one player. In the original rules she sees the exact card; in Vietnamese play she learns only whether they are on the werewolf side.',
+  d:'Each night, looks at one player. In the original rules she sees the exact card; in Vietnamese play she learns only whether they are on the werewolf side.', dVi:'M\u1ed7i \u0111\u00eam soi m\u1ed9t ng\u01b0\u1eddi. Theo lu\u1eadt g\u1ed1c c\u00f4 th\u1ea5y \u0111\u00fang l\u00e1 b\u00e0i; theo l\u1ed1i Vi\u1ec7t Nam c\u00f4 ch\u1ec9 bi\u1ebft ng\u01b0\u1eddi \u0111\u00f3 c\u00f3 thu\u1ed9c phe s\u00f3i hay kh\u00f4ng.',
   say:'Seer, wake up. Point to the player whose true nature you wish to see.',
   sayVi:'Tiên Tri thức dậy. Chỉ vào người mà bạn muốn soi.',pick:1},
  {id:'wolf',name:'Werewolf',vi:'Ma Sói',team:'wolf',set:'Base',max:8,n1:60,every:60,
-  d:'Wakes each night with the pack and agrees on one victim.',
+  d:'Wakes each night with the pack and agrees on one victim.', dVi:'M\u1ed7i \u0111\u00eam th\u1ee9c c\u00f9ng b\u1ea7y v\u00e0 th\u1ed1ng nh\u1ea5t m\u1ed9t n\u1ea1n nh\u00e2n.',
   say:'Werewolves, wake up. Recognise each other, and choose your victim.',
   sayVi:'Ma Sói thức dậy. Nhìn nhau nhận đồng đội, và chọn nạn nhân đêm nay.',pick:1},
  {id:'whitewolf',name:'White Werewolf',vi:'Sói Trắng',team:'wolf',set:'Characters',max:1,n1:65,every:65,alt:true,
-  d:'Wakes with the pack, then again every second night to devour a werewolf. Wins alone.',
+  d:'Wakes with the pack, then again every second night to devour a werewolf. Wins alone.', dVi:'Th\u1ee9c c\u00f9ng b\u1ea7y, r\u1ed3i c\u1ee9 c\u00e1ch m\u1ed9t \u0111\u00eam l\u1ea1i th\u1ee9c th\u00eam \u0111\u1ec3 \u0103n m\u1ed9t con s\u00f3i. Th\u1eafng m\u1ed9t m\u00ecnh.',
   say:'White Werewolf, wake up. You may devour one of your own. Point, or shake your head.',
   sayVi:'Sói Trắng thức dậy. Bạn có thể ăn một con sói. Hãy chỉ, hoặc lắc đầu.',pick:1},
  {id:'witch',name:'Witch',vi:'Phù Thuỷ',team:'village',set:'Base',max:1,n1:70,every:70,
-  d:'One healing potion and one poison, each usable once in the whole game.',
+  d:'One healing potion and one poison, each usable once in the whole game.', dVi:'M\u1ed9t thu\u1ed1c c\u1ee9u v\u00e0 m\u1ed9t thu\u1ed1c \u0111\u1ed9c, m\u1ed7i lo\u1ea1i d\u00f9ng \u0111\u01b0\u1ee3c \u0111\u00fang m\u1ed9t l\u1ea7n c\u1ea3 v\u00e1n.',
   say:'Witch, wake up. This is the victim. Will you save them? Will you poison anyone?',
   sayVi:'Phù Thuỷ thức dậy. Đây là nạn nhân đêm nay. Bạn có cứu không? Có dùng thuốc độc không?',special:'witch'},
  {id:'piper',name:'The Pied Piper',vi:'Người Thổi Sáo',team:'solo',set:'Characters',max:1,n1:80,every:80,
-  d:'Charms two players each night. Wins alone the moment every other living player is charmed.',
+  d:'Charms two players each night. Wins alone the moment every other living player is charmed.', dVi:'M\u1ed7i \u0111\u00eam m\u00ea ho\u1eb7c hai ng\u01b0\u1eddi. Th\u1eafng m\u1ed9t m\u00ecnh ngay khi m\u1ecdi ng\u01b0\u1eddi c\u00f2n s\u1ed1ng \u0111\u1ec1u \u0111\u00e3 b\u1ecb m\u00ea.',
   say:'Pied Piper, wake up and charm two players.',
   sayVi:'Người Thổi Sáo thức dậy và mê hoặc hai người.',pick:2,special:'charm'},
  {id:'hunter',name:'Hunter',vi:'Thợ Săn',team:'village',set:'Base',max:1,n1:82,
-  d:'When he dies he must immediately shoot one living player — the shot is compulsory, not a choice. Vietnamese play denies him the shot if the Witch poisoned him; Miller’s Hollow lets him fire whatever killed him.',
+  d:'When he dies he must immediately shoot one living player — the shot is compulsory, not a choice. Vietnamese play denies him the shot if the Witch poisoned him; Miller’s Hollow lets him fire whatever killed him.', dVi:'Khi ch\u1ebft anh ta ph\u1ea3i b\u1eafn ngay m\u1ed9t ng\u01b0\u1eddi c\u00f2n s\u1ed1ng \u2014 ph\u00e1t s\u00fang l\u00e0 b\u1eaft bu\u1ed9c, kh\u00f4ng ph\u1ea3i l\u1ef1a ch\u1ecdn. L\u1ed1i Vi\u1ec7t Nam kh\u00f4ng cho b\u1eafn n\u1ebfu b\u1ecb Ph\u00f9 Thu\u1ef7 \u0111\u1ea7u \u0111\u1ed9c; Miller\u2019s Hollow cho b\u1eafn d\u00f9 ch\u1ebft v\u00ec l\u00fd do g\u00ec.',
   say:'Hunter, show yourself to me only, then close your eyes.',
   sayVi:'Thợ Săn cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'elder',name:'The Elder',vi:'Trưởng Lão',team:'village',set:'Characters',max:1,n1:84,
-  d:'Survives the first werewolf attack. If the village kills him — the vote, the Witch’s poison or the Hunter’s shot — every villager loses their power. A werewolf kill does not cost the village anything.',
+  d:'Survives the first werewolf attack. If the village kills him — the vote, the Witch’s poison or the Hunter’s shot — every villager loses their power. A werewolf kill does not cost the village anything.', dVi:'S\u1ed1ng s\u00f3t qua l\u1ea7n t\u1ea5n c\u00f4ng \u0111\u1ea7u ti\u00ean c\u1ee7a ma s\u00f3i. N\u1ebfu d\u00e2n l\u00e0ng gi\u1ebft \u00f4ng \u2014 b\u1eb1ng phi\u1ebfu b\u1ea7u, thu\u1ed1c \u0111\u1ed9c c\u1ee7a Ph\u00f9 Thu\u1ef7 hay ph\u00e1t s\u00fang c\u1ee7a Th\u1ee3 S\u0103n \u2014 to\u00e0n b\u1ed9 ph\u00e9p c\u1ee7a d\u00e2n l\u00e0ng m\u1ea5t s\u1ea1ch. S\u00f3i gi\u1ebft th\u00ec l\u00e0ng kh\u00f4ng m\u1ea5t g\u00ec.',
   say:'Elder, show yourself to me only, then close your eyes.',
   sayVi:'Trưởng Lão cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'knight',name:'Knight with the Rusty Sword',vi:'Hiệp Sĩ Kiếm Rỉ',team:'village',set:'Characters',max:1,n1:86,
-  d:'When the werewolves kill him, the first werewolf clockwise from him dies of infection the next night.',
+  d:'When the werewolves kill him, the first werewolf clockwise from him dies of infection the next night.', dVi:'Khi ma s\u00f3i gi\u1ebft anh ta, con s\u00f3i \u0111\u1ea7u ti\u00ean theo chi\u1ec1u kim \u0111\u1ed3ng h\u1ed3 s\u1ebd ch\u1ebft v\u00ec nhi\u1ec5m r\u1ec9 s\u00e9t v\u00e0o \u0111\u00eam sau.',
   say:'Knight, show yourself to me only, then close your eyes.',
   sayVi:'Hiệp Sĩ Kiếm Rỉ cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'beartamer',name:'Bear Tamer',vi:'Người Dạy Gấu',team:'village',set:'Characters',max:1,n1:88,
-  d:'Each dawn the moderator growls if either living neighbour is a werewolf.',
+  d:'Each dawn the moderator growls if either living neighbour is a werewolf.', dVi:'M\u1ed7i s\u00e1ng qu\u1ea3n tr\u00f2 g\u1ea7m l\u00ean n\u1ebfu m\u1ed9t trong hai ng\u01b0\u1eddi s\u1ed1ng b\u00ean c\u1ea1nh l\u00e0 ma s\u00f3i.',
   say:'Bear Tamer, show yourself to me only, then close your eyes.',
   sayVi:'Người Dạy Gấu cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'angel',name:'The Angel',vi:'Thiên Thần',team:'solo',set:'Characters',max:1,n1:90,
-  d:'Wins immediately and alone if eliminated on the first day\u2019s vote, or taken on the first night.',
+  d:'Wins immediately and alone if eliminated on the first day\u2019s vote, or taken on the first night.', dVi:'Th\u1eafng ngay l\u1eadp t\u1ee9c v\u00e0 m\u1ed9t m\u00ecnh n\u1ebfu b\u1ecb lo\u1ea1i b\u1eb1ng phi\u1ebfu b\u1ea7u ng\u00e0y \u0111\u1ea7u ti\u00ean, ho\u1eb7c b\u1ecb \u0103n \u0111\u00eam \u0111\u1ea7u ti\u00ean.',
   say:'Angel, show yourself to me only, then close your eyes.',
   sayVi:'Thiên Thần cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'idiot',name:'Village Idiot',vi:'Thằng Ngốc',team:'village',set:'Characters',max:1,n1:92,
-  d:'If voted out he is revealed and spared, but loses the right to vote forever.',
+  d:'If voted out he is revealed and spared, but loses the right to vote forever.', dVi:'N\u1ebfu b\u1ecb b\u1ecf phi\u1ebfu treo c\u1ed5 th\u00ec \u0111\u01b0\u1ee3c l\u1eadt b\u00e0i v\u00e0 tha m\u1ea1ng, nh\u01b0ng m\u1ea5t quy\u1ec1n b\u1ecf phi\u1ebfu v\u0129nh vi\u1ec5n.',
   say:'Village Idiot, show yourself to me only, then close your eyes.',
   sayVi:'Thằng Ngốc cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'scapegoat',name:'Scapegoat',vi:'Vật Tế Thần',team:'village',set:'Characters',max:1,n1:94,
-  d:'If the village vote ties, he dies instead \u2014 and as he goes he decides who may vote tomorrow.',
+  d:'If the village vote ties, he dies instead \u2014 and as he goes he decides who may vote tomorrow.', dVi:'N\u1ebfu phi\u1ebfu c\u1ee7a l\u00e0ng ho\u00e0, anh ta ch\u1ebft thay \u2014 v\u00e0 l\u00fac ch\u1ebft anh ta quy\u1ebft \u0111\u1ecbnh ai \u0111\u01b0\u1ee3c b\u1ecf phi\u1ebfu ng\u00e0y mai.',
   say:'Scapegoat, show yourself to me only, then close your eyes.',
   sayVi:'Vật Tế Thần cho tôi thấy mặt, rồi nhắm mắt lại.'},
  {id:'servant',name:'Devoted Servant',vi:'Người Hầu Trung Thành',team:'village',set:'Characters',max:1,n1:96,
-  d:'At the moment somebody is eliminated \u2014 before their card is turned up, if your table turns them \u2014 she may show her own and take their role instead.',
+  d:'At the moment somebody is eliminated \u2014 before their card is turned up, if your table turns them \u2014 she may show her own and take their role instead.', dVi:'Ngay l\u00fac m\u1ed9t ng\u01b0\u1eddi b\u1ecb lo\u1ea1i \u2014 tr\u01b0\u1edbc khi l\u1eadt b\u00e0i c\u1ee7a h\u1ecd, n\u1ebfu b\u00e0n b\u1ea1n c\u00f3 l\u1eadt \u2014 c\u00f4 c\u00f3 th\u1ec3 l\u1eadt b\u00e0i m\u00ecnh ra v\u00e0 nh\u1eadn l\u1ea5y vai c\u1ee7a ng\u01b0\u1eddi \u0111\u00f3.',
   say:'Devoted Servant, show yourself to me only, then close your eyes.',
   sayVi:'Người Hầu Trung Thành cho tôi thấy mặt, rồi nhắm mắt lại.'},
 ];
@@ -129,6 +129,11 @@ const T = (vi, en) => vnUI() ? vi : en;
 /* A role's name in the interface language. This was an inline ruleset test in nine
    places, which is what made choosing Miller's Hollow rename every card in the app. */
 const rName = r => T(r.vi, r.name);
+/* A role's description, which the night call puts under the heading and the deck list puts
+   in the row. English-only until now, so a Vietnamese moderator read an English paragraph
+   on every single night step. Falls back to the English rather than to nothing, so a role
+   added without a dVi still says something. */
+const rDesc = r => T(r.dVi || r.d, r.d);
 /* Which physical box a card came from, in the interface language. */
 const provLabel = set => vnUI()
   ? (set === 'Characters' ? 'Mở rộng' : 'Cơ bản')
@@ -150,8 +155,13 @@ const pIcon = p => p.role ? icSvg(p.role, teamOf(p)) : '<span class="ic none"><i
    while the wolves choose, and wolf membership cannot change mid-night (the Hound
    picks at 30, and every death resolves at dawn), so moving them is neutral for the
    players and means the moderator already knows the pack when they must answer. */
-const RULESETS = { vn:{ label:'Ma Sói Việt Nam', over:{ fox:61, seer:62 } },
-                  mh:{ label:'Miller’s Hollow (bản gốc)', over:{} } };
+/* The ruleset NAME is a proper noun and stays as it is; the gloss beside it is a label,
+   and it was Vietnamese in both directions — an English interface still read
+   "Miller’s Hollow (bản gốc)". A function, not a string: T() has to be
+   evaluated when the label is drawn, not when this table is built. */
+const RULESETS = { vn:{ label:() => 'Ma S\u00f3i Vi\u1ec7t Nam', over:{ fox:61, seer:62 } },
+                   mh:{ label:() => T('Miller\u2019s Hollow (b\u1ea3n g\u1ed1c)',
+                                      'Miller\u2019s Hollow (original)'), over:{} } };
 const over = id => RULESETS[G && G.rules ? G.rules : 'vn'].over[id];
 const n1Of    = r => over(r.id) != null ? over(r.id) : r.n1;
 const everyOf = r => r.every == null ? null : (over(r.id) != null ? over(r.id) : r.every);
@@ -590,9 +600,9 @@ function checks(){
       ' is the usual balance. You have ' + w + '.')]);
   for (const id in G.counts) if (R[id].only && R[id].only !== G.rules)
     out.push(['warn', T(
-      R[id].vi + ' (' + R[id].name + ') kh\u00f4ng c\u00f3 trong h\u1ed9p ' + RULESETS[G.rules].label +
+      R[id].vi + ' (' + R[id].name + ') kh\u00f4ng c\u00f3 trong h\u1ed9p ' + RULESETS[G.rules].label() +
         '. Gi\u1eef l\u1ea1i n\u1ebfu b\u00e0n b\u1ea1n ch\u01a1i th\u1ebf \u2014 b\u1ed9 \u0111\u1ec1 xu\u1ea5t v\u00e0 x\u00e1o b\u00e0i s\u1ebd b\u1ecf n\u00f3 ra.',
-      R[id].name + ' (' + R[id].vi + ') is not in the ' + RULESETS[G.rules].label +
+      R[id].name + ' (' + R[id].vi + ') is not in the ' + RULESETS[G.rules].label() +
         ' box. Keep it if your table plays that way \u2014 the suggested deck and the shuffle leave it out.')]);
   if (G.counts.thief) out.push(['warn', T(
     '\u0102n tr\u1ed9m c\u1ea7n hai l\u00e1 d\u01b0 ngo\u00e0i s\u1ed1 ng\u01b0\u1eddi ch\u01a1i. L\u1ea5y ch\u00fang ra kh\u1ecfi h\u1ed9p v\u00e0 \u0111\u1ec3 ri\u00eang.',
@@ -677,6 +687,7 @@ function thiefTakes(th, r){
 function stepInfo(s){
   if (s.role === '__lovers') return { name:'The Lovers', vi:'Cặp Đôi',  id:'__lovers',
     d:'The two Lovers learn who they are.',
+    dVi:'Hai ng\u01b0\u1eddi trong C\u1eb7p \u0110\u00f4i bi\u1ebft nhau l\u00e0 ai.',
     say:'Lovers, wake up and look at one another. You now win or lose together.',
     sayVi:'Cặp Đôi thức dậy và nhìn mặt nhau. Từ giờ hai người thắng hoặc chết cùng nhau.' };
   return R[s.role];
@@ -1259,7 +1270,7 @@ function rRoles(){
   pc.appendChild(el('div','grp', T('Th\u1ee9 t\u1ef1 lu\u1eadt', 'Rules order')));
   const pr = el('div','chips');
   for (const k of ['vn','mh']){
-    const b = el('div','chip' + (G.rules===k ? ' sel' : ''), RULESETS[k].label);
+    const b = el('div','chip' + (G.rules===k ? ' sel' : ''), RULESETS[k].label());
     b.onclick = () => { snap(); G.rules = k; render(); };
     pr.appendChild(b);
   }
@@ -1273,15 +1284,26 @@ function rRoles(){
   RB.appendChild(pc);
   RB.appendChild(collapsible('house', T('Lu\u1eadt nh\u00e0', 'House rules'),
     houseRulesUI()));
-  RB.appendChild(collapsible('order', T('Hai bộ luật khác nhau ở đâu?', 'How do the two rulesets differ?'),
+  RB.appendChild(collapsible('order',
+    T('Hai b\u1ed9 lu\u1eadt kh\u00e1c nhau \u1edf \u0111\u00e2u?', 'How do the two rulesets differ?'),
     (G.rules === 'vn'
-      ? '<p>Tiên Tri và Cáo được gọi <b>sau</b> Ma Sói, nên app đã biết cả bầy Sói và trả lời được ngay trên màn hình.</p>' +
-        '<p>Bảo Vệ có trong bộ cơ bản. Phù Thuỷ không được tự cứu. Thợ Săn bị thuốc độc thì không bắn được. ' +
-        'Sói bằng số Dân là Sói thắng luôn. Phù hiệu Trưởng Làng nặng 1.5 phiếu.</p>'
-      : '<p>The Seer and the Fox are called <b>before</b> the pack, and the Seer sees the exact card. ' +
-        'On the first night that can mean reading a card at the table.</p>' +
-        '<p>No Bodyguard in the original box. The Witch may save herself. The Hunter fires whatever killed ' +
-        'him. The wolves must finish every villager to win. The badge is worth a flat double vote.</p>')));
+      ? T('<p>Ti\u00ean Tri v\u00e0 C\u00e1o \u0111\u01b0\u1ee3c g\u1ecdi <b>sau</b> Ma S\u00f3i, n\u00ean app \u0111\u00e3 bi\u1ebft c\u1ea3 b\u1ea7y S\u00f3i ' +
+          'v\u00e0 tr\u1ea3 l\u1eddi \u0111\u01b0\u1ee3c ngay tr\u00ean m\u00e0n h\u00ecnh.</p>' +
+          '<p>B\u1ea3o V\u1ec7 c\u00f3 trong b\u1ed9 c\u01a1 b\u1ea3n. Ph\u00f9 Thu\u1ef7 kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u. Th\u1ee3 S\u0103n b\u1ecb thu\u1ed1c \u0111\u1ed9c ' +
+          'th\u00ec kh\u00f4ng b\u1eafn \u0111\u01b0\u1ee3c. S\u00f3i b\u1eb1ng s\u1ed1 D\u00e2n l\u00e0 S\u00f3i th\u1eafng lu\u00f4n. Ph\u00f9 hi\u1ec7u Tr\u01b0\u1edfng L\u00e0ng n\u1eb7ng 1.5 phi\u1ebfu.</p>',
+          '<p>The Seer and the Fox are called <b>after</b> the pack, so the app already knows ' +
+          'every wolf and can answer on screen.</p>' +
+          '<p>The Bodyguard is in the base box. The Witch may not save herself. A poisoned ' +
+          'Hunter does not fire. Wolves equalling villagers ends it there and then. The badge ' +
+          'is worth 1.5 votes.</p>')
+      : T('<p>Ti\u00ean Tri v\u00e0 C\u00e1o \u0111\u01b0\u1ee3c g\u1ecdi <b>tr\u01b0\u1edbc</b> Ma S\u00f3i, v\u00e0 Ti\u00ean Tri th\u1ea5y \u0111\u00fang l\u00e1 b\u00e0i. ' +
+          '\u0110\u00eam \u0111\u1ea7u ti\u00ean \u0111i\u1ec1u \u0111\u00f3 c\u00f3 th\u1ec3 b\u1eaft b\u1ea1n ph\u1ea3i xem b\u00e0i ngay t\u1ea1i b\u00e0n.</p>' +
+          '<p>H\u1ed9p g\u1ed1c kh\u00f4ng c\u00f3 B\u1ea3o V\u1ec7. Ph\u00f9 Thu\u1ef7 \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u. Th\u1ee3 S\u0103n b\u1eafn d\u00f9 ch\u1ebft v\u00ec l\u00fd do g\u00ec. ' +
+          'S\u00f3i ph\u1ea3i gi\u1ebft h\u1ebft d\u00e2n m\u1edbi th\u1eafng. Ph\u00f9 hi\u1ec7u n\u1eb7ng g\u1ea5p \u0111\u00f4i.</p>',
+          '<p>The Seer and the Fox are called <b>before</b> the pack, and the Seer sees the exact card. ' +
+          'On the first night that can mean reading a card at the table.</p>' +
+          '<p>No Bodyguard in the original box. The Witch may save herself. The Hunter fires whatever killed ' +
+          'him. The wolves must finish every villager to win. The badge is worth a flat double vote.</p>'))));
   const rec = el('div','card');
   // Classic / Characters is a SCOPE, not an action. Both buttons below obey it,
   // which is why tapping the words themselves never dealt a new deck.
@@ -1310,14 +1332,20 @@ function rRoles(){
       (G.counts.villager ? ', ' + rName(R.villager) + ' \u00d7' + G.counts.villager : '')
     : T('Ch\u01b0a ch\u1ecdn l\u00e1 n\u00e0o.','No cards chosen yet.')));
   RB.appendChild(rec);
-  RB.appendChild(collapsible('deckhow', T('Hai nút này khác nhau thế nào?','What is the difference between these two buttons?'),
-    '<p><b>Xáo bộ mới</b> cho một bộ khác mỗi lần bấm. <b>Bộ đề xuất</b> luôn cho cùng một bộ. ' +
-    'Cả hai đều lấy trong phạm vi bạn chọn ở trên.</p>' +
+  RB.appendChild(collapsible('deckhow',
+    T('Hai n\u00fat n\u00e0y kh\u00e1c nhau th\u1ebf n\u00e0o?', 'What is the difference between these two buttons?'),
+    T('<p><b>X\u00e1o b\u1ed9 m\u1edbi</b> cho m\u1ed9t b\u1ed9 kh\u00e1c m\u1ed7i l\u1ea7n b\u1ea5m. <b>B\u1ed9 \u0111\u1ec1 xu\u1ea5t</b> lu\u00f4n cho c\u00f9ng m\u1ed9t b\u1ed9. ' +
+      'C\u1ea3 hai \u0111\u1ec1u l\u1ea5y trong ph\u1ea1m vi b\u1ea1n ch\u1ecdn \u1edf tr\u00ean.</p>',
+      '<p><b>Shuffle</b> deals a different deck every time you tap it. <b>Suggested</b> always gives ' +
+      'the same one. Both draw from the box you chose above.</p>') +
     (chars ? (reach.length
-      ? '<p>Ở bàn ' + n + ' người, lá mở rộng có thể ra: ' + reach.join(', ') + '.</p>'
-      : '<p>Bàn ' + n + ' người quá nhỏ để lá mở rộng nào lọt vào \u2014 xáo sẽ ra bộ cơ bản.</p>')
-      : '<p>Chỉ lấy lá trong hộp cơ bản.</p>')));
-
+      ? T('<p>\u1ede b\u00e0n ' + n + ' ng\u01b0\u1eddi, l\u00e1 m\u1edf r\u1ed9ng c\u00f3 th\u1ec3 ra: ' + reach.join(', ') + '.</p>',
+          '<p>At a table of ' + n + ', these expansion cards can turn up: ' + reach.join(', ') + '.</p>')
+      : T('<p>B\u00e0n ' + n + ' ng\u01b0\u1eddi qu\u00e1 nh\u1ecf \u0111\u1ec3 l\u00e1 m\u1edf r\u1ed9ng n\u00e0o l\u1ecdt v\u00e0o \u2014 x\u00e1o s\u1ebd ra b\u1ed9 c\u01a1 b\u1ea3n.</p>',
+          '<p>A table of ' + n + ' is too small for any expansion card to reach \u2014 a shuffle will give ' +
+          'a base deck.</p>'))
+      : T('<p>Ch\u1ec9 l\u1ea5y l\u00e1 trong h\u1ed9p c\u01a1 b\u1ea3n.</p>',
+          '<p>Only cards from the base box.</p>'))));
   const A = $('advice'); A.innerHTML = '';
   const cs = checks();
   /* Only a deck that cannot be dealt stops anyone. A warning about the usual wolf count,
@@ -1375,7 +1403,7 @@ function rRoles(){
         '<span class="vi">' + T(r.name, r.vi) + '</span>' +
         (off ? '<span class="tag">' + T('kh\u00f4ng c\u00f3 trong h\u1ed9p','not in this box') + '</span>' : '') +
         '<span class="prov">' + provLabel(r.set) + '</span></div>' +
-      '<div class="rd">' + r.d + '</div>');
+      '<div class="rd">' + rDesc(r) + '</div>');
     info.onclick = () => row.classList.toggle('open');
     const stp = el('div','stp');
     const minus = el('button',null,'\u2212'); minus.disabled = !c;
@@ -1421,22 +1449,36 @@ function rDeal(){
        { t: T('Ghi l\u1ea1i b\u1ed9 b\u00e0i \u2192','Collect the deal \u2192'), on:() => { snap(); G.phase='learn'; render(); } }]);
   // must live in a container that gets cleared, or every visit appends another
   const A = $('dealAlt'); A.innerHTML = '';
-  A.appendChild(collapsible('deal', 'Which route should I take?',
+  A.appendChild(collapsible('deal',
+    T('N\u00ean ch\u1ecdn c\u00e1ch n\u00e0o?', 'Which route should I take?'),
     (mh
-      ? '<p><b>You are on the Miller’s Hollow order, so the Seer sees the exact card.</b> ' +
-        'Every look needs a specific card read out. Collect the deal now and the app can show her any ' +
-        'card on screen; skip it and you will be reading cards at the table all game.</p>'
-      : '<p><b>Vietnamese order.</b> The Seer only needs to know werewolf or not, and the pack is called ' +
-        'before her, so after tonight the app can answer every look on screen without touching the table.</p>') +
-    '<p><b>Collect the deal</b> is one pass round the table where each player shows you their card. ' +
-    'It takes a minute, and then nothing is ever lifted during the night \u2014 no player can feel their ' +
-    'card being picked up and work out the Seer checked them.</p>' +
-    '<p><b>Discover during the night</b> keeps you blind: each role is called and you tap whoever opens ' +
-    'their eyes. Faster to start, but when the Seer points at a card the app has never seen, you will have ' +
-    'to lift it at the table.</p>' +
-    '<p><b>A tip either way:</b> once every player has looked at their own card, collect all the cards and ' +
-    'keep them stacked in seat order in your lap. Nobody needs their card again, and with nothing at any ' +
-    'seat there is nothing for anyone to feel being lifted.</p>'));
+      ? T('<p><b>B\u1ea1n \u0111ang d\u00f9ng th\u1ee9 t\u1ef1 Miller\u2019s Hollow, n\u00ean Ti\u00ean Tri th\u1ea5y \u0111\u00fang l\u00e1 b\u00e0i.</b> ' +
+          'M\u1ed7i l\u1ea7n soi \u0111\u1ec1u ph\u1ea3i \u0111\u1ecdc ra m\u1ed9t l\u00e1 c\u1ee5 th\u1ec3. Ghi l\u1ea1i b\u1ed9 b\u00e0i ngay th\u00ec app hi\u1ec7n \u0111\u01b0\u1ee3c b\u1ea5t k\u1ef3 l\u00e1 n\u00e0o ' +
+          'tr\u00ean m\u00e0n h\u00ecnh; b\u1ecf qua th\u00ec c\u1ea3 v\u00e1n b\u1ea1n s\u1ebd ph\u1ea3i xem b\u00e0i ngay t\u1ea1i b\u00e0n.</p>',
+          '<p><b>You are on the Miller\u2019s Hollow order, so the Seer sees the exact card.</b> ' +
+          'Every look needs a specific card read out. Collect the deal now and the app can show her any ' +
+          'card on screen; skip it and you will be reading cards at the table all game.</p>')
+      : T('<p><b>Th\u1ee9 t\u1ef1 Vi\u1ec7t Nam.</b> Ti\u00ean Tri ch\u1ec9 c\u1ea7n bi\u1ebft c\u00f3 ph\u1ea3i s\u00f3i hay kh\u00f4ng, m\u00e0 b\u1ea7y s\u00f3i \u0111\u01b0\u1ee3c g\u1ecdi ' +
+          'tr\u01b0\u1edbc c\u00f4, n\u00ean t\u1eeb \u0111\u00eam nay app tr\u1ea3 l\u1eddi \u0111\u01b0\u1ee3c m\u1ecdi l\u1ea7n soi m\u00e0 kh\u00f4ng \u0111\u1ee5ng v\u00e0o b\u00e0i tr\u00ean b\u00e0n.</p>',
+          '<p><b>Vietnamese order.</b> The Seer only needs to know werewolf or not, and the pack is called ' +
+          'before her, so after tonight the app can answer every look on screen without touching the table.</p>')) +
+    T('<p><b>Ghi l\u1ea1i b\u1ed9 b\u00e0i</b> l\u00e0 \u0111i m\u1ed9t v\u00f2ng quanh b\u00e0n, m\u1ed7i ng\u01b0\u1eddi cho b\u1ea1n xem l\u00e1 c\u1ee7a h\u1ecd. ' +
+      'M\u1ea5t m\u1ed9t ph\u00fat, v\u00e0 sau \u0111\u00f3 kh\u00f4ng bao gi\u1edd ph\u1ea3i nh\u1ea5c b\u00e0i gi\u1eefa \u0111\u00eam \u2014 kh\u00f4ng ai c\u1ea3m th\u1ea5y b\u00e0i m\u00ecnh ' +
+      'b\u1ecb c\u1ea7m l\u00ean r\u1ed3i \u0111o\u00e1n ra Ti\u00ean Tri v\u1eeba soi m\u00ecnh.</p>',
+      '<p><b>Collect the deal</b> is one pass round the table where each player shows you their card. ' +
+      'It takes a minute, and then nothing is ever lifted during the night \u2014 no player can feel their ' +
+      'card being picked up and work out the Seer checked them.</p>') +
+    T('<p><b>T\u00ecm ra trong \u0111\u00eam</b> th\u00ec b\u1ea1n v\u1eabn m\u00f9: g\u1ecdi t\u1eebng vai v\u00e0 b\u1ea5m v\u00e0o ng\u01b0\u1eddi m\u1edf m\u1eaft. ' +
+      'B\u1eaft \u0111\u1ea7u nhanh h\u01a1n, nh\u01b0ng khi Ti\u00ean Tri ch\u1ec9 v\u00e0o m\u1ed9t l\u00e1 app ch\u01b0a t\u1eebng th\u1ea5y, b\u1ea1n ph\u1ea3i xem b\u00e0i t\u1ea1i b\u00e0n.</p>',
+      '<p><b>Discover during the night</b> keeps you blind: each role is called and you tap whoever opens ' +
+      'their eyes. Faster to start, but when the Seer points at a card the app has never seen, you will have ' +
+      'to lift it at the table.</p>') +
+    T('<p><b>M\u1eb9o cho c\u1ea3 hai c\u00e1ch:</b> khi m\u1ecdi ng\u01b0\u1eddi \u0111\u00e3 xem b\u00e0i c\u1ee7a m\u00ecnh, thu h\u1ebft b\u00e0i l\u1ea1i v\u00e0 x\u1ebfp ' +
+      'theo th\u1ee9 t\u1ef1 ch\u1ed7 ng\u1ed3i tr\u00ean \u0111\u00f9i b\u1ea1n. Kh\u00f4ng ai c\u1ea7n b\u00e0i n\u1eefa, v\u00e0 kh\u00f4ng c\u00f2n g\u00ec \u1edf ch\u1ed7 n\u00e0o \u0111\u1ec3 ai \u0111\u00f3 ' +
+      'c\u1ea3m th\u1ea5y b\u1ecb nh\u1ea5c l\u00ean.</p>',
+      '<p><b>A tip either way:</b> once every player has looked at their own card, collect all the cards and ' +
+      'keep them stacked in seat order in your lap. Nobody needs their card again, and with nothing at any ' +
+      'seat there is nothing for anyone to feel being lifted.</p>')));
   const extra = el('button','btn sec wide', T('Bỏ qua — tìm ra trong đêm','Skip \u2014 find out during the night'));
   extra.onclick = () => { snap(); G.knewDeal = false; G.night=1; G.phase='night';
     buildNight(); log('Night falls on Miller’s Hollow.','Night 1'); render(); };
@@ -1650,7 +1692,7 @@ function rNight(){
     ? info.vi + ' <span class="vi">' + info.name + '</span>'
     : info.name + (info.vi ? ' <span class="vi">' + info.vi + '</span>' : ''));
   const holders = s.role === '__lovers' ? G.players.filter(p => p.lover) : liveWith(s.role);
-  $('nSub').textContent = (identified && holders.length ? holders.map(p=>p.name).join(', ') + ' \u2014 ' : '') + (info.d || '');
+  $('nSub').textContent = (identified && holders.length ? holders.map(p=>p.name).join(', ') + ' \u2014 ' : '') + (info.d ? rDesc(info) : '');
   const primary = (vn && info.sayVi) ? info.sayVi : info.say;
   const second  = (vn && info.sayVi) ? info.say : info.sayVi;
   $('nSayT').innerHTML = (primary || '') +
@@ -1742,7 +1784,8 @@ function rNight(){
       if (selfVictim) B.appendChild(el('div', blockSelf ? 'alert no' : 'tell', blockSelf
         ? T('N\u1ea1n nh\u00e2n ch\u00ednh l\u00e0 Ph\u00f9 Thu\u1ef7. Lu\u1eadt Vi\u1ec7t Nam kh\u00f4ng cho c\u00f4 t\u1ef1 u\u1ed1ng thu\u1ed1c c\u1ee9u \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.', 'The victim is the Witch herself. Vietnamese rules do not let her drink her own cure \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.')
         : T('N\u1ea1n nh\u00e2n ch\u00ednh l\u00e0 Ph\u00f9 Thu\u1ef7. Miller\u2019s Hollow cho ph\u00e9p c\u00f4 t\u1ef1 c\u1ee9u.', 'The victim is the Witch herself. Miller’s Hollow allows her to save herself.')));
-      const b = el('button','btn sm sec', (G.n.witchSave ? '\u2713 Saving ' : 'Save ') + v.name);
+      const b = el('button','btn sm sec', (G.n.witchSave
+      ? T('\u2713 \u0110ang c\u1ee9u ', '\u2713 Saving ') : T('C\u1ee9u ', 'Save ')) + v.name);
       b.disabled = blockSelf;
       b.onclick = () => { G.n.witchSave = !G.n.witchSave; render(); };
       B.appendChild(b);
@@ -1912,9 +1955,11 @@ function rNight(){
         T('</b> ch\u01b0a bi\u1ebft ai c\u1ea7m. B\u1ea1n t\u1ef1 xem ba l\u00e1 \u0111\u00f3 r\u1ed3i cho t\u00f4i bi\u1ebft \u2014 t\u00f4i kh\u00f4ng \u0111o\u00e1n b\u1eeba.',
           '</b> still unaccounted for. Look at those three cards yourself, then tell me what you found \u2014 I will not guess.')));
       const yn = el('div','chips');
-      const y = el('div','chip' + (G.n.foxAns === true ? ' sel' : ''), 'A werewolf is among them');
+      const y = el('div','chip' + (G.n.foxAns === true ? ' sel' : ''),
+        T('Trong ba ng\u01b0\u1eddi n\u00e0y c\u00f3 s\u00f3i', 'A werewolf is among them'));
       y.onclick = () => { G.n.foxAns = true; render(); };
-      const no = el('div','chip' + (G.n.foxAns === false ? ' sel' : ''), 'None \u2014 he loses his power');
+      const no = el('div','chip' + (G.n.foxAns === false ? ' sel' : ''),
+        T('Kh\u00f4ng c\u00f3 \u2014 C\u00e1o m\u1ea5t ph\u00e9p', 'None \u2014 he loses his power'));
       no.onclick = () => { G.n.foxAns = false; render(); };
       yn.append(y, no); B.appendChild(yn);
     }
@@ -2096,16 +2141,27 @@ function rDay(){
       '</b><p class="note">' + T('Phi\u1ebfu c\u1ee7a h\u1ecd n\u1eb7ng <b>','Their vote is worth <b>') +
       SHERIFF_WEIGHT() +
       T('</b>, v\u00e0 khi ch\u1ebft h\u1ecd ch\u1ec9 \u0111\u1ecbnh ng\u01b0\u1eddi k\u1ebf nhi\u1ec7m.</p>', '</b>, and on dying they name their successor.</p>')));
-    B.appendChild(collapsible('sheriff', T('Ph\u00f9 hi\u1ec7u th\u1ef1c s\u1ef1 l\u00e0m \u0111\u01b0\u1ee3c g\u00ec','What the badge actually does'),
-      '<p>This is <b>not a card</b> \u2014 it is a title the village votes on, so anyone can hold it. ' +
-      'A werewolf can be elected, and often tries to be.</p>' +
-      '<p>\u00b7 Their vote is worth <b>' + SHERIFF_WEIGHT() + '</b> in every day vote.<br>' +
-      '\u00b7 When they die, whatever kills them, they <b>name their successor</b> before play continues ' +
-      '\u2014 or destroy the badge so nobody carries it.<br>' +
-      '\u00b7 The title survives everything else: losing a power, being revealed, changing side.</p>' +
+    B.appendChild(collapsible('sheriff',
+      T('Ph\u00f9 hi\u1ec7u th\u1ef1c s\u1ef1 l\u00e0m \u0111\u01b0\u1ee3c g\u00ec', 'What the badge actually does'),
+      T('<p>\u0110\u00e2y <b>kh\u00f4ng ph\u1ea3i l\u00e1 b\u00e0i</b> \u2014 \u0111\u00f3 l\u00e0 ch\u1ee9c danh do d\u00e2n l\u00e0ng b\u1ea7u, n\u00ean ai c\u0169ng c\u00f3 th\u1ec3 gi\u1eef. ' +
+        'M\u1ed9t con s\u00f3i ho\u00e0n to\u00e0n c\u00f3 th\u1ec3 \u0111\u01b0\u1ee3c b\u1ea7u, v\u00e0 th\u01b0\u1eddng r\u1ea5t mu\u1ed1n \u0111\u01b0\u1ee3c b\u1ea7u.</p>',
+        '<p>This is <b>not a card</b> \u2014 it is a title the village votes on, so anyone can hold it. ' +
+        'A werewolf can be elected, and often tries to be.</p>') +
+      '<p>\u00b7 ' + T('Phi\u1ebfu c\u1ee7a h\u1ecd n\u1eb7ng <b>','Their vote is worth <b>') + SHERIFF_WEIGHT() +
+      T('</b> trong m\u1ecdi v\u00f2ng b\u1ecf phi\u1ebfu ban ng\u00e0y.<br>', '</b> in every day vote.<br>') +
+      T('\u00b7 Khi h\u1ecd ch\u1ebft, d\u00f9 ch\u1ebft v\u00ec g\u00ec, h\u1ecd <b>ch\u1ec9 \u0111\u1ecbnh ng\u01b0\u1eddi k\u1ebf nhi\u1ec7m</b> tr\u01b0\u1edbc khi ch\u01a1i ti\u1ebfp ' +
+        '\u2014 ho\u1eb7c hu\u1ef7 ph\u00f9 hi\u1ec7u \u0111\u1ec3 kh\u00f4ng ai gi\u1eef.<br>' +
+        '\u00b7 Ch\u1ee9c danh n\u00e0y s\u1ed1ng s\u00f3t qua m\u1ecdi th\u1ee9 kh\u00e1c: m\u1ea5t ph\u00e9p, b\u1ecb l\u1eadt b\u00e0i, \u0111\u1ed5i phe.</p>',
+        '\u00b7 When they die, whatever kills them, they <b>name their successor</b> before play continues ' +
+        '\u2014 or destroy the badge so nobody carries it.<br>' +
+        '\u00b7 The title survives everything else: losing a power, being revealed, changing side.</p>') +
       '<p>' + (vn
-        ? 'Vietnamese tables usually weight the badge at 1.5 so it cannot outvote two villagers on its own. Miller’s Hollow uses a flat double.'
-        : 'Miller’s Hollow gives a flat double vote. Vietnamese and 狼人杀 tables usually use 1.5 instead.') + '</p>'));
+        ? T('B\u00e0n Vi\u1ec7t Nam th\u01b0\u1eddng \u0111\u1ec3 ph\u00f9 hi\u1ec7u n\u1eb7ng 1.5 \u0111\u1ec3 n\u00f3 kh\u00f4ng m\u1ed9t m\u00ecnh th\u1eafng \u0111\u01b0\u1ee3c hai d\u00e2n. ' +
+            'Miller\u2019s Hollow d\u00f9ng g\u1ea5p \u0111\u00f4i.',
+            'Vietnamese tables usually weight the badge at 1.5 so it cannot outvote two villagers on its own. ' +
+            'Miller\u2019s Hollow uses a flat double.')
+        : T('Miller\u2019s Hollow cho g\u1ea5p \u0111\u00f4i phi\u1ebfu. B\u00e0n Vi\u1ec7t Nam v\u00e0 \u72fc\u4eba\u6740 th\u01b0\u1eddng d\u00f9ng 1.5.',
+            'Miller\u2019s Hollow gives a flat double vote. Vietnamese and \u72fc\u4eba\u6740 tables usually use 1.5 instead.')) + '</p>'));
     B.appendChild(el('div','grp', T('Ai \u0111\u01b0\u1ee3c b\u1ea7u?','Who was elected?')));
     const c = el('div','chips');
     for (const p of A) c.appendChild(chip(p, { on:() => { snap(); p.sheriff = true; G.sheriffDone = true;
@@ -2201,7 +2257,7 @@ function rDay(){
     row.appendChild(power);
     if (sh){
       const bg = el('button','ico', G.sheriffVote === p.id ? '\u2b50' : '\u2606');
-      bg.title = 'The Sheriff voted for this player';
+      bg.title = T('Tr\u01b0\u1edfng L\u00e0ng b\u1ecf phi\u1ebfu cho ng\u01b0\u1eddi n\u00e0y', 'The Sheriff voted for this player');
       bg.onclick = () => { holdOrder(); G.sheriffVote = G.sheriffVote === p.id ? null : p.id; refresh(); };
       row.appendChild(bg);
     }
@@ -2578,7 +2634,8 @@ function openRoster(){
     B.appendChild(c);
     // the Thief can end up holding one of the two spare cards, which are not in the deck
     const tog = el('button','btn sec sm', G.showAllRoles
-      ? 'Only cards in this deck' : 'Thief took a spare \u2014 show every card');
+      ? T('Ch\u1ec9 l\u00e1 trong b\u1ed9 n\u00e0y', 'Only cards in this deck')
+      : T('\u0102n tr\u1ed9m l\u1ea5y l\u00e1 d\u01b0 \u2014 hi\u1ec7n m\u1ecdi l\u00e1', 'Thief took a spare \u2014 show every card'));
     tog.onclick = () => { G.showAllRoles = !G.showAllRoles; openRoster(); };
     B.appendChild(tog);
   } else {
@@ -2629,8 +2686,8 @@ function showVersion(){
   caches.keys().then(keys => {
     const shell = keys.find(k => /^mh-v.*-shell$/.test(k));
     out.textContent = shell
-      ? 'Version ' + shell.replace(/^mh-/, '').replace(/-shell$/, '')
-      : 'Version unknown — not cached yet, so this is the newest build.';
+      ? T('Phi\u00ean b\u1ea3n ', 'Version ') + shell.replace(/^mh-/, '').replace(/-shell$/, '')
+      : T('Ch\u01b0a bi\u1ebft phi\u00ean b\u1ea3n \u2014 ch\u01b0a l\u01b0u cache, n\u00ean \u0111\u00e2y l\u00e0 b\u1ea3n m\u1edbi nh\u1ea5t.', 'Version unknown — not cached yet, so this is the newest build.');
   }).catch(() => { out.textContent = 'Version unknown.'; });
 }
 // Are all werewolf-side cards accounted for? In the Vietnamese order the pack is
@@ -2713,7 +2770,8 @@ function holdShow(on){
   if (!s) return;
   s.classList.toggle('on', on);
   s.setAttribute('aria-hidden', on ? 'false' : 'true');
-  $('bReveal').textContent = on ? 'Release to hide' : 'Hold to see it';
+  $('bReveal').textContent = on
+    ? T('Th\u1ea3 ra \u0111\u1ec3 \u1ea9n', 'Release to hide') : T('Gi\u1eef \u0111\u1ec3 xem', 'Hold to see it');
 };
 {
   const b = $('bReveal');

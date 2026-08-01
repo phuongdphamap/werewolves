@@ -96,8 +96,9 @@ t('wolf counts stay correct under the French ruleset', () => {
 });
 
 console.log('\nA MANUAL CHOICE IS ALLOWED BUT FLAGGED');
+// the ruleset label is a function now, so it is evaluated when the label is drawn
 t('the deck check warns rather than silently forbidding', () =>
-  /is not in the ' \+ RULESETS\[G\.rules\]\.label \+/.test(src)
+  /is not in the ' \+ RULESETS\[G\.rules\]\.label\(\) \+/.test(src)
     ? true : 'no warning in checks()');
 t('the role list dims a card the ruleset does not own', () =>
   /\.r\.off\{opacity/.test(src) && /off \? ' off' : ''/.test(src)

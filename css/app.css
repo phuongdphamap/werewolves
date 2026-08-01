@@ -461,7 +461,11 @@
   .exp[open] > summary::after{content:'\2212'}
   .exp > summary:hover{color:var(--txt)}
   .exp[open] > summary{border-bottom:1px solid var(--line)}
-  .expBody{padding:var(--s3) var(--s4) var(--s4);font-size:var(--t-small);color:var(--txt2);line-height:1.65}
+  /* Even on all four sides. It was 14 top against 20 sides and 20 bottom, so the prose sat
+     visibly closer to the divider above it than to the border below — reported from a
+     screenshot. The summary keeps its own 14/20 because it is a row; a body is a panel,
+     and a panel is padded like .card. */
+  .expBody{padding:var(--s4);font-size:var(--t-small);color:var(--txt2);line-height:1.65}
   .expBody b{color:var(--txt70)}
   /* Direct children only. A collapsible's body is either prose — a string of <p>, which
      this spaces — or a component that brings its own spacing tokens, like the house-rules
