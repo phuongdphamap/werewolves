@@ -186,21 +186,32 @@ is pinned by tests in `fox-test.js`.
 
 ### The disputed rules are settable
 
-Five rules are genuinely argued about between tables, so they are **house rules** with
+Seven rules are genuinely argued about between tables, so they are **house rules** with
 three states rather than hard-coded:
 
 ```js
-G.selfHeal      // null = follow the published rule, true, false
+G.elderRevenge  // null = follow the published rule, true, false
+G.selfHeal      // null = ...
 G.hunterPoison  // null = ...
 G.hunterElder   // null = ...
 G.showCards     // null = ...
+G.voteMajority  // null = ...
 G.hunterNight   // null = ...
-witchMaySaveSelf()     // null ? rules !== 'vn' : G.selfHeal
-hunterFiresPoisoned()  // null ? rules !== 'vn' : G.hunterPoison
-hunterFiresPowerless() // null ? false            : G.hunterElder
-cardsShownOnDeath()    // null ? rules !== 'vn' : G.showCards
+elderStripsPowers()      // null ? true           : G.elderRevenge
+witchMaySaveSelf()       // null ? rules !== 'vn' : G.selfHeal
+hunterFiresPoisoned()    // null ? rules !== 'vn' : G.hunterPoison
+hunterFiresPowerless()   // null ? false          : G.hunterElder
+cardsShownOnDeath()      // null ? rules !== 'vn' : G.showCards
+voteNeedsMajority()      // null ? false          : G.voteMajority
 hunterShootsInTheNight() // null ? false          : G.hunterNight
 ```
+
+Two of them exist because a table asked. **`elderRevenge`** answers "can the Hunter fire
+after the Elder dies while the rest of the village keeps its powers?" — `hunterElder`
+exempts the Hunter alone, so the broader question needed its own switch, and it sits above
+the Hunter row because it governs it. **`voteMajority`** is the one that was not a
+disagreement at all: the app simply had the rule wrong (B-72), and the setting exists so a
+table used to the old behaviour can keep it.
 
 `null` is **distinct from `false`** and must stay that way — a test asserts it. An
 explicit ruling survives switching ruleset.
@@ -596,6 +607,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-63 | "His card stays down" implied the Hunter could be **kept secret** | Copy I added one commit earlier. True about the card and wrong about the secret: a dead player points and somebody drops, which identifies him whatever the reveal rule says — and a Hunter voted out fires in daylight, where nothing can hide it. The screen now says so, and points at the one arrangement that does hide him: take the shot in the night. |
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
+| B-72 | The day vote required an **absolute majority**, which neither rulebook prints | Asked at a table: should the most votes hang, or must it clear half? Both boxes say the most votes — *"the player with the most fingers pointing at them is convicted"* — with a re-vote on a tie and nobody hanged if it holds. Vietnamese play agrees: người nhiều phiếu nhất bị treo. The app demanded `best > TP/2`, and that is not a harmless stricter reading: on eight voters a decisive **4/3/1** split offered the moderator no Hang button at all, while the bar asked for a fifth vote that did not exist. The bigger the table the more the votes spread, so it got worse exactly as it mattered more — and it applied to every day phase of every game. Now plurality by default, with the majority available as a house rule. |
 | B-68 | The haptics button shipped as an **empty bordered box on every iPhone** | Reported from a phone. Two v5 findings interacted: P4 gave `.ico` `display:inline-flex` for its 44px floor, and P3 added a button hidden with the `hidden` attribute. An author `display` beats the UA stylesheet's `[hidden]{display:none}` regardless of specificity — author origin outranks user-agent origin — so on any browser without `navigator.vibrate` the control was never hidden. And `paintHaptic` returned *before* setting the label, so what remained was a bordered box with nothing in it. Fixed with a global `[hidden]{display:none !important}`, and by labelling before hiding so a future failure is at least readable. |
 | B-69 | Both moderator settings were **forgotten by the next game** | `G.lang` and `G.tips` lived in the object `blank()` replaces, so "Same table, new game" reset them: fold the tips away in your third game, start a fourth, and they are back. The asymmetry gave it away — `gamesPlayed`, the *automatic* guess, was given its own `localStorage` key precisely so it would outlive a game, while the two controls that overrule that guess were not. They are device preferences and now live in `mh.prefs`, out of the undo buffer and the save as well: switching language is not a move Undo should reverse. |
 | B-70 | Twenty rules blocks were **hard-coded English** after the language switch shipped | The old bilingual design was noisy, but a Vietnamese moderator could always read *something*. Picking one language turned redundancy into a gap: the interface says it speaks Vietnamese, then hands over the Fox's ruling in English, mid-night, in front of the table. Worst on the collect-the-deal screen, where a bare `.tell` sat four lines above correctly wrapped buttons — a Vietnamese action bar under an English instruction telling the moderator what to tap. Fixed by wrapping them, and by a structural scan that walks every `.tell` / `.alert` construction looking for prose never reached through `T()`. The scan found two more I had missed by hand. |
@@ -686,7 +698,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   856 assertions across 30 suites, 0 failing
+#   864 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -718,7 +730,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**856 assertions plus 57,000 generated decks.**
+**864 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -928,6 +940,20 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     margin reset had been losing since the day it was written (B-71). Both looked correct
     in the diff. If a rule exists to *override* another, give it more specificity, not a
     later line.
+
+33. **A test that mirrors the code it tests will agree with a bug forever.** `vote-test.js`
+    restated the day-vote condition in a local `verdict()` — "mirrors the app", said the
+    comment — and asserted *"a plurality below half does not carry"* as an invariant. Both
+    the app and the suite were wrong in the same way, so thirty suites stayed green while
+    the app refused legitimate hangings (B-72). It now lifts the real expression out of
+    `rDay` and throws if it cannot find it. This is the same lesson as rule 17, arriving
+    somewhere new: proving a copy proves nothing.
+
+34. **Check the rulebook before hardening a rule.** The majority threshold was not a
+    misread of the code; it was invented, defended by arithmetic, given a threshold
+    readout in the bar and pinned by a suite. Everything downstream was careful and the
+    premise was never checked. When a rule is *this* load-bearing — every day phase of
+    every game — the cheap step is reading the box.
 
 ---
 

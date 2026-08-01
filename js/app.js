@@ -395,6 +395,18 @@ const hunterFiresPowerless = () => G.hunterElder == null ? false : G.hunterElder
    Hunter row moot \u2014 which the panel now says out loud rather than leaving two settings
    that look independent and are not. */
 const elderStripsPowers = () => G.elderRevenge == null ? true : G.elderRevenge;
+/* Does a name have to clear HALF the voting weight to be hanged, or is the most votes
+   enough? Both rulebooks say the most votes: "the player with the most fingers pointing
+   at them is convicted", with a re-vote on a tie and nobody hanged if it stays tied.
+   Vietnamese play is the same \u2014 ng\u01b0\u1eddi nhi\u1ec1u phi\u1ebfu nh\u1ea5t b\u1ecb treo.
+
+   This app required an absolute majority, which is not a rule either box prints, and it
+   is not a harmless stricter reading: on eight voters a decisive 4/3/1 split offered the
+   moderator no way to hang anybody, and the bar asked for a fifth vote that did not
+   exist. The bigger the table the more the votes spread, so it got worse as it mattered
+   more. Default is now the printed rule; a table that really does demand a majority can
+   still ask for one. */
+const voteNeedsMajority = () => G.voteMajority == null ? false : G.voteMajority;
 /* Is a dead player's card turned face up? Miller’s Hollow reveals every elimination,
    night or day, with no exception — which is why the Devoted Servant's window is defined
    as "before an eliminated player's card is revealed". Vietnamese tables commonly do not
@@ -1486,6 +1498,17 @@ function houseRulesUI(){
              'exception. Many Ma S\u00f3i Vi\u1ec7t Nam tables <b>leave them face down</b>, which makes ' +
              'the deduction harder. The Village Idiot is turned either way: being shown is how the ' +
              'village learns to spare him.' },
+    { key:'voteMajority', q:'Ph\u1ea3i qu\u00e1 b\u00e1n m\u1edbi treo \u0111\u01b0\u1ee3c?',
+      en:'Must a name clear half the votes to be hanged?',
+      now:voteNeedsMajority(), byRule:false,
+      note:'C\u1ea3 hai b\u1ed9 lu\u1eadt \u0111\u1ec1u in l\u00e0 <b>kh\u00f4ng</b>: ai <b>nhi\u1ec1u phi\u1ebfu nh\u1ea5t</b> th\u00ec b\u1ecb treo, ' +
+           'ho\u00e0 th\u00ec b\u1ea7u l\u1ea1i, v\u1eabn ho\u00e0 th\u00ec kh\u00f4ng ai ch\u1ebft. \u0110\u00f2i qu\u00e1 b\u00e1n nghe c\u00f3 v\u1ebb ch\u1eb7t ch\u1ebd h\u01a1n ' +
+           'nh\u01b0ng b\u00e0n c\u00e0ng \u0111\u00f4ng phi\u1ebfu c\u00e0ng t\u1ea3n: 8 ng\u01b0\u1eddi chia 4/3/1 l\u00e0 \u0111\u00e3 kh\u00f4ng treo \u0111\u01b0\u1ee3c ai, ' +
+           'd\u00f9 c\u1ea3 b\u00e0n \u0111\u00e3 b\u1ecf phi\u1ebfu r\u00f5 r\u00e0ng.',
+      noteEn:'Both rulebooks print <b>no</b>: the <b>most votes</b> hangs, a tie is re-voted, ' +
+             'and a tie that holds hangs nobody. Requiring a majority sounds stricter but the ' +
+             'bigger the table the more the votes spread \u2014 on eight voters a 4/3/1 split ' +
+             'hangs nobody at all, even though the table voted decisively.' },
     { key:'hunterNight', q:'Thợ Săn bị sói ăn \u2014 bắn ngay trong đêm?',
       en:'Is a night-eaten Hunter\u2019s shot taken privately, during the night?',
       now:hunterShootsInTheNight(), byRule:false,
@@ -2252,24 +2275,34 @@ function rDay(){
       if (document.activeElement !== c.box) c.box.value = String(tallyOf(c.p));
     }
     const cast = A.reduce((a,p) => a + tallyOf(p), 0) + (G.sheriffVote && sh ? wt - 1 : 0);
-    const passing = lead.length === 1 && best > thr;
+    const over = best > thr;
+    /* Most votes, unique leader — unless this table has asked for a majority. No `best > 0`
+       guard: the loop above only ever puts somebody in `lead` on a positive tally, so a
+       single leader already implies a vote was cast. */
+    const passing = lead.length === 1 && (!voteNeedsMajority() || over);
     if (passing && !wasPassing) buzz('commit');
     wasPassing = passing;
     verdict.className = 'tell' + (passing ? ' ok' : '');
     verdict.innerHTML = passing
       ? '<b>' + lead[0].name + '</b>' +
-        T(' \u0111\u01b0\u1ee3c ' + fmtN(best) + '/' + fmtN(TP) + ' \u2014 qu\u00e1 b\u00e1n. Phi\u1ebfu c\u00f3 hi\u1ec7u l\u1ef1c.',
-          ' has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.') +
+        T(' \u0111\u01b0\u1ee3c ' + fmtN(best) + '/' + fmtN(TP) + ' \u2014 nhi\u1ec1u phi\u1ebfu nh\u1ea5t' +
+            (over ? ', qu\u00e1 b\u00e1n' : '') + '. Phi\u1ebfu c\u00f3 hi\u1ec7u l\u1ef1c.',
+          ' has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 the most' +
+            (over ? ', and over half' : '') + '. The vote carries.') +
         // said before the button, not after: once it is tapped the screen has moved on
         '<p class="note">' + revealNote([lead[0]]) + '</p>'
       : lead.length > 1 && best > 0
         ? T('Ho\u00e0 ' + fmtN(best) + ' phi\u1ebfu: <b>','Tied on ' + fmtN(best) + ': <b>') +
           lead.map(x=>x.name).join(', ') +
-          T('</b>. Kh\u00f4ng ai qu\u00e1 b\u00e1n.', '</b>. Nobody clears half.')
+          T('</b>. Ho\u00e0 th\u00ec ch\u01b0a ai b\u1ecb treo \u2014 b\u1ea7u l\u1ea1i gi\u1eefa nh\u1eefng ng\u01b0\u1eddi n\u00e0y.',
+            '</b>. A tie hangs nobody \u2014 re-vote between them.')
         : best === 0 ? T('Ch\u01b0a ghi phi\u1ebfu n\u00e0o.', 'No votes recorded yet.')
+          // only reachable when this table has asked for a majority
           : '<b>' + lead[0].name + '</b>' +
-            T(' d\u1eabn v\u1edbi ' + fmtN(best) + ', nh\u01b0ng ch\u01b0a qu\u00e1 ' + fmtN(thr) + '. Nh\u01b0 hi\u1ec7n t\u1ea1i phi\u1ebfu kh\u00f4ng c\u00f3 hi\u1ec7u l\u1ef1c.',
-              ' leads on ' + fmtN(best) + ', but that is not more than ' + fmtN(thr) + '. As it stands the vote fails.');
+            T(' d\u1eabn v\u1edbi ' + fmtN(best) + ', nh\u01b0ng ch\u01b0a qu\u00e1 ' + fmtN(thr) +
+                '. B\u00e0n n\u00e0y \u0111\u00f2i qu\u00e1 b\u00e1n, n\u00ean phi\u1ebfu ch\u01b0a c\u00f3 hi\u1ec7u l\u1ef1c.',
+              ' leads on ' + fmtN(best) + ', but that is not more than ' + fmtN(thr) +
+                '. This table requires a majority, so the vote fails.');
     twice.style.display = cast > TP ? '' : 'none';
     twice.innerHTML = T(
       'B\u1ea1n \u0111\u00e3 ghi ' + fmtN(cast) + ' tr\u00ean t\u1ed1i \u0111a ' + fmtN(TP) + '. C\u00f3 ng\u01b0\u1eddi b\u1ecf phi\u1ebfu hai l\u1ea7n.',
@@ -2278,15 +2311,22 @@ function rDay(){
     const opts = [];
     if (passing) opts.push({ t: T('Treo c\u1ed5 ','Hang ') + lead[0].name + ' \u2192', on:() => resolveVote(lead[0]) });
     if (sc.length && lead.length > 1) opts.push({ t: T('Ho\u00e0 \u2014 V\u1eadt T\u1ebf Th\u1ea7n ch\u1ebft thay','Tied \u2014 Scapegoat dies'), sec:true, on:() => resolveVote(sc[0], true) });
-    opts.push({ t: best > 0 ? 'Clear the tally' : 'Nobody was voted out', sec:true, on:() => {
+    opts.push({ t: best > 0 ? T('Xo\u00e1 phi\u1ebfu, b\u1ea7u l\u1ea1i','Clear the tally')
+                            : T('Kh\u00f4ng ai b\u1ecb treo','Nobody was voted out'), sec:true, on:() => {
       if (best > 0){ G.votes = {}; G.sheriffVote = null; refresh(); return; }
-      snap(); log('The vote did not clear half. Nobody was hanged.');
+      snap(); log(voteNeedsMajority()
+        ? 'The vote did not clear half. Nobody was hanged.'
+        : 'No name was voted out. Nobody was hanged.');
       G.votes = {}; G.sheriffVote = null; G.resume = 'night'; proceed(); } });
     bar(opts);
     // Pinned last: bar() clears the note, so this has to follow it.
-    barNote(fmtN(cast) + T(' / <b>',' of <b>') + fmtN(TP) +
-      T('</b> phi\u1ebfu \u00b7 c\u1ea7n <b','</b> cast \u00b7 a name needs <b') +
-      (passing ? ' class="hit"' : '') + '>' + T('h\u01a1n ','more than ') + fmtN(thr) + '</b>');
+    barNote(fmtN(cast) + T(' / <b>',' of <b>') + fmtN(TP) + T('</b> phi\u1ebfu \u00b7 ','</b> cast \u00b7 ') +
+      (voteNeedsMajority()
+        ? T('c\u1ea7n <b','a name needs <b') + (passing ? ' class="hit"' : '') + '>' +
+          T('h\u01a1n ','more than ') + fmtN(thr) + '</b>'
+        : T('nhi\u1ec1u phi\u1ebfu nh\u1ea5t l\u00e0 b\u1ecb treo \u00b7 qu\u00e1 b\u00e1n l\u00e0 <b',
+            'most votes hangs \u00b7 over <b') + (over ? ' class="hit"' : '') + '>' +
+          fmtN(thr) + T('</b> th\u00ec b\u1ea7u l\u1ea1i kh\u00f4ng l\u1eadt \u0111\u01b0\u1ee3c','</b> cannot be overturned')));
   }
   // A blur can change the ordering that was held back while typing.
   for (const c of cells) c.box.addEventListener('blur', () => refresh());
