@@ -1607,28 +1607,47 @@ function houseRulesUI(){
   return wrap;
 }
 
-/* One player left and one card left means there is nothing worth asking, and a
-   moderator holding fifteen people's attention should not have to answer it.
-   Returns the deduced role, or null when the answer is not actually forced.
+/* When the cards still to place are ALL THE SAME, every remaining seat is forced and
+   there is nothing worth asking — so fill them and say so. Going once round a table of
+   fifteen, the last four are almost always plain Villagers, and tapping "Dân làng" four
+   times while fifteen people wait is four chances to mis-tap for no information.
 
-   Requiring exactly one free slot is what makes this safe in the Roster mid-game.
-   The deck stops describing the table once a card leaves it — the Thief swaps for
-   one of the two spares, which were never counted — but such a swap always leaves
-   at least two slots looking free, because he frees his own and fills no counted
-   one. So a drifted deck can never be mistaken for a forced answer. */
-function autoFillLastCard(){
+   Two conditions, and the second is what makes it sound:
+
+     1. the unplaced cards balance the unassigned seats. If they do not, the deck has
+        stopped describing the table and nothing here is deducible.
+     2. every unplaced card is the same role. Then there is no other card any of those
+        seats could be holding, whatever route the deck took to get here.
+
+   This replaces a rule that required exactly one seat and exactly one card. That was
+   sound but far narrower, and its stated reason — that a Thief swap always leaves two
+   slots looking free, so a drifted deck could never look forced — no longer applies:
+   thiefTakes() keeps G.counts in step, so the deck balances again after a swap. Condition
+   1 is now what refuses a drifted deck, and it refuses it in every shape, not just the
+   Thief's.
+
+   Returns the deduced role, or null when the answer is not actually forced. */
+function autoFillForced(){
   const left = unassigned();
-  if (left.length !== 1) return null;
   const short = [];
   for (const k in G.counts){
     for (let i = withRole(k).length; i < G.counts[k]; i++) short.push(k);
   }
-  if (short.length !== 1) return null;          // ambiguous, so leave it alone
-  left[0].role = short[0];
-  log(T(left[0].name + ' c\u1ea7m l\u00e1 cu\u1ed1i c\u00f9ng, ' + rName(R[short[0]]) + '.',
-        left[0].name + ' holds the last card, the ' + rName(R[short[0]]) + '.'),
-      T('Chu\u1ea9n b\u1ecb','Setup'));
-  return R[short[0]];
+  /* Not `<`: a deck with MORE cards left than seats does not add up either, and deducing
+     from it hands somebody a card the table does not have. No `left.length` guard above
+     either — an empty board gives an empty `short`, which the next line already refuses. */
+  if (short.length !== left.length) return null;       // the deck does not describe the table
+  if (new Set(short).size !== 1) return null;          // more than one card left: ambiguous
+  const id = short[0], r = R[id];
+  left.forEach(p => p.role = id);
+  const names = left.map(p => p.name).join(T(', ', ', '));
+  log(left.length === 1
+    ? T(names + ' c\u1ea7m l\u00e1 cu\u1ed1i c\u00f9ng, ' + rName(r) + '.',
+        names + ' holds the last card, the ' + rName(r) + '.')
+    : T(left.length + ' ng\u01b0\u1eddi c\u00f2n l\u1ea1i \u0111\u1ec1u l\u00e0 ' + rName(r) + ': ' + names + '.',
+        'The remaining ' + left.length + ' are all ' + rName(r) + ': ' + names + '.'),
+    T('Chu\u1ea9n b\u1ecb','Setup'));
+  return r;
 }
 
 /* ---- collect the deal ---- */
@@ -1653,7 +1672,7 @@ function rLearn(){
         '<span class="ic">' + icOf(r.id) + '</span>' + rName(r) +
         '<span class="bd">' + placed + '/' + G.counts[r.id] + '</span>');
       if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
-        autoFillLastCard(); render(); };
+        autoFillForced(); render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
@@ -2679,7 +2698,7 @@ function openRoster(){
         '<span class="bd">' + (inDeck ? placed + '/' + G.counts[r.id] : 'off-deck') + '</span>');
       if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
         log(T(p.name + ' l\u00e0 ' + rName(r) + '.', p.name + ' is the ' + r.name + '.'));
-        autoFillLastCard(); openRoster(); };
+        autoFillForced(); openRoster(); };
       c.appendChild(b);
     }
     B.appendChild(c);

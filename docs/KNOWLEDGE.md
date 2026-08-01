@@ -301,6 +301,27 @@ known", stop and ask what you actually need.
 `unplacedWolfCards()` names the missing cards in words, so the message tells the
 moderator *what to go and find* rather than which players it does not recognise.
 
+### Collecting the deal deduces what is forced
+
+Going once round a table of fifteen, the last four are almost always plain Villagers.
+`autoFillForced()` fills any run of identical remaining cards in one tap — Villagers,
+Werewolves, and the pair and trio, which are always the same card as each other and so are
+frequently exactly what the tail of a deal is.
+
+Two conditions, and the second is what makes it sound:
+
+1. the unplaced cards **balance** the unassigned seats. `!==`, not `<`: a deck with more
+   cards left than seats does not add up either, and deducing from it hands somebody a card
+   the table does not have.
+2. every unplaced card is the **same role**. Then no seat could be holding anything else,
+   whatever route the deck took to get here.
+
+It replaced a rule that required exactly one seat and exactly one card. That was sound but
+far narrower, and its stated reason — that a Thief swap always leaves two slots looking
+free, so a drifted deck could never look forced — had already stopped being the guard:
+`thiefTakes()` keeps `G.counts` in step (B-55), so the deck balances again after a swap.
+Condition 1 refuses a drifted deck in every shape, not just the Thief's.
+
 ### The one case that still asks
 
 **Miller’s Hollow + discover-during-the-night + night one.** The Fox and Seer are
