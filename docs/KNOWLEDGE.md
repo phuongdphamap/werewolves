@@ -632,6 +632,8 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
 | B-74 | The long prose ignored the language switch entirely | Reported from screenshots: an English interface serving Vietnamese essays. The `.tell` sweep in v6 covered the short blocks but not the four collapsible bodies, the ruleset gloss (`Miller’s Hollow (bản gốc)` in both directions), or **role descriptions** — which the night call puts under every heading and the deck list puts in every row, so a Vietnamese moderator read an English paragraph on every single step. The `order` explainer was the worst shape: it chose its text by *ruleset*, so the language you got depended on which rules you were playing. Content per ruleset, language per `T()` — four texts, not two. All 26 cards now carry a `dVi`, reached through one `rDesc()` accessor that falls back to the English rather than to nothing. |
 | B-77 | Two buttons side by side had **no gap between them** | Reported from a screenshot: on the Witch screen the disabled "Save X" sat welded to "Our table allows self-rescue". Both were appended straight into `#nBody`, and a bare `.btn` is inline-block — so the stack handed each a *vertical* `margin-top` that does nothing to boxes laid out horizontally, and the horizontal gap measured **0**. They are one `.row.flow` now: a real flex row with the standard 10px gap, wrapping because two full labels do not fit a phone. |
+| B-80 | The teaching tips stayed English, **inside a box labelled "Luật & mẹo"** | Reported from a screenshot. `tip()` pushes raw HTML into a buffer that `flushTips()` later wraps in a collapsible, so its literals sit at neither a `.tell` construction nor a `collapsible()` call — the two places the language scans looked. Five shipped untranslated. The scan had a blind spot, which is worse than no scan because it was trusted: it is now three scans, and a fourth that fails if prose reaches the screen through any helper not on the list. |
+| B-81 | Both language scans passed a **half-translated ternary** | Found by mutating one branch of the Seer tip. The scans asked "does this argument mention `T(`" — true for `cond ? 'english' : T(vi, en)`. They now check every prose literal individually, counting the `T(` parens still open at that point, which is the technique the `.tell` scan already used. The looser form had been in the log scan since it was written. |
 | B-79 | The chronicle, and the win reason, stayed English | The last surface. All 44 `log()` sites, the `when` column from `label()`, and every `checkWin()` return now go through `T()` — the win reason mattered twice over, since `G.over.why` is also the sentence on the end screen. Rendered at write time rather than at display time, which is only sound because the language chip lives on the deck screen and is unreachable once the first night begins: a game cannot change language midway, so a chronicle cannot end up half in each. That placement is now pinned by a test, because moving the control to the Roster would quietly break the guarantee. |
 | B-78 | The fix for B-77 shipped as `.row.wrap`, which **inherited the root container** | `.wrap` is the app's top-level layout element — `display:flex; flex-direction:column`. A modifier named `.row.wrap` matched it too, so the pair stacked vertically instead of sitting side by side. Caught by measuring `flexDirection` and finding `column` where the row rule says `row`; renamed to `.row.flow`. A modifier that reuses a layout class name silently takes its declarations, and `spacing-test.js` now refuses any that do. |
 | B-76 | A stack that followed prose got **no gap at all** | Reported from a screenshot: the "Which route should I take?" collapsible sat flush against the deal note. The structural rule paired stack with stack — `.stack:not(:empty) + .stack:not(:empty)` — so `#dealAlt`, whose previous sibling is a plain `<p>`, was given nothing, and its first child gets no `* + *` either. Measured at **0px** where every other gap on that screen was 20. Generalised to `* + .stack:not(:empty)`; margins collapse, so a neighbour with its own bottom margin (`.sub` at 28) still wins and nothing compounds. |
@@ -728,7 +730,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   904 assertions across 30 suites, 0 failing
+#   907 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -760,7 +762,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**904 assertions plus 57,000 generated decks.**
+**907 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -1004,6 +1006,20 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     navigation, not of the logging, and nothing was stopping someone moving the control to
     the Roster and quietly invalidating it. So the property is now a test. When a shortcut
     depends on an invariant somewhere else in the app, pin the invariant, not the shortcut.
+
+38. **A scan with a blind spot is worse than no scan.** The `.tell` sweep was made
+    structural precisely so the next untranslated block could not ship — and then five
+    did, because `tip()` hands its prose to a buffer rather than to a construction the
+    scan recognises (B-80). Nobody re-checked by hand, because the scan was there. When a
+    check becomes the reason to stop looking, its coverage is the thing to verify: there is
+    now a test that fails if prose reaches the screen through *any* helper not on a known
+    list.
+
+39. **"Contains a T(" is not "is translated".** Both scans accepted
+    `cond ? 'english' : T(vi, en)` — one wrapped branch was enough to satisfy them
+    (B-81). Checking a whole argument for the presence of a helper says nothing about the
+    literals inside it. Walk the literals, and for each one ask whether a call is still
+    open around it.
 
 ---
 

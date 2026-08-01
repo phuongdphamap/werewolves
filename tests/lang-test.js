@@ -78,6 +78,21 @@ t('role names go through one accessor', () =>
 /* Comments quote the old pattern to explain why it went, and a source scan cannot tell
    that from a live call site. Stripped, so the check is about code. */
 const code = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/* Is every prose literal in this argument reached through T()? Asking only "does the
+   argument mention T(" is not enough: a ternary with one branch wrapped and one bare
+   passes that, which is exactly how a Seer tip shipped half-translated. */
+const PROSE_LIT = /'([^'\n]*?[a-z]{2,} [a-z]{2,} [a-z]{2,}[^'\n]*?)'/g;
+function unwrapped(arg){
+  const out = [];
+  for (const m of arg.matchAll(PROSE_LIT)){
+    const before = arg.slice(0, m.index);
+    const open = (before.match(/\bT\(/g) || []).length -
+                 (before.match(/\bT\([^()]*\)/g) || []).length;
+    if (open <= 0) out.push(m[1].slice(0, 40));
+  }
+  return out;
+}
+
 t('no card is named by testing the ruleset any more', () => {
   const bad = [...code.matchAll(/G\.rules ?=== ?'vn' \? [\w.[\]]*\.vi/g)].map(m => m[0]);
   return bad.length === 0
@@ -194,6 +209,40 @@ t('the collect-the-deal instruction is wrapped, like the buttons under it', () =
 /* The gaps the structural scan above cannot see, because they are not .tell blocks:
    collapsible bodies, role descriptions, and a handful of one-off controls. All of them
    were reported from screenshots — an English interface serving Vietnamese essays. */
+/* tip() pushes raw HTML into a buffer that flushTips() later wraps in a collapsible, so
+   its literals sit at neither a .tell construction nor a collapsible() call — the two
+   places the scans above look. Five of them shipped in English and a Vietnamese moderator
+   saw "She is called after the pack here" inside a box labelled "Luật & mẹo". A scan with
+   a blind spot is worse than no scan, because it is trusted. */
+console.log('\nTHE TEACHING TIPS ARE SCANNED TOO');
+t('every tip() goes through T()', () => {
+  const bad = [];
+  for (const m of code.matchAll(/[^\w.]tip\(([\s\S]*?)\);/g)){
+    const arg = m[1];
+    if (/^\s*html\s*$/.test(arg)) continue;            // the definition
+    const loose = unwrapped(arg);
+    if (!loose.length) continue;
+    bad.push(code.slice(0, m.index).split('\n').length + ': "' + loose[0] + '..."');
+  }
+  return bad.length === 0
+    ? true : bad.length + ' untranslated tip(s) — ' + bad.join(' | ');
+});
+t('...and there are enough of them for that to mean something', () => {
+  const n = (code.match(/[^\w.]tip\(/g) || []).length - 1;   // minus the definition
+  return n >= 4 ? true : 'only ' + n + ' tip sites; the scan may have stopped matching';
+});
+/* The general form of the same mistake: any helper that takes prose and renders it later.
+   If a new one is added, it has to be added to a scan as well. */
+t('no other helper quietly accepts prose without a scan behind it', () => {
+  // V is the resume veil's local alias for T, asserted as `const V = T;` further up
+  const known = ['T', 'V', 'log', 'tip', 'el', 'collapsible', 'bar', 'barNote'];
+  const callers = new Set();
+  for (const m of code.matchAll(/[^\w.](\w+)\('[^']{25,}'/g)) callers.add(m[1]);
+  const unscanned = [...callers].filter(c => !known.includes(c));
+  return unscanned.length === 0
+    ? true : 'prose reaches the screen through unscanned helper(s): ' + unscanned.join(', ');
+});
+
 console.log('\nTHE LONGER PROSE FOLLOWS IT TOO');
 t('every collapsible body is a T() pair, not one language', () => {
   const calls = [...js.matchAll(/collapsible\(\s*'(\w+)'/g)].map(m => m[1]);
@@ -289,9 +338,10 @@ t('every log entry goes through T()', () => {
   const bad = [];
   for (const m of code.matchAll(/(?<!function )\blog\(([\s\S]*?)\);/g)){
     const arg = m[1];
-    if (/\bT\(/.test(arg)) continue;
     if (/^\s*v\.why\s*$/.test(arg)) continue;      // already a T() pair where it is built
-    bad.push(code.slice(0, m.index).split('\n').length + ': ' + arg.trim().slice(0, 46));
+    const loose = unwrapped(arg);
+    if (!loose.length) continue;
+    bad.push(code.slice(0, m.index).split('\n').length + ': "' + loose[0] + '..."');
   }
   return bad.length === 0
     ? true : bad.length + ' untranslated log site(s) — ' + bad.slice(0, 3).join(' | ');
