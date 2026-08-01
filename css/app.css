@@ -296,8 +296,15 @@
   .btn.sec.on{border-color:var(--moon);color:var(--moon);background:rgba(232,223,200,.10)}
 
   .chips{display:flex;flex-wrap:wrap;gap:var(--s2)}
+  /* A control owns its own colour. .chip was the one that did not, so it inherited — and
+     inside .expBody, which sets color:var(--txt2) for prose, every house-rule chip drew its
+     label at 67% alpha while the identical chips in a .card drew at full. Reported as the
+     House rules highlight looking darker than Rules order; the backgrounds were always the
+     same, it was the text. Same shape as the .expBody p bug: a container's prose styling
+     reaching into a component nested inside it. */
   .chip{display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--line);
-    border-radius:var(--r-full);padding:11px 16px;font-size:var(--t-body);font-weight:500;cursor:pointer;
+    border-radius:var(--r-full);padding:11px 16px;font-size:var(--t-body);font-weight:500;
+    color:var(--txt);cursor:pointer;
     min-height:44px;transition:border-color .15s,background .15s;touch-action:manipulation}
   .chip:hover{border-color:var(--line2)}
   /* The most-tapped control in the app — every night target, every card set, every house

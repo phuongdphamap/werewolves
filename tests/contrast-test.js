@@ -73,6 +73,32 @@ t('a dead chip clears 3:1 and has no strikethrough', () => {
   return r >= 3 ? true : 'dead chip is ' + r.toFixed(2) + ':1 at opacity ' + o;
 });
 
+/* A control has to declare its own colour, or a container's prose colour reaches it.
+   .chip did not, so inside .expBody — which sets color:var(--txt2) for prose — every
+   house-rule chip drew its label at 67% alpha while the identical chips inside a .card
+   drew at full. Reported as the House rules highlight looking darker than Rules order.
+   Same shape as the `.expBody p` bug: styling meant for prose reaching a component. */
+console.log('\nA CONTROL OWNS ITS OWN COLOUR');
+const CONTROLS = ['.chip', '.btn', '.ico', '.stp button', '.altBtn'];
+const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+for (const sel of CONTROLS){
+  t(sel + ' declares a colour rather than inheriting one', () => {
+    const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = bare.match(new RegExp('(^|,|\n)\\s*' + esc + '\\{([^}]*)\\}', 'm'));
+    if (!m) return 'rule not found';
+    return /(^|;)\s*color:/.test(m[2])
+      ? true : 'inherits, so a container can dim it: ' + sel + '{' + m[2].slice(0, 60) + '}';
+  });
+}
+t('and a chip inside a collapsible is not dimmed to prose alpha', () => {
+  // the two rules that would fight: .expBody's prose colour, and the chip's own
+  const body = (bare.match(/\.expBody\{[^}]*\}/) || [''])[0];
+  const chip = (bare.match(/\n  \.chip\{[^}]*\}/) || [''])[0];
+  if (!/color:var\(--txt2\)/.test(body)) return 'the collapsible body no longer sets a prose colour';
+  return /color:var\(--txt\)/.test(chip)
+    ? true : 'the chip would inherit --txt2 inside a collapsible';
+});
+
 console.log('\nVIETNAMESE KEEPS ITS DIACRITICS');
 /* Sizes are scale tokens now, so the value has to be resolved through :root rather than
    read off the rule. A token that silently shrank would otherwise pass by returning NaN. */

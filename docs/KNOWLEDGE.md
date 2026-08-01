@@ -632,6 +632,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
 | B-74 | The long prose ignored the language switch entirely | Reported from screenshots: an English interface serving Vietnamese essays. The `.tell` sweep in v6 covered the short blocks but not the four collapsible bodies, the ruleset gloss (`Miller’s Hollow (bản gốc)` in both directions), or **role descriptions** — which the night call puts under every heading and the deck list puts in every row, so a Vietnamese moderator read an English paragraph on every single step. The `order` explainer was the worst shape: it chose its text by *ruleset*, so the language you got depended on which rules you were playing. Content per ruleset, language per `T()` — four texts, not two. All 26 cards now carry a `dVi`, reached through one `rDesc()` accessor that falls back to the English rather than to nothing. |
 | B-77 | Two buttons side by side had **no gap between them** | Reported from a screenshot: on the Witch screen the disabled "Save X" sat welded to "Our table allows self-rescue". Both were appended straight into `#nBody`, and a bare `.btn` is inline-block — so the stack handed each a *vertical* `margin-top` that does nothing to boxes laid out horizontally, and the horizontal gap measured **0**. They are one `.row.flow` now: a real flex row with the standard 10px gap, wrapping because two full labels do not fit a phone. |
+| B-83 | House-rule chips drew their labels **dimmer than identical chips elsewhere** | Asked from a screenshot: is the House rules highlight meant to be darker than Rules order? It was not, and it was not the highlight — both backgrounds computed to exactly `rgba(232,223,200,.16)`. `.chip` was the one control that never declared a `color`, so it inherited: full `--txt` inside a `.card`, but `--txt2` (67% alpha) inside `.expBody`, which sets a prose colour. Same shape as B-59 — a container's text styling reaching into a component nested in it. `.chip` owns its colour now, and a test walks every control to check the rest already do. |
 | B-82 | Two house-rule rows drew **no selected chip** | Reported from a screenshot. `elderRevenge` and `voteMajority` were added later than the other five and never reached `blank()`, so `G[key]` was `undefined`. Every accessor reads `== null`, which `undefined` satisfies — so the rules behaved correctly and only the highlight was wrong, which is why nothing caught it. The chip read `===`, and `undefined === null` is false. Both keys are in `blank()` now, and the chip reads `(G[r.key] ?? null)` too, because `blank()` cannot reach a game saved before a rule existed. |
 | B-80 | The teaching tips stayed English, **inside a box labelled "Luật & mẹo"** | Reported from a screenshot. `tip()` pushes raw HTML into a buffer that `flushTips()` later wraps in a collapsible, so its literals sit at neither a `.tell` construction nor a `collapsible()` call — the two places the language scans looked. Five shipped untranslated. The scan had a blind spot, which is worse than no scan because it was trusted: it is now three scans, and a fourth that fails if prose reaches the screen through any helper not on the list. |
 | B-81 | Both language scans passed a **half-translated ternary** | Found by mutating one branch of the Seer tip. The scans asked "does this argument mention `T(`" — true for `cond ? 'english' : T(vi, en)`. They now check every prose literal individually, counting the `T(` parens still open at that point, which is the technique the `.tell` scan already used. The looser form had been in the log scan since it was written. |
@@ -731,7 +732,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   910 assertions across 30 suites, 0 failing
+#   916 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -763,7 +764,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**910 assertions plus 57,000 generated decks.**
+**916 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -1028,6 +1029,12 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     and looked broken (B-82) — the only symptom was a missing highlight, which no rules test
     would ever check. When one field is read in two places, read it the same way in both,
     or the mismatch surfaces as something that looks cosmetic and is not.
+
+41. **A component that inherits anything can be restyled by wherever it lands.** `.chip`
+    declared background, border, radius, size and weight — everything except colour — so it
+    looked finished and drew differently in two places (B-83). Inheritance is not a default
+    to leave alone: for a control it is a dependency on the container. The fix is one line;
+    the check that it holds for every other control is the part worth keeping.
 
 ---
 
