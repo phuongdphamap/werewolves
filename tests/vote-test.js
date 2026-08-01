@@ -75,6 +75,75 @@ function verdict(tally){
            who: lead.length === 1 ? lead[0].name : null, tied: lead.length > 1 };
 }
 
+/* Measured at 320px in a frame: the row that had crossed half gave its name column exactly
+   ZERO pixels. .stp took 142 at flex:0 0 auto, the "carries" tag 54 at nowrap, the seat 22
+   and three gaps 30 — the whole 246px content box before the name was considered, and .nm
+   is the only child that can shrink. The row announced that somebody was about to be
+   hanged and did not say who.
+
+   A player's name is the one string this app cannot paraphrase or truncate: saying it out
+   loud correctly is the whole product. So it is never the element that yields. */
+console.log('A NAME IS NEVER WHAT GETS SACRIFICED');
+const CSS = fs.readFileSync('../css/app.css', 'utf8');
+const APP = fs.readFileSync('../js/app.js', 'utf8');
+t('the winning row no longer spends 54px on a word', () => {
+  const line = (APP.match(/c\.power\.textContent = [^;]*;/) || [''])[0];
+  return !/'carries'/.test(line)
+    ? true : 'the tag is back and the name pays for it: ' + line;
+});
+t('what is left in that slot is the Sheriff star, which nothing else shows', () => {
+  const line = (APP.match(/c\.power\.textContent = [^;]*;/) || [''])[0];
+  return /extra \? '\\u2b50' : ''/.test(line) ? true : 'the star was dropped too: ' + line;
+});
+/* Dropping the tag bought the name 62px of the 128 it needs at 320. The rest has to come
+   from somewhere the row can actually give, and the stepper cannot: it is two 44px touch
+   targets and a field, all of it the minimum. So the name takes a second line rather than
+   an ellipsis. */
+t('the name in a vote row wraps rather than ellipsising', () => {
+  const rule = (CSS.match(/\.p\.vote \.nm\{[^}]*\}/) || [''])[0];
+  if (!rule) return 'no .p.vote .nm rule: the row falls back to .p .nm, which ellipsises';
+  const missing = [
+    ['white-space:normal',  /white-space:normal/],
+    ['overflow:visible',    /overflow:visible/],
+    ['text-overflow:clip',  /text-overflow:clip/],
+  ].filter(([, re]) => !re.test(rule)).map(([w]) => w);
+  return missing.length === 0 ? true : '.p .nm still wins on: ' + missing.join(', ');
+});
+t('and a name with no space in it still cannot overflow the row', () =>
+  /\.p\.vote \.nm\{[^}]*overflow-wrap:anywhere/.test(CSS)
+    ? true : 'one long token would push the stepper off the screen');
+
+t('and the slot collapses when it holds nothing', () =>
+  /\.p\.vote \.carries:empty\{display:none\}/.test(CSS)
+    ? true : 'an empty flex child still costs a gap either side');
+/* Removing the word must not remove the FACT. It is still carried three ways on the row,
+   and stated in words in the bar note, which is full width and has room. */
+t('the row still says it carries, without words', () => {
+  const need = [
+    ['a red border', /\.p\.vote\.over\{border-color:var\(--wolf\)\}/],
+    ['a red name',   /\.p\.vote\.over \.nm\{color:var\(--wolf\)\}/],
+    ['a fill',       /\.p\.vote\.over \.fill\{[^}]*var\(--wolf\)/],
+  ].filter(([, re]) => !re.test(CSS)).map(([what]) => what);
+  return need.length === 0 ? true : 'lost: ' + need.join(', ');
+});
+t('and the bar note names who carries, in words', () => {
+  const r = (APP.match(/function refresh\(\)\{[\s\S]*?\n  \}/) || [''])[0];
+  return /'<b class="hit">' \+ lead\[0\]\.name/.test(r)
+    ? true : 'nothing states in words which name carries';
+});
+/* The day's primary action used to read "Hang {name} \u2192". At 320 the button offers 116px
+   for its label and the Vietnamese form of a three-part name needs 208, so .bar .in .btn's
+   ellipsis trimmed the identity of the person being eliminated off the control that
+   commits the elimination. */
+t('the confirm button carries no name to truncate', () => {
+  const line = (APP.match(/if \(passing\) opts\.push\(\{ t: [^\n]*/) || [''])[0];
+  return !/lead\[0\]\.name/.test(line)
+    ? true : 'the name is back on a button that ellipsises: ' + line;
+});
+t('the bar can still ellipsise, since a long label must not break the row', () =>
+  /\.bar \.in \.btn\{[^}]*text-overflow:ellipsis\}/.test(CSS)
+    ? true : 'a long label would now wrap the button row instead');
+
 console.log('THE MOST VOTES HANGS');
 const SEVEN = ['wolf','wolf','villager','villager','villager','seer','witch'];
 const EIGHT = ['wolf','wolf','villager','villager','villager','villager','seer','witch'];

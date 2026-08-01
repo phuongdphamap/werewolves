@@ -10,6 +10,7 @@ let pass = 0, fail = 0;
 const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.message; }
   if (r === true){ pass++; console.log('  ok   ' + name); }
   else { fail++; console.log('  FAIL ' + name + '  -> ' + r); } };
+const CSSRULES = re => src.match(re) || [];
 const rule = re => { const m = src.match(re); return m ? m[0].replace(/\s+/g,' ') : ''; };
 
 // the shipped distribution rule, lifted out so the logic itself is under test
@@ -181,10 +182,26 @@ t('and .wrap is where the variable is consumed, so the scope holds', () => {
   return (/var\(--barh/.test(wrap) && users.every(u => u === '.wrap'))
     ? true : '--barh is read outside .wrap, where the scoped value will not reach: ' + users.join(', ');
 });
-t('a long label truncates instead of breaking the row', () => {
-  const r = rule(/\.bar \.in \.btn\{[^}]*\}/);
-  return (/min-width:0/.test(r) && /white-space:nowrap/.test(r) && /text-overflow:ellipsis/.test(r))
-    ? true : r || 'rule missing';
+t('the row may break rather than truncate every label in it', () => {
+  const r = rule(/\.bar \.in\{[^}]*\}/);
+  return /flex-wrap:wrap/.test(r)
+    ? true : 'at 320 two buttons need 291px of 276 and both ellipsise, the primary included';
+});
+t('a button alone on a wrapped line fills it', () => {
+  const rules = [...CSSRULES(/\.bar \.in \.btn\{[^}]*\}/g)].join(' ');
+  return /flex:1 1 auto/.test(rules)
+    ? true : 'it would sit at its content width with the rest of the line empty';
+});
+t('but a single label too long for a whole line still truncates', () => {
+  const rules = [...CSSRULES(/\.bar \.in \.btn\{[^}]*\}/g)].join(' ');
+  const missing = ['min-width:0', 'white-space:nowrap', 'text-overflow:ellipsis']
+    .filter(k => !rules.includes(k));
+  return missing.length === 0 ? true : 'lost the last resort: ' + missing.join(', ');
+});
+t('and the bar height is measured, not guessed, so a wrapped row keeps its clearance', () => {
+  const fn = (js.match(/function measureBar\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /offsetHeight/.test(fn)
+    ? true : 'a two-line bar would cover the last row of the list';
 });
 t('the buttons are the same height as each other', () => {
   const r = rule(/\.bar \.in\{[^}]*\}/);
