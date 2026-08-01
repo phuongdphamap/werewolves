@@ -186,21 +186,32 @@ is pinned by tests in `fox-test.js`.
 
 ### The disputed rules are settable
 
-Five rules are genuinely argued about between tables, so they are **house rules** with
+Seven rules are genuinely argued about between tables, so they are **house rules** with
 three states rather than hard-coded:
 
 ```js
-G.selfHeal      // null = follow the published rule, true, false
+G.elderRevenge  // null = follow the published rule, true, false
+G.selfHeal      // null = ...
 G.hunterPoison  // null = ...
 G.hunterElder   // null = ...
 G.showCards     // null = ...
+G.voteMajority  // null = ...
 G.hunterNight   // null = ...
-witchMaySaveSelf()     // null ? rules !== 'vn' : G.selfHeal
-hunterFiresPoisoned()  // null ? rules !== 'vn' : G.hunterPoison
-hunterFiresPowerless() // null ? false            : G.hunterElder
-cardsShownOnDeath()    // null ? rules !== 'vn' : G.showCards
+elderStripsPowers()      // null ? true           : G.elderRevenge
+witchMaySaveSelf()       // null ? rules !== 'vn' : G.selfHeal
+hunterFiresPoisoned()    // null ? rules !== 'vn' : G.hunterPoison
+hunterFiresPowerless()   // null ? false          : G.hunterElder
+cardsShownOnDeath()      // null ? rules !== 'vn' : G.showCards
+voteNeedsMajority()      // null ? false          : G.voteMajority
 hunterShootsInTheNight() // null ? false          : G.hunterNight
 ```
+
+Two of them exist because a table asked. **`elderRevenge`** answers "can the Hunter fire
+after the Elder dies while the rest of the village keeps its powers?" — `hunterElder`
+exempts the Hunter alone, so the broader question needed its own switch, and it sits above
+the Hunter row because it governs it. **`voteMajority`** is the one that was not a
+disagreement at all: the app simply had the rule wrong (B-72), and the setting exists so a
+table used to the old behaviour can keep it.
 
 `null` is **distinct from `false`** and must stay that way — a test asserts it. An
 explicit ruling survives switching ruleset.
@@ -433,8 +444,18 @@ Any container that renders a stack of blocks carries `class="stack"`:
 ```css
 .stack > * + *{margin-top:var(--s4)}
 .stack > *{margin-bottom:0}                 /* so gaps cannot compound */
-.stack:not(:empty) + .stack:not(:empty){margin-top:var(--s4)}
+* + .stack:not(:empty){margin-top:var(--s4)}
+.stack > .card,.stack > .alert,.stack > .exp{margin-bottom:0}   /* see B-71 */
 ```
+
+The third rule used to pair stack with stack, which left any stack following a plain
+paragraph with no gap at all (B-76). The fourth exists because `.stack > *` and `.card`
+are both a single class, so the reset was losing on source order (B-71). Both were
+invisible in the diff and found by measuring.
+
+The scale governs **block rhythm**, not every pixel: a button's `11px 14px` padding and an
+icon's `8px` gap are deliberately outside it. `spacing-test.js` checks the rhythm rules
+specifically — a mutation that set the stack gap to `7px` passed every other suite.
 
 There are **no id-based spacing selectors**. Three separate spacing bugs came from a
 hand-maintained id list I kept forgetting to extend (B-16). `#lRoles` is deliberately
@@ -522,8 +543,16 @@ language plus twenty untranslated blocks is worse than the bilingual noise it re
 (B-70). `lang-test.js` walks every `.tell` and `.alert` construction and fails on any prose
 literal not reached through `T()`; that scan found two blocks the hand sweep missed.
 
-Still English-only: the long explanatory essays behind the deck-screen collapsibles, and
-the chronicle log. Both are reference rather than instruction, and neither is read out.
+Everything a moderator reads on screen is paired: labels, headings, buttons, house-rule
+notes, the four collapsible essays, and all 26 role descriptions (`dVi`, reached through
+`rDesc()`, which falls back to the English so a card added without one still says
+something). The role description is the one that mattered most — the night call puts it
+under every heading and the deck list puts it in every row (B-74).
+
+**Still English-only: the chronicle.** Log entries are written once, at the moment they
+happen, and stored as finished strings — translating the writers would not retranslate a
+game already in progress, and a record of what was said is arguably not a label at all.
+It is the one surface left, and it is deliberate.
 
 ### The teaching layer retires itself
 
@@ -596,6 +625,13 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-63 | "His card stays down" implied the Hunter could be **kept secret** | Copy I added one commit earlier. True about the card and wrong about the secret: a dead player points and somebody drops, which identifies him whatever the reveal rule says — and a Hunter voted out fires in daylight, where nothing can hide it. The screen now says so, and points at the one arrangement that does hide him: take the shot in the night. |
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
+| B-74 | The long prose ignored the language switch entirely | Reported from screenshots: an English interface serving Vietnamese essays. The `.tell` sweep in v6 covered the short blocks but not the four collapsible bodies, the ruleset gloss (`Miller’s Hollow (bản gốc)` in both directions), or **role descriptions** — which the night call puts under every heading and the deck list puts in every row, so a Vietnamese moderator read an English paragraph on every single step. The `order` explainer was the worst shape: it chose its text by *ruleset*, so the language you got depended on which rules you were playing. Content per ruleset, language per `T()` — four texts, not two. All 26 cards now carry a `dVi`, reached through one `rDesc()` accessor that falls back to the English rather than to nothing. |
+| B-77 | Two buttons side by side had **no gap between them** | Reported from a screenshot: on the Witch screen the disabled "Save X" sat welded to "Our table allows self-rescue". Both were appended straight into `#nBody`, and a bare `.btn` is inline-block — so the stack handed each a *vertical* `margin-top` that does nothing to boxes laid out horizontally, and the horizontal gap measured **0**. They are one `.row.flow` now: a real flex row with the standard 10px gap, wrapping because two full labels do not fit a phone. |
+| B-78 | The fix for B-77 shipped as `.row.wrap`, which **inherited the root container** | `.wrap` is the app's top-level layout element — `display:flex; flex-direction:column`. A modifier named `.row.wrap` matched it too, so the pair stacked vertically instead of sitting side by side. Caught by measuring `flexDirection` and finding `column` where the row rule says `row`; renamed to `.row.flow`. A modifier that reuses a layout class name silently takes its declarations, and `spacing-test.js` now refuses any that do. |
+| B-76 | A stack that followed prose got **no gap at all** | Reported from a screenshot: the "Which route should I take?" collapsible sat flush against the deal note. The structural rule paired stack with stack — `.stack:not(:empty) + .stack:not(:empty)` — so `#dealAlt`, whose previous sibling is a plain `<p>`, was given nothing, and its first child gets no `* + *` either. Measured at **0px** where every other gap on that screen was 20. Generalised to `* + .stack:not(:empty)`; margins collapse, so a neighbour with its own bottom margin (`.sub` at 28) still wins and nothing compounds. |
+| B-75 | A collapsible body was **padded unevenly** | `14px 20px 20px`, so the prose sat visibly nearer the divider above it than the border below. Spotted in a screenshot, confirmed by measuring. The summary keeps its own 14/20 because it is a row; a body is a panel, and a panel is padded like `.card`. |
+| B-73 | The vote tallies could **sum past the electorate** | Reported from a game: nine players, five votes recorded on one name and nine on another — fourteen hands from nine people, and a leader the table never produced. Each box was clamped to `voters.length` **on its own**, with nothing bounding the total. The over-count warning fired but only warned; the vote still carried on impossible arithmetic. The cap is now what is *left*: `voters.length` minus the hands already on other names. It never falls below what a name already holds, so a tally that is somehow over — a resumed save, an electorate that shrank mid-count — can still be corrected downwards instead of every box locking to zero. |
+| B-72 | The day vote required an **absolute majority**, which neither rulebook prints | Asked at a table: should the most votes hang, or must it clear half? Both boxes say the most votes — *"the player with the most fingers pointing at them is convicted"* — with a re-vote on a tie and nobody hanged if it holds. Vietnamese play agrees: người nhiều phiếu nhất bị treo. The app demanded `best > TP/2`, and that is not a harmless stricter reading: on eight voters a decisive **4/3/1** split offered the moderator no Hang button at all, while the bar asked for a fifth vote that did not exist. The bigger the table the more the votes spread, so it got worse exactly as it mattered more — and it applied to every day phase of every game. Now plurality by default, with the majority available as a house rule. |
 | B-68 | The haptics button shipped as an **empty bordered box on every iPhone** | Reported from a phone. Two v5 findings interacted: P4 gave `.ico` `display:inline-flex` for its 44px floor, and P3 added a button hidden with the `hidden` attribute. An author `display` beats the UA stylesheet's `[hidden]{display:none}` regardless of specificity — author origin outranks user-agent origin — so on any browser without `navigator.vibrate` the control was never hidden. And `paintHaptic` returned *before* setting the label, so what remained was a bordered box with nothing in it. Fixed with a global `[hidden]{display:none !important}`, and by labelling before hiding so a future failure is at least readable. |
 | B-69 | Both moderator settings were **forgotten by the next game** | `G.lang` and `G.tips` lived in the object `blank()` replaces, so "Same table, new game" reset them: fold the tips away in your third game, start a fourth, and they are back. The asymmetry gave it away — `gamesPlayed`, the *automatic* guess, was given its own `localStorage` key precisely so it would outlive a game, while the two controls that overrule that guess were not. They are device preferences and now live in `mh.prefs`, out of the undo buffer and the save as well: switching language is not a move Undo should reverse. |
 | B-70 | Twenty rules blocks were **hard-coded English** after the language switch shipped | The old bilingual design was noisy, but a Vietnamese moderator could always read *something*. Picking one language turned redundancy into a gap: the interface says it speaks Vietnamese, then hands over the Fox's ruling in English, mid-night, in front of the table. Worst on the collect-the-deal screen, where a bare `.tell` sat four lines above correctly wrapped buttons — a Vietnamese action bar under an English instruction telling the moderator what to tap. Fixed by wrapping them, and by a structural scan that walks every `.tell` / `.alert` construction looking for prose never reached through `T()`. The scan found two more I had missed by hand. |
@@ -686,7 +722,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   856 assertions across 30 suites, 0 failing
+#   899 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -718,7 +754,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**856 assertions plus 57,000 generated decks.**
+**899 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -928,6 +964,32 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     margin reset had been losing since the day it was written (B-71). Both looked correct
     in the diff. If a rule exists to *override* another, give it more specificity, not a
     later line.
+
+33. **A test that mirrors the code it tests will agree with a bug forever.** `vote-test.js`
+    restated the day-vote condition in a local `verdict()` — "mirrors the app", said the
+    comment — and asserted *"a plurality below half does not carry"* as an invariant. Both
+    the app and the suite were wrong in the same way, so thirty suites stayed green while
+    the app refused legitimate hangings (B-72). It now lifts the real expression out of
+    `rDay` and throws if it cannot find it. This is the same lesson as rule 17, arriving
+    somewhere new: proving a copy proves nothing.
+
+34. **Check the rulebook before hardening a rule.** The majority threshold was not a
+    misread of the code; it was invented, defended by arithmetic, given a threshold
+    readout in the bar and pinned by a suite. Everything downstream was careful and the
+    premise was never checked. When a rule is *this* load-bearing — every day phase of
+    every game — the cheap step is reading the box.
+
+35. **A vertical margin does nothing to boxes laid out horizontally.** `.stack` hands every
+    child a `margin-top`, which is exactly right for blocks and useless for two inline-block
+    buttons that share a line: they get 20px above the line and 0px between them (B-77).
+    When two controls belong side by side, the container has to say so — a row with a gap,
+    not two children of a column.
+
+36. **Never name a modifier after a layout class.** `.row.wrap` looked like "a row that
+    wraps" and was also `.wrap`, the app's root container, so it inherited
+    `flex-direction:column` and did the opposite of its name (B-78). CSS has no namespaces;
+    a two-class selector matches anything carrying both. The check is cheap and now
+    automatic.
 
 ---
 

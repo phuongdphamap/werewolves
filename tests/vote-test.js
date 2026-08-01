@@ -1,7 +1,14 @@
-// Verifies the two rules just added, against the shipped code:
-//   1. a day vote only carries if it clears more than half the voting weight
+// Verifies the two day-vote rules against the shipped code:
+//   1. the most votes hangs — both rulebooks say so, and this app required an absolute
+//      majority instead, which on eight voters left a decisive 4/3/1 split with no way to
+//      hang anybody at all
 //   2. the werewolves win the moment they equal the villagers, not only when
 //      every villager is dead
+//
+// This suite used to MIRROR the app's condition in a local verdict() rather than run the
+// app's own, and it asserted "a plurality below half does not carry" as an invariant. So
+// it stayed green for the whole life of the bug: it was testing a copy of the mistake.
+// verdict() now lifts the real expression out of rDay.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 /* causeLabel() and unplacedWolfCards() speak the interface language now, so the harness
@@ -42,7 +49,17 @@ const t = (name, fn) => { const r = fn();
   if (r === true){ pass++; console.log('  ok   ' + name); }
   else { fail++; console.log('  FAIL ' + name + '  -> ' + r); } };
 
-// mirrors the app: a name carries only when its weight is strictly over half
+/* The real gate, lifted out of rDay rather than restated here. If the shipped expression
+   changes, this changes with it — which is the whole point: the previous local copy
+   happily agreed with a rule the game does not have. */
+eval(src.match(/const voteNeedsMajority = [^;]*;/)[0]
+  .replace('const voteNeedsMajority','globalThis.voteNeedsMajority'));
+const GATE = (function(){
+  // the comment between the two may be a line or a block comment; neither is the point
+  const m = src.match(/const over = best > thr;[\s\S]*?const passing = ([^;]+);/);
+  if (!m) throw new Error('the passing expression moved; this suite must follow it');
+  return m[1];
+})();
 function verdict(tally){
   const TP = totalPower(), thr = TP/2;
   const sh = alive().find(p => p.sheriff);
@@ -52,30 +69,79 @@ function verdict(tally){
     const power = (tally[p.id]||0) + (G.sheriffVote === p.id && sh ? wt-1 : 0);
     if (power > best){ best = power; lead = [p]; } else if (power === best && power > 0) lead.push(p);
   }
-  return { carries: lead.length === 1 && best > thr, best, thr, TP,
+  const over = best > thr;
+  const carries = eval(GATE);          // the shipped expression, evaluated on this tally
+  return { carries, best, thr, TP, over,
            who: lead.length === 1 ? lead[0].name : null, tied: lead.length > 1 };
 }
 
-console.log('OVER HALF, OR IT DOES NOT COUNT');
-t('7 voters: 4 hands carries, 3 does not', () => {
-  table(['wolf','wolf','villager','villager','villager','seer','witch']);
-  const a = verdict({ p2:4 }), b = verdict({ p2:3 });
-  return (a.carries && !b.carries && a.thr === 3.5) ? true
-    : 'thr=' + a.thr + ' four=' + a.carries + ' three=' + b.carries;
+console.log('THE MOST VOTES HANGS');
+const SEVEN = ['wolf','wolf','villager','villager','villager','seer','witch'];
+const EIGHT = ['wolf','wolf','villager','villager','villager','villager','seer','witch'];
+t('7 voters: 4 hands carries, and so does 3 when it leads', () => {
+  table(SEVEN);
+  const a = verdict({ p2:4 }), b = verdict({ p2:3, p3:2, p4:1 });
+  return (a.carries && b.carries && a.thr === 3.5) ? true
+    : 'thr=' + a.thr + ' four=' + a.carries + ' three-leading=' + b.carries;
 });
-t('8 voters: 5 carries, 4 is exactly half and fails', () => {
-  table(['wolf','wolf','villager','villager','villager','villager','seer','witch']);
-  return (verdict({ p2:5 }).carries && !verdict({ p2:4 }).carries) ? true : 'half should fail';
+/* The case that started this: eight voters, every vote cast, one clear leader on four \u2014
+   and the app offered no way to hang anybody, while the bar asked for a fifth vote that
+   did not exist. */
+t('8 voters: a decisive 4/3/1 hangs the leader', () => {
+  table(EIGHT);
+  const v = verdict({ p2:4, p3:3, p4:1 });
+  return (v.carries && v.who === 'P2' && !v.over) ? true : JSON.stringify(v);
 });
-t('a plurality below half does not carry', () => {
-  table(['wolf','wolf','villager','villager','villager','seer','witch']);
-  const v = verdict({ p2:3, p3:2, p4:1 });
-  return (!v.carries && v.who === 'P2') ? true : JSON.stringify(v);
+t('exactly half still carries, because half is not the bar any more', () => {
+  table(EIGHT);
+  const v = verdict({ p2:4, p3:2, p4:2 });
+  return v.carries ? true : JSON.stringify(v);
 });
-t('a tie never carries', () => {
-  table(['wolf','wolf','villager','villager','villager','seer','witch']);
-  const v = verdict({ p2:4, p3:4 });
-  return (!v.carries && v.tied) ? true : JSON.stringify(v);
+t('a single vote carries if nothing else is cast', () => {
+  table(SEVEN);
+  return verdict({ p2:1 }).carries ? true : 'one vote and a clear leader should hang';
+});
+t('no votes at all hangs nobody', () => {
+  table(SEVEN);
+  const v = verdict({});
+  return (!v.carries && v.best === 0) ? true : JSON.stringify(v);
+});
+/* The gate carries no `best > 0` clause, because it cannot need one: a name only enters
+   `lead` on a positive tally, so a single leader already means a vote was cast. That is a
+   property of the tally loop, not of the gate, so it is pinned where it lives. */
+t('a leader can only exist on a positive tally, which is why the gate needs no zero check', () => {
+  const loop = src.match(/for \(const p of A\)\{\n\s*const pw = tallyOf\(p\) \+ extraOf\(p\);[\s\S]*?\n    \}/);
+  if (!loop) return 'the tally loop moved; re-check the gate';
+  const seeds = /if \(pw > best\)\{ best = pw; lead = \[p\]; \} else if \(pw === best && pw > 0\) lead\.push\(p\)/;
+  const gate = src.match(/const passing = ([^;]+);/)[1];
+  return seeds.test(loop[0]) && !/best > 0/.test(gate)
+    ? true : 'either the loop can seed a zero leader, or the gate re-added a dead check';
+});
+t('a tie never carries, whatever the count', () => {
+  table(SEVEN);
+  return (!verdict({ p2:4, p3:4 }).carries && !verdict({ p2:1, p3:1 }).carries)
+    ? true : 'a tie hangs nobody until it is re-voted';
+});
+
+/* A table that really does demand a majority can still ask for one. Default off, because
+   neither rulebook prints it. */
+console.log('\nAND A TABLE MAY STILL DEMAND A MAJORITY');
+t('the printed rule is the default', () => {
+  table(SEVEN); G.voteMajority = null;
+  return voteNeedsMajority() === false ? true : 'the app defaults to a rule neither box prints';
+});
+t('turning it on restores the stricter bar', () => {
+  table(EIGHT); G.voteMajority = true;
+  const v = verdict({ p2:4, p3:3, p4:1 });
+  return !v.carries ? true : 'the override is ignored';
+});
+t('...and a real majority still carries under it', () => {
+  table(EIGHT); G.voteMajority = true;
+  return verdict({ p2:5, p3:2, p4:1 }).carries ? true : 'nothing can carry at all';
+});
+t('turning it explicitly off is the same as the default', () => {
+  table(EIGHT); G.voteMajority = false;
+  return verdict({ p2:4, p3:3, p4:1 }).carries ? true : 'false and null disagree';
 });
 t('the silenced Idiot lowers the bar', () => {
   const g = table(['wolf','wolf','villager','idiot','villager','seer','witch']);
@@ -90,12 +156,23 @@ t('the badge is worth 1.5 in Vietnamese play, 2 in French', () => {
   G.rules = 'mh'; const b = totalPower();
   return (a === 4.5 && b === 5) ? true : 'vn=' + a + ' mh=' + b;
 });
-t('the badge can push a name over the line on its own', () => {
+/* What the badge is FOR, once the bar is a plurality: it settles a contest the hands
+   alone would leave tied. The half-point is exactly enough to do that and nothing more. */
+t('the badge breaks a tie the hands alone could not', () => {
   const g = table(['wolf','wolf','villager','villager','seer']); g.players[4].sheriff = true;
-  G.rules = 'vn'; G.sheriffVote = 'p2';
-  const with_ = verdict({ p2:2 });          // 2 hands + 0.5 = 2.5 of 5.5 -> not over half
-  const need = verdict({ p2:3 });           // 3 hands + 0.5 = 3.5 of 5.5 -> carries
-  return (!with_.carries && need.carries) ? true : 'two=' + with_.best + ' three=' + need.best + ' thr=' + need.thr;
+  G.rules = 'vn';
+  G.sheriffVote = null;  const level = verdict({ p2:2, p3:2 });
+  G.sheriffVote = 'p2';  const tipped = verdict({ p2:2, p3:2 });
+  return (!level.carries && level.tied && tipped.carries && tipped.who === 'P2')
+    ? true : 'level=' + JSON.stringify(level) + ' tipped=' + JSON.stringify(tipped);
+});
+t('and under a majority house rule it can still push a name over half', () => {
+  const g = table(['wolf','wolf','villager','villager','seer']); g.players[4].sheriff = true;
+  G.rules = 'vn'; G.voteMajority = true; G.sheriffVote = 'p2';
+  const short = verdict({ p2:2 });   // 2 + 0.5 = 2.5 of 5.5 -> under half
+  const over  = verdict({ p2:3 });   // 3 + 0.5 = 3.5 of 5.5 -> over
+  return (!short.carries && over.carries)
+    ? true : 'two=' + short.best + ' three=' + over.best + ' thr=' + over.thr;
 });
 /* "As he dies he decides who may vote tomorrow." One day. The list used to be cleared
    only by the "Everyone may vote" button on the screen that set it, so a tie on day 2

@@ -166,7 +166,13 @@
      advice ended up with no spacing at all. */
   .stack > * + *{margin-top:var(--s4)}
   .stack > *{margin-bottom:0}
-  .stack:not(:empty) + .stack:not(:empty){margin-top:var(--s4)}
+  /* A stack that follows ANYTHING, not just another stack. The old rule paired stack with
+     stack, so #dealAlt — which sits after a plain <p> — was given nothing at all, and the
+     collapsible inside it rendered flush against the deal note while every other gap on
+     that screen was 20px. Its first child gets no `* + *` either, so there was nothing to
+     fall back on. Margins collapse, so a sibling that already carries a bottom margin
+     (.sub at 28) still wins and nothing compounds. */
+  * + .stack:not(:empty){margin-top:var(--s4)}
   section.on{display:block}
 
   /* THREE SURFACES, one job each.
@@ -256,6 +262,14 @@
   .why > p{font-size:var(--t-small);line-height:1.6;color:var(--txt70);margin:5px 0 0}
 
   .row{display:flex;gap:var(--s2);align-items:center}
+  /* Two buttons side by side need a ROW, not two stack children. A bare .btn is
+     inline-block, so a stack gives it a vertical margin that does nothing horizontally and
+     no gap at all — the Witch's "Save X" sat welded to "Our table allows self-rescue".
+     Wrapping, because two full labels do not fit a phone: the flex gap then spaces the
+     second line as well, which a margin would not have.
+     NOT called .wrap — that is the app's root container, and .row.wrap inherited its
+     flex-direction:column, which stacked the pair instead of spacing it. */
+  .row.flow{flex-wrap:wrap}
   /* the control beside a field matches its height exactly; typography is inherited
      from .btn so it cannot drift out of step with the big action button */
   .row.tall{align-items:stretch}
@@ -461,7 +475,11 @@
   .exp[open] > summary::after{content:'\2212'}
   .exp > summary:hover{color:var(--txt)}
   .exp[open] > summary{border-bottom:1px solid var(--line)}
-  .expBody{padding:var(--s3) var(--s4) var(--s4);font-size:var(--t-small);color:var(--txt2);line-height:1.65}
+  /* Even on all four sides. It was 14 top against 20 sides and 20 bottom, so the prose sat
+     visibly closer to the divider above it than to the border below — reported from a
+     screenshot. The summary keeps its own 14/20 because it is a row; a body is a panel,
+     and a panel is padded like .card. */
+  .expBody{padding:var(--s4);font-size:var(--t-small);color:var(--txt2);line-height:1.65}
   .expBody b{color:var(--txt70)}
   /* Direct children only. A collapsible's body is either prose — a string of <p>, which
      this spaces — or a component that brings its own spacing tokens, like the house-rules

@@ -21,9 +21,34 @@ t('no id-based spacing selector survives', () =>
   !/#\w+ > \* \+ \*/.test(src) ? true : (src.match(/#\w+ > \* \+ \*/g)||[]).join(', '));
 t('children give up their own bottom margin, so gaps cannot double', () =>
   /\.stack > \*\{margin-bottom:0\}/.test(src) ? true : 'margins would compound to 34px');
-t('two adjacent stacks are spaced from each other', () =>
-  /\.stack:not\(:empty\) \+ \.stack:not\(:empty\)\{margin-top:var\(--s4\)\}/.test(src)
-    ? true : 'recBox would sit flush against advice');
+/* The pairing rule used to require BOTH siblings to be stacks, so #dealAlt — which
+   follows a plain <p> — was given nothing, and the collapsible inside it rendered flush
+   against the deal note while every other gap on that screen was 20px. Its first child
+   gets no `* + *` either, so there was nothing to fall back on. Reported from a
+   screenshot; measured at 0px before the fix. */
+t('a stack is spaced from whatever precedes it, not only from another stack', () => {
+  if (/\.stack:not\(:empty\) \+ \.stack:not\(:empty\)\{/.test(src))
+    return 'the rule still pairs stack with stack, so a stack after a <p> gets nothing';
+  return /\* \+ \.stack:not\(:empty\)\{margin-top:var\(--s4\)\}/.test(src)
+    ? true : 'nothing gives a following stack a top margin';
+});
+t('and an empty one still adds no stray gap', () =>
+  /\* \+ \.stack:not\(:empty\)\{/.test(src)
+    ? true : 'an empty #advice would push the page down');
+/* Every stack in the static markup, checked against what precedes it. The rule only helps
+   if the containers it is written for actually have a preceding sibling to be spaced from. */
+t('every stack in the markup either leads its section or has something to be spaced from', () => {
+  const ids = [...src.matchAll(/<div class="[^"]*\bstack\b[^"]*" id="(\w+)"/g)].map(m => m[1]);
+  if (ids.length < 8) return 'only found ' + ids.length + ' stacks in the markup';
+  // a stack whose previous sibling is a <p> or a <div> is exactly the case that was broken
+  const afterProse = ids.filter(id => {
+    const i = src.indexOf('id="' + id + '"');
+    const before = src.slice(Math.max(0, i - 400), i);
+    return /<p[^>]*>[\s\S]*?<\/p>\s*<div[^>]*$/.test(before);
+  });
+  return afterProse.length > 0
+    ? true : 'no stack follows prose any more; re-check whether this rule is still needed';
+});
 t('an empty container adds no stray gap', () =>
   /:not\(:empty\)/.test(src) ? true : 'an empty #advice would still push the page down');
 
@@ -31,6 +56,93 @@ t('an empty container adds no stray gap', () =>
    render functions so they could follow the interface language, and `$('pTtl').textContent
    = …` throws on a typo — taking the whole screen down, not just the label. The suites
    never execute a render, so nothing else here would notice. */
+/* The rhythm rules specifically — the gaps that decide how blocks sit relative to each
+   other. Component padding (a button's 11px 14px, an icon's 8px gap) is deliberately NOT
+   in scope: the scale governs the page, not every pixel inside a control. A mutation that
+   set the stack gap to 7px sailed past every other suite. */
+console.log('\nTHE BLOCK RHYTHM COMES FROM THE SPACING SCALE');
+const SCALE = ['s1','s2','s3','s4','s5','s6'];
+const rhythmRules = [
+  ['\\.stack > \\* \\+ \\*', 'the gap between siblings in a stack'],
+  ['\\* \\+ \\.stack:not\\(:empty\\)', 'the gap above a stack'],
+  ['\\.roles > \\.grp', 'the gap above a role-list heading'],
+  ['\\n  \\.grp', 'the group heading'],
+  ['\\n  \\.card', 'a card'],
+  ['\\.expBody', 'a collapsible body'],
+];
+for (const [sel, what] of rhythmRules){
+  t(what + ' is measured in scale steps', () => {
+    const r = (src.match(new RegExp(sel + '\\{[^}]*\\}')) || [''])[0];
+    if (!r) return 'rule missing for ' + sel;
+    const spacing = [...r.matchAll(/(?:margin|padding|gap)[a-z-]*:([^;}]+)/g)].map(m => m[1].trim());
+    if (!spacing.length) return true;                       // declares no spacing at all
+    const bare = spacing.filter(v => /\d+px/.test(v) && !/var\(--s\d\)/.test(v));
+    return bare.length === 0
+      ? true : 'off the scale: ' + bare.join(' | ') + '   in ' + r.replace(/\s+/g, ' ');
+  });
+}
+t('and every step the rhythm uses is one that exists', () => {
+  const used = new Set();
+  for (const [sel] of rhythmRules){
+    const r = (src.match(new RegExp(sel + '\\{[^}]*\\}')) || [''])[0];
+    for (const m of r.matchAll(/var\(--(s\d)\)/g)) used.add(m[1]);
+  }
+  const unknown = [...used].filter(k => !SCALE.includes(k));
+  return unknown.length === 0 ? true : 'undeclared step(s): ' + unknown.join(', ');
+});
+
+/* Two buttons side by side are a ROW, not two stack children. A bare .btn is inline-block,
+   so a stack hands it a vertical margin that does nothing horizontally and no gap at all —
+   the Witch's "Save X" rendered welded to "Our table allows self-rescue". Measured at 0px.
+   Reported from a screenshot. */
+console.log('\nSIDE-BY-SIDE BUTTONS ARE A ROW');
+t('no two buttons are appended straight into the same stack', () => {
+  /* Two .btn appended to the same container with nothing between them. An `} else {`
+     inside the span means they are alternatives — the dawn screen's adjust/hide pair —
+     and only one ever renders, so that is not the shape being caught. */
+  const bad = [...js.matchAll(/(\w+)\.appendChild\((\w+)\);([\s\S]{0,400}?)\1\.appendChild\((\w+)\);/g)]
+    .filter(m => {
+      if (/\}\s*else\s*\{/.test(m[3] === undefined ? '' : m[3])) return false;
+      const both = new RegExp("const " + m[2] + " = el\\('button','btn[\\s\\S]*?const " + m[4] + " = el\\('button','btn");
+      return m[1] === 'B' && both.test(js);
+    })
+    .map(m => m[2] + ' + ' + m[4]);
+  return bad.length === 0
+    ? true : 'buttons sharing a stack with no row between them: ' + bad.join(', ');
+});
+t('the row modifier exists and only adds wrapping', () => {
+  const r = (src.match(/\.row\.flow\{[^}]*\}/) || [''])[0];
+  return /^\.row\.flow\{flex-wrap:wrap\}$/.test(r.replace(/\s+/g, ''))
+    ? true : 'the modifier does more than wrap: ' + (r || 'rule missing');
+});
+t('the Witch pair uses it', () => {
+  const w = (js.match(/const blockSelf = selfVictim[\s\S]*?B\.appendChild\(row\);/) || [''])[0];
+  return /el\("div","row flow"\)/.test(w) && /row\.appendChild\(b\)/.test(w) && /row\.appendChild\(allow\)/.test(w)
+    ? true : 'the two buttons are not in one row';
+});
+t('and the shuffle pair does too, rather than an inline style', () =>
+  !/style\.flexWrap/.test(js) && (js.match(/el\("div","row flow"\)/g) || []).length >= 2
+    ? true : 'a row still sets its wrapping from JavaScript');
+
+/* .row.wrap was the first name tried, and it inherited flex-direction:column from .wrap —
+   the app's ROOT container — which stacked the pair instead of spacing it. A modifier that
+   reuses a layout class name silently takes its declarations. */
+t('no component modifier collides with a top-level layout class', () => {
+  // comments name the collision to explain it; the check is about selectors
+  const bare = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  const layout = ['wrap', 'bar', 'in', 'stack', 'group'];
+  const bad = [];
+  for (const name of layout){
+    const re = new RegExp('\\.[a-z][\\w-]*\\.' + name + '\\b(?![\\w-])', 'g');
+    for (const m of bare.match(re) || []){
+      if (/^\.(stack|group)\./.test(m)) continue;      // scoping, not a modifier
+      bad.push(m);
+    }
+  }
+  return bad.length === 0
+    ? true : 'modifier(s) inherit a layout class: ' + [...new Set(bad)].join(', ');
+});
+
 console.log('\nEVERY ELEMENT THE APP ADDRESSES EXISTS');
 t('no $() lookup is missing from the markup', () => {
   const ids = [...new Set([...js.matchAll(/\$\('(\w+)'\)/g)].map(m => m[1]))];
@@ -162,6 +274,27 @@ t('the generic rule alone would lose to the component', () => {
    its top margin and sat flush against whatever was above it, while the identical
    grp/chips/note pattern in a plain .card kept its 10px. Reported as "why is the content
    paragraph tight with the header above". */
+/* The body was padded 14 top against 20 sides and 20 bottom, so the prose sat visibly
+   nearer the divider above it than the border below. Reported from a screenshot. */
+console.log('\nA COLLAPSIBLE BODY IS PADDED EVENLY');
+t('the body pads all four sides the same', () => {
+  const r = (src.match(/\.expBody\{[^}]*\}/) || [''])[0];
+  const pad = (r.match(/padding:([^;]+);/) || [,''])[1].trim();
+  return pad === 'var(--s4)'
+    ? true : 'padding is ' + pad + ', so the text hugs one edge';
+});
+t('...and it matches what a .card uses, since both are panels', () => {
+  const card = (src.match(/\n  \.card\{[^}]*\}/) || [''])[0];
+  const body = (src.match(/\.expBody\{[^}]*\}/) || [''])[0];
+  const p = r => ((r.match(/padding:([^;}]+)/) || [,''])[1] || '').trim();
+  return p(card) === p(body) ? true : 'card=' + p(card) + ' expBody=' + p(body);
+});
+t('the summary keeps its own row padding, which is a different job', () => {
+  const r = (src.match(/\.exp > summary\{[^}]*\}/) || [''])[0];
+  return /padding:var\(--s3\) var\(--s4\)/.test(r)
+    ? true : 'the summary is no longer a row: ' + r;
+});
+
 console.log('\nA COMPONENT INSIDE A COLLAPSIBLE KEEPS ITS OWN SPACING');
 t('the prose rule is scoped to direct children', () =>
   /\.expBody > p\{/.test(src)

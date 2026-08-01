@@ -5,6 +5,9 @@
 // js/app.js and run against stubs, so a test cannot pass against a drifted copy.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+/* showVersion() speaks the interface language now. English, so the assertions below read
+   as the string a moderator on an English device would see. */
+globalThis.T = (vi, en) => en;
 
 function grab(name){
   const i = src.indexOf('function ' + name + '(');

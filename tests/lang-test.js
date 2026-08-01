@@ -191,6 +191,69 @@ t('the collect-the-deal instruction is wrapped, like the buttons under it', () =
     ? true : 'the instruction is still English under a Vietnamese bar';
 });
 
+/* The gaps the structural scan above cannot see, because they are not .tell blocks:
+   collapsible bodies, role descriptions, and a handful of one-off controls. All of them
+   were reported from screenshots — an English interface serving Vietnamese essays. */
+console.log('\nTHE LONGER PROSE FOLLOWS IT TOO');
+t('every collapsible body is a T() pair, not one language', () => {
+  const calls = [...js.matchAll(/collapsible\(\s*'(\w+)'/g)].map(m => m[1]);
+  const skip = new Set(['house', 'chronicle']);   // a live node, and the log itself
+  const bad = [];
+  for (const key of calls){
+    if (skip.has(key)) continue;
+    const i = js.indexOf("collapsible('" + key + "'");
+    // to the end of the appendChild that wraps it
+    const body = js.slice(i, i + 2600);
+    const end = body.indexOf('\n  RB.') + 1 || body.indexOf('\n  const') + 1 || 2600;
+    const chunk = body.slice(0, end);
+    // a paragraph of prose in the body must be reached through T()
+    for (const m of chunk.matchAll(/'(<p>[^']{20,})'/g)){
+      const before = chunk.slice(0, m.index);
+      const open = (before.match(/\bT\(/g) || []).length -
+                   (before.match(/\bT\([^()]*\)/g) || []).length;
+      if (open <= 0){ bad.push(key); break; }
+    }
+  }
+  return bad.length === 0
+    ? true : 'single-language body in collapsible(s): ' + [...new Set(bad)].join(', ');
+});
+t('the ruleset explainer picks its language separately from its content', () => {
+  // content per ruleset, language per T() — four texts, not two
+  const i = js.indexOf("collapsible('order'");
+  const chunk = js.slice(i, i + 2200);
+  return /G\.rules === 'vn'\s*\n\s*\? T\(/.test(chunk) && /\n\s*: T\(/.test(chunk)
+    ? true : 'the essay is still chosen by ruleset alone, so one language gets the other';
+});
+t('the ruleset gloss is translated, the name is not', () => {
+  const r = (js.match(/const RULESETS = \{[\s\S]*?\};/) || [''])[0];
+  return /T\('Miller[^']*b\\u1ea3n g\\u1ed1c\)'/.test(r) && /Ma S\\u00f3i Vi\\u1ec7t Nam/.test(r)
+    ? true : 'the gloss beside the ruleset name is not a pair: ' + r.slice(0, 160);
+});
+
+console.log('\nEVERY ROLE EXPLAINS ITSELF IN BOTH LANGUAGES');
+t('every card carries a Vietnamese description', () => {
+  const roles = (js.match(/const ROLES = \[[\s\S]*?\n\];/) || [''])[0];
+  const ids = [...roles.matchAll(/\{id:'(\w+)'/g)].map(m => m[1]);
+  const withVi = [...roles.matchAll(/dVi:'/g)].length;
+  return ids.length > 20 && withVi === ids.length
+    ? true : withVi + ' of ' + ids.length + ' cards have a dVi';
+});
+t('and so does the Lovers step, which is not in ROLES', () => {
+  const fn = (js.match(/function stepInfo\(s\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /dVi:/.test(fn) ? true : 'the Lovers call has an English-only description';
+});
+t('one accessor serves both places a description is drawn', () => {
+  const has = /const rDesc = r => T\(r\.dVi \|\| r\.d, r\.d\);/.test(js);
+  const deck = /'<div class="rd">' \+ rDesc\(r\) \+ '<\/div>'/.test(js);
+  const night = /info\.d \? rDesc\(info\) : ''/.test(js);
+  return has && deck && night
+    ? true : 'accessor=' + has + ' deckList=' + deck + ' nightCall=' + night;
+});
+t('a card added without one falls back to English rather than to nothing', () => {
+  const a = (js.match(/const rDesc = [^;]*;/) || [''])[0];
+  return /r\.dVi \|\| r\.d/.test(a) ? true : 'a missing dVi would render undefined: ' + a;
+});
+
 console.log('\nHEADINGS AND BUTTONS FOLLOW IT TOO');
 /* The four setup headings were static markup with no id, so nothing could address them:
    a Vietnamese interface still opened on "Who is at the table?" in 21px serif, which is

@@ -107,8 +107,14 @@ t('the Fox step explains its position under each ruleset', () =>
 t('the Miller’s Hollow note warns a card may need reading', () =>
   /I may not know the pack yet, and I will ask rather than guess/.test(src)
     ? true : 'no warning for the French order');
+/* The explainer is a T() pair now and the Vietnamese is spelled with escapes, so this
+   checks both halves name the Fox — an English reader was getting the Vietnamese essay. */
 t('the ruleset explainer names the Fox alongside the Seer', () =>
-  /Tiên Tri và Cáo được gọi <b>sau<\/b> Ma Sói/.test(src) ? true : 'explainer still mentions only the Seer');
+  /Ti\\u00ean Tri v\\u00e0 C\\u00e1o \\u0111\\u01b0\\u1ee3c g\\u1ecdi <b>sau<\/b>/.test(src)
+    ? true : 'explainer still mentions only the Seer');
+t('...in English too', () =>
+  /The Seer and the Fox are called <b>after<\/b> the pack/.test(src)
+    ? true : 'the English half drops the Fox');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

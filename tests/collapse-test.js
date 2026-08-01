@@ -89,8 +89,12 @@ t('the current deck is still shown unfolded', () =>
 t('and both name their cards in the interface language', () =>
   /const chain = list => list\.length \? list\.map\(rName\)/.test(src)
     ? true : 'the call-order preview is back to hard-coded Vietnamese names');
-t('the Sheriff vote weight is still shown unfolded', () =>
-  /Their vote is worth <b>' \+ SHERIFF_WEIGHT\(\)/.test(src) ? true : 'lost the weight');
+// the label is a T() pair now; the weight itself must still sit outside the fold
+t('the Sheriff vote weight is still shown unfolded', () => {
+  const day = (src.match(/if \(G\.day === 1 && !G\.sheriffDone\)\{[\s\S]*?collapsible\('sheriff'/) || [''])[0];
+  return /'Their vote is worth <b>'\) \+\n\s*SHERIFF_WEIGHT\(\)/.test(day)
+    ? true : 'lost the weight';
+});
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
