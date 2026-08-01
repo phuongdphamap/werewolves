@@ -544,12 +544,19 @@ t('the Thief step is wired to it, not to a bare role assignment', () => {
   return (/thiefTakes\(th, r\)/.test(step) && !/th\.role = /.test(step))
     ? true : 'the swap bypasses the helper: ' + step;
 });
+/* `id` is on the safe list above only because of where it comes from. Pinned here, or the
+   allowlist would bless any variable that happens to be called id. */
+t('the forced fill reads its card straight out of G.counts', () => {
+  const fn = (src.match(/function autoFillForced\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /const id = short\[0\]/.test(fn) && /for \(const k in G\.counts\)/.test(fn)
+    ? true : 'id no longer comes from the deck: ' + fn.slice(0, 200);
+});
 t('nothing else moves a card without telling the deck', () => {
   /* Every other assignment records a card the deck already counts — identifying a holder
      (r.id / s.role), clearing one (null), the forced last card (short[0], read straight
      out of G.counts), and the villager fill, which only runs when the leftover seats
      exactly equal G.counts.villager. The Thief was the one that did not. */
-  const safe = /= *(?:r\.id|s\.role|null|short\[0\]|'villager')/;
+  const safe = /= *(?:r\.id|s\.role|null|short\[0\]|id|'villager')/;
   const assigns = [...src.matchAll(/\b[\w[\]]+\.role = [^;)]+/g)].map(m => m[0]);
   const unaccounted = assigns.filter(a => !safe.test(a));
   return unaccounted.length === 0
