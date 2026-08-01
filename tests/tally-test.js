@@ -106,24 +106,102 @@ t('and the threshold is still pinned in words as well', () =>
   /more than[\s\S]{0,40}fmtN\(thr\)/.test(src) ? true : 'the exact number is gone from the bar note');
 
 console.log('\nBAD INPUT CANNOT GET IN');
-// mirror of the shipped clamp
-const clampTyped = (raw, voters) => {
+/* The whole clamp, lifted out of rDay instead of restated. A local mirror is what let the
+   day-vote rule stay wrong for so long: the copy agreed with the mistake. */
+const CLAMP = (function(){
+  const m = src.match(/const digits = box\.value[^\n]*\n\s*const v = ([^;]+);/);
+  if (!m) throw new Error('the typed clamp moved; this suite must follow it');
+  return m[1];
+})();
+const clampTyped = (raw, room) => {
   const digits = String(raw).replace(/[^0-9]/g, '').slice(0, 3);
-  return Math.max(0, Math.min(voters, digits === '' ? 0 : parseInt(digits, 10)));
+  const roomFor = () => room, p = { id:'x' };   // the clamp reads roomFor(p)
+  return eval(CLAMP);
 };
 t('letters are ignored', () => clampTyped('a5b', 17) === 5 ? true : clampTyped('a5b', 17));
 t('an empty box means zero', () => clampTyped('', 17) === 0 ? true : clampTyped('', 17));
 t('a minus sign cannot make it negative', () => clampTyped('-3', 17) === 3 ? true : clampTyped('-3', 17));
-t('more votes than voters is refused', () => clampTyped('99', 17) === 17 ? true : clampTyped('99', 17));
+t('more votes than there is room for is refused', () => clampTyped('99', 17) === 17 ? true : clampTyped('99', 17));
 t('a long paste is truncated, not parsed as millions', () =>
   clampTyped('123456', 17) === 17 ? true : clampTyped('123456', 17));
 t('a decimal point is dropped rather than rounding oddly', () =>
   clampTyped('2.9', 17) === 17 ? true : clampTyped('2.9', 17));   // "29" -> clamped to 17
-t('the clamp is applied in the shipped code, not just in this test', () =>
-  /Math\.min\(voters\.length, digits === '' \? 0 : parseInt\(digits, 10\)\)/.test(src)
-    ? true : 'no clamp against the electorate');
-t('the stepper is clamped the same way', () =>
-  /Math\.min\(voters\.length, Math\.round\(v\) \|\| 0\)/.test(src) ? true : 'stepper unclamped');
+
+/* Reported from a game: nine players, five votes on one name and nine on another. Each box
+   was clamped to voters.length ON ITS OWN, so nothing bounded the total — fourteen hands
+   from nine people, and a leader the table never produced. The budget is what is LEFT. */
+console.log('\nAND THE TALLIES CANNOT SUM PAST THE ELECTORATE');
+eval(src.match(/  function handsElsewhere\(id\)\{[^}]*\}/)[0]
+  .replace('function handsElsewhere','globalThis.handsElsewhere = function'));
+eval(src.match(/  function roomFor\(p\)\{[^}]*\}/)[0]
+  .replace('function roomFor','globalThis.roomFor = function'));
+// the shipped budget, run against a board this suite controls
+function board(nVoters, tally){
+  globalThis.A = Object.keys(tally).map(id => ({ id }));
+  globalThis.voters = { length: nVoters };
+  globalThis.tallyOf = q => tally[q.id] || 0;
+  return tally;
+}
+t('with nine voters and five already on one name, the next is capped at four', () => {
+  board(9, { a:5, b:0 });
+  const r = roomFor({ id:'b' });
+  return r === 4 ? true : 'room for b was ' + r + ', so 9 could still be entered';
+});
+t('the reported case cannot be reached at all', () => {
+  board(9, { a:5, b:0 });
+  const b = Math.min(roomFor({ id:'b' }), 9);
+  return (5 + b) <= 9 ? true : 'still records ' + (5 + b) + ' hands from 9 people';
+});
+t('one name may still take every vote', () => {
+  board(9, { a:0, b:0 });
+  return roomFor({ id:'a' }) === 9 ? true : 'a unanimous vote became unrecordable';
+});
+t('a full tally leaves no room anywhere else', () => {
+  board(9, { a:4, b:3, c:2 });
+  return roomFor({ id:'d' }) === 0 ? true : 'room left after every hand is spent';
+});
+t('a name can always be raised to what is left, and no further', () => {
+  board(9, { a:4, b:3, c:0 });
+  return roomFor({ id:'c' }) === 2 ? true : 'room for c was ' + roomFor({ id:'c' });
+});
+t('editing a name counts its own votes as available again', () => {
+  // otherwise lowering 5 to 4 would be blocked by the 5 it already holds
+  board(9, { a:5, b:4 });
+  return roomFor({ id:'a' }) === 5 ? true : 'a recorded name could not be corrected';
+});
+/* The case above cannot tell a correct budget from one that counts the edited name twice,
+   because the tally is full and Math.max floors both at the name's own total. This one
+   has room left, so the two answers differ: 3 if the name's own votes are freed, 2 if
+   they are charged to it a second time. */
+t('...and is not charged for them twice when there is room to grow', () => {
+  board(9, { a:4, b:2, c:1 });
+  const r = roomFor({ id:'c' });
+  return r === 3 ? true : 'room for c was ' + r + ', so its own 1 was counted against it';
+});
+/* An electorate can shrink after the count begins — the Scapegoat's decree, a resumed
+   save — and the budget must not then lock every box to zero. */
+t('an over-count can still be corrected downwards', () => {
+  board(4, { a:5, b:3 });
+  const r = roomFor({ id:'a' });
+  return r === 5 ? true : 'room was ' + r + ', so the stale 5 could not be edited at all';
+});
+t('but it cannot be made worse', () => {
+  board(4, { a:5, b:3 });
+  return roomFor({ id:'b' }) === 3 ? true : 'b could still be increased past a spent electorate';
+});
+t('the budget counts hands, not the badge', () => {
+  // extraOf() applies the badge separately; it is weight on a hand, not a second hand
+  const fn = (src.match(/function handsElsewhere\(id\)\{[^}]*\}/) || [''])[0];
+  return /tallyOf\(q\)/.test(fn) && !/extraOf|votePower|wt/.test(fn)
+    ? true : 'the badge leaked into the hand budget: ' + fn;
+});
+t('every entry point uses the budget, not the raw electorate', () => {
+  const bad = [...src.matchAll(/Math\.min\(voters\.length,/g)].length;
+  return bad === 0 ? true : bad + ' clamp(s) still bound a single box to the whole electorate';
+});
+t('and so does the + button', () =>
+  /c\.plus\.disabled = tallyOf\(c\.p\) >= roomFor\(c\.p\);/.test(src)
+    ? true : '+ would step past the remaining hands');
 
 console.log('\nTYPING DOES NOT DESTROY THE BOX');
 t('rows are built once and only the numbers refresh', () => {

@@ -2214,7 +2214,7 @@ function rDay(){
     box.onfocus = () => box.select();
     box.oninput = () => {
       const digits = box.value.replace(/[^0-9]/g, '').slice(0, 3);
-      const v = Math.max(0, Math.min(voters.length, digits === '' ? 0 : parseInt(digits, 10)));
+      const v = Math.max(0, Math.min(roomFor(p), digits === '' ? 0 : parseInt(digits, 10)));
       if (String(v) !== digits && digits !== '') box.value = String(v);   // refuse the impossible
       else if (digits !== box.value) box.value = digits;
       G.votes[p.id] = v;
@@ -2233,9 +2233,23 @@ function rDay(){
   const twice  = el('div','alert no'); B.appendChild(twice);
 
   function tallyOf(p){ return G.votes[p.id] || 0; }
+  /* HANDS, not weight. Every eligible voter raises exactly one, so the tallies across all
+     names can never sum past the electorate — and each box used to be clamped to
+     voters.length on its own, with nothing bounding the total. On nine players that let a
+     moderator record 5 for one name and 9 for another: fourteen hands from nine people,
+     and a "winner" the table never produced. Reported from a game.
+
+     The badge is not part of this budget: it adds weight on top of its holder's hand, not
+     a second hand, and extraOf() applies it separately.
+
+     The ceiling never falls below what is already recorded, so a tally that is somehow
+     over — a resumed save, or an electorate that shrank after the count began — can still
+     be corrected downwards instead of every box locking to zero. */
+  function handsElsewhere(id){ return A.reduce((n, q) => n + (q.id === id ? 0 : tallyOf(q)), 0); }
+  function roomFor(p){ return Math.max(voters.length - handsElsewhere(p.id), tallyOf(p)); }
   function extraOf(p){ return (G.sheriffVote === p.id && sh) ? wt - 1 : 0; }
   function setVote(p, v){
-    G.votes[p.id] = Math.max(0, Math.min(voters.length, Math.round(v) || 0));
+    G.votes[p.id] = Math.max(0, Math.min(roomFor(p), Math.round(v) || 0));
     refresh();
   }
   /* Counting a real vote is a fast run of taps down the list, out loud. Promotion used to
@@ -2271,7 +2285,7 @@ function rDay(){
       c.power.textContent = over ? 'carries' : (extra ? '\u2b50' : '');
       if (!frozen) c.row.style.order = over ? -2 : (pw > 0 && pw === best ? -1 : 0);
       c.minus.disabled = !tallyOf(c.p);
-      c.plus.disabled = tallyOf(c.p) >= voters.length;
+      c.plus.disabled = tallyOf(c.p) >= roomFor(c.p);
       if (document.activeElement !== c.box) c.box.value = String(tallyOf(c.p));
     }
     const cast = A.reduce((a,p) => a + tallyOf(p), 0) + (G.sheriffVote && sh ? wt - 1 : 0);
