@@ -181,6 +181,32 @@ t('and every accessor is settable from some panel', () => {
     !new RegExp("\\{ key:'" + a + "'").test(src));
   return hidden.length === 0 ? true : 'settable in code but not in the UI: ' + hidden.join(', ');
 });
+/* Reported from a screenshot: two rows drew no selected chip at all. Their keys were
+   never added to blank(), so G[key] was `undefined` — and every accessor reads `== null`,
+   which undefined satisfies, so the RULES were right and only the highlight was wrong.
+   Nothing tied the panel to the state it reads until now. */
+t('every rule in the panel is initialised in blank()', () => {
+  const b = (src.match(/function blank\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  const keys = [...src.matchAll(/\{ key:'(\w+)'/g)].map(m => m[1]);
+  const missing = keys.filter(k => !new RegExp('\\b' + k + ':null').test(b));
+  return keys.length >= 6 && missing.length === 0
+    ? true : 'undefined at the start of a game, so no chip looks picked: ' + missing.join(', ');
+});
+/* And the chip must not care, because blank() cannot reach a game saved before the rule
+   existed: that state resumes with the key genuinely absent. */
+t('and the chip treats an absent key as the default, not as no answer', () => {
+  const line = (src.match(/const b = el\('div','chip' \+ \([^\n]*r\.key[^\n]*\), lab\);/) || [''])[0];
+  return /\(G\[r\.key\] \?\? null\) === val/.test(line)
+    ? true : 'a strict === leaves an old save with nothing highlighted: ' + line;
+});
+t('the accessors are loose on purpose, which is why the rules still worked', () => {
+  // `== null` matches undefined as well as null; that asymmetry with the chip's === is
+  // exactly why this shipped looking broken while behaving correctly
+  const loose = [...src.matchAll(/G\.(\w+) == null \?/g)].map(m => m[1]);
+  const strict = [...src.matchAll(/G\.(\w+) === null \?/g)].map(m => m[1]);
+  return loose.length >= 6 && strict.length === 0
+    ? true : 'an accessor uses === and would misread an absent key: ' + strict.join(', ');
+});
 t('and the follow-the-default shape is shared, not reinvented per panel', () => {
   const panels = (src.match(/const opts = \[\[null, T\(/g) || []).length;
   return panels >= 2 ? true : 'only ' + panels + ' panel(s) offer a follow-the-default option';
