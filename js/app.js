@@ -2401,7 +2401,8 @@ function rDay(){
       c.fill.style.width = TP > 0 ? Math.min(100, (pw / TP) * 100) + '%' : '0';
       c.row.classList.toggle('over', over);
       c.row.classList.toggle('lead', !over && pw > 0 && pw === best && lead.length === 1);
-      c.power.textContent = over ? 'carries' : (extra ? '\u2b50' : '');
+      // the star, and only the star: see the .carries comment in the stylesheet
+      c.power.textContent = extra ? '\u2b50' : '';
       if (!frozen) c.row.style.order = over ? -2 : (pw > 0 && pw === best ? -1 : 0);
       c.minus.disabled = !tallyOf(c.p);
       c.plus.disabled = tallyOf(c.p) >= roomFor(c.p);
@@ -2442,7 +2443,11 @@ function rDay(){
       'You have recorded ' + fmtN(cast) + ' of a possible ' + fmtN(TP) + '. Somebody has voted twice.');
 
     const opts = [];
-    if (passing) opts.push({ t: T('Treo c\u1ed5 ','Hang ') + lead[0].name + ' \u2192', on:() => resolveVote(lead[0]) });
+    /* No name on the button. At 320 it offers 116px for the label and "Treo c\u1ed5 Nguy\u1ec5n
+       V\u0103n Minh \u2192" needs 208, so .bar .in .btn's ellipsis trimmed the identity of the
+       person being eliminated off the control that commits the elimination. The name is in
+       the bar note directly above, full width, where it fits. */
+    if (passing) opts.push({ t: T('Treo c\u1ed5 \u2192','Hang \u2192'), on:() => resolveVote(lead[0]) });
     if (sc.length && lead.length > 1) opts.push({ t: T('Ho\u00e0 \u2014 V\u1eadt T\u1ebf Th\u1ea7n ch\u1ebft thay','Tied \u2014 Scapegoat dies'), sec:true, on:() => resolveVote(sc[0], true) });
     opts.push({ t: best > 0 ? T('Xo\u00e1 phi\u1ebfu, b\u1ea7u l\u1ea1i','Clear the tally')
                             : T('Kh\u00f4ng ai b\u1ecb treo','Nobody was voted out'), sec:true, on:() => {
@@ -2453,7 +2458,14 @@ function rDay(){
       G.votes = {}; G.sheriffVote = null; G.resume = 'night'; proceed(); } });
     bar(opts);
     // Pinned last: bar() clears the note, so this has to follow it.
-    barNote(fmtN(cast) + T(' / <b>',' of <b>') + fmtN(TP) + T('</b> phi\u1ebfu \u00b7 ','</b> cast \u00b7 ') +
+    /* When a name carries, it leads the note. This is the only place the name is now said
+       on the day screen \u2014 the row can no longer fit it and the button no longer holds it \u2014
+       so it comes first, and the arithmetic follows it. */
+    barNote((passing
+        ? '<b class="hit">' + lead[0].name + '</b>' +
+          T(' nhi\u1ec1u phi\u1ebfu nh\u1ea5t \u00b7 ', ' carries \u00b7 ')
+        : '') +
+      fmtN(cast) + T(' / <b>',' of <b>') + fmtN(TP) + T('</b> phi\u1ebfu \u00b7 ','</b> cast \u00b7 ') +
       (voteNeedsMajority()
         ? T('c\u1ea7n <b','a name needs <b') + (passing ? ' class="hit"' : '') + '>' +
           T('h\u01a1n ','more than ') + fmtN(thr) + '</b>'

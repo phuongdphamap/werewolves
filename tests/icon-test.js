@@ -64,9 +64,12 @@ t('control glyphs are styled too', () =>
   /svg\.uic\{/.test(src) ? true : '.uic rule missing, so shuffle and sound draw at full size');
 
 console.log('\nTHE ADD BUTTON MATCHES ITS FIELD');
+// the field's SIZE is --t-field now (iOS zooms below 16); its family and tracking are
+// still the shared control tokens
 t('the field draws its font from the shared control tokens', () =>
-  /input\[type=text\]\{[^}]*font-size:var\(--ctl-size\)/.test(src)
-    ? true : 'field no longer uses the token');
+  /input\[type=text\]\{[^}]*font-size:var\(--t-field\)/.test(src) &&
+  /input\[type=text\]\{[^}]*letter-spacing:var\(--ctl-track\)/.test(src)
+    ? true : 'field no longer uses the tokens');
 t('the button inherits its font from .btn rather than restating it', () => {
   const m = src.match(/\.row\.tall \.btn\{[^}]*\}/);
   if (!m) return 'rule missing';

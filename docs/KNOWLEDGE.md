@@ -702,6 +702,9 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-19 | "Classic" and "Characters" appeared broken | At ≤12 players they produced **identical decks**, because `REC_CHAR` opened with the same base cards and the villager floor stopped the list before it reached an expansion role. Nothing changed on click, so it looked dead. |
 | B-20 | Counting a 17-player vote meant 11 taps per candidate | Steppers only. Added a typed input — which then must not trigger `render()`. |
 | B-27 | The two deck presets looked like actions, not a setting | Restructured: Classic/Characters is a **scope**, and both Shuffle and Suggested obey it. |
+| B-84 | The vote row named nobody on the row about to hang somebody | Design review v7, confirmed by measuring at 320: the leading row's name column was **exactly 0px**. The 44px stepper is `flex:0 0 auto` at 142, the seat icon 22, three gaps 30 — 246 of a 246px content box before the name was considered, and `.nm` is the only child that can shrink. A `carries` tag added later took 54 of it. The tag is gone (the border, the name colour and the fill already say it, and the bar note now says it in words), the Sheriff star stays, and `.p.vote .nm` wraps instead of ellipsising. |
+| B-85 | The button that hangs a player **truncated the player** | Same review. `Treo cổ {name} →` needed 208px of the 116 the bar offers at 320, so `.bar .in .btn`'s ellipsis cut the identity off the control that commits the elimination — worse in Vietnamese than in English, which is how it survived a review in English. The name moved to the bar note directly above, which is full width. |
+| B-86 | Every button in the bar truncated at 320, including the primary | Found while verifying B-85: with the name off it, the day's two buttons still needed 291px of a 276px row, so `Treo cổ →` lost six pixels and `Xoá phiếu, bầu lại` nine. `.bar .in` was `nowrap` by an explicit early decision — "a long label must never break the row: it truncates instead" — which answers a one-button overflow and not a crowded row. It wraps now; truncation is the last resort for a single label too long for a whole line. `measureBar()` reads `offsetHeight`, so the clearance followed for free. |
 
 ### Security
 
@@ -1056,6 +1059,20 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     looked finished and drew differently in two places (B-83). Inheritance is not a default
     to leave alone: for a control it is a dependency on the container. The fix is one line;
     the check that it holds for every other control is the part worth keeping.
+
+42. **A name is never the element that yields.** Three findings in one review (B-84, B-85,
+    B-86) were the same shape: a row or a button ran out of room, and the part that gave way
+    was the player's name. Everything else on those screens can be paraphrased, abbreviated
+    or dropped — a tally can lose its label, a verb can go, a tag can vanish — because the
+    moderator can reconstruct it. The name is the one string the app cannot restate and the
+    one it exists to say out loud. So it is never what pays for a layout: something else
+    shrinks, or the row wraps.
+
+43. **A rule written for one failure will be applied to a different one.** `.bar .in` was
+    `nowrap` with a comment explaining why — one long label must not break the row. Correct,
+    and it silently became the answer to *two* labels crowding each other, which it answers
+    badly: it truncated both instead of one. When a constraint has a stated reason, check the
+    case in front of you is actually that reason before letting it decide.
 
 ---
 

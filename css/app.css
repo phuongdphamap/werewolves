@@ -70,6 +70,13 @@
     --t-say:21px;     /* headings, and the sentence read aloud */
     --t-h:26px;       /* a screen that is nothing but a heading */
     --t-max:34px;     /* the reveal */
+    /* 16, and the number is not a taste decision: iOS Safari zooms the page whenever it
+       focuses an input rendering below 16px, and does not zoom back out on blur. The
+       scale had no 16 step, so --t-body at 15 was the nearest thing and the fields took
+       it — which meant tapping the vote tally mid-count scaled the page and slid the row
+       out from under the moderator's thumb. maximum-scale would silence that by taking
+       pinch-zoom from everyone; this costs one pixel on two controls instead. */
+    --t-field:16px;   /* any input the user can focus. Never lower this. */
     /* THREE RADII, tied to what they round. There were seven (5, 9, 10, 11, 12, 14, 999)
        with no rule connecting a radius to the size of the thing it wrapped. */
     --r-ctl:10px;     /* rows, controls, fields */
@@ -275,9 +282,9 @@
   .row.tall{align-items:stretch}
   .row.tall .btn{padding:0 20px;display:flex;align-items:center;justify-content:center}
   input[type=text]{flex:1;background:var(--surf2);border:1px solid var(--line);border-radius:var(--r-ctl);
-    color:var(--txt);font-family:var(--ui);font-size:var(--ctl-size);letter-spacing:var(--ctl-track);
+    color:var(--txt);font-family:var(--ui);font-size:var(--t-field);letter-spacing:var(--ctl-track);
     padding:13px 15px;min-width:0}
-  input[type=text]::placeholder{font-family:var(--ui);font-size:var(--ctl-size);
+  input[type=text]::placeholder{font-family:var(--ui);font-size:var(--t-field);
     letter-spacing:var(--ctl-track);font-weight:500;color:rgba(237,233,224,.38);opacity:1}
   input[type=text]:focus{outline:none;border-color:var(--line2)}
   .btn{background:var(--moon);color:#171320;border:0;border-radius:var(--r-ctl);font-family:var(--ui);
@@ -425,8 +432,26 @@
   .p.vote.over{border-color:var(--wolf)}
   .p.vote.over .fill{background:rgba(208,85,74,.20);border-right-color:var(--wolf)}
   .p.vote.over .nm{color:var(--wolf)}
-  .p.vote .carries{font-size:var(--t-micro);font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+  /* Every other list in the app gives a name the whole row, so .p .nm ellipsises and nobody
+     ever sees it happen. This row is the exception: the stepper is 142px of 44px touch
+     targets that cannot give, and at 320 that left the name 62px for a string needing 128.
+     "Nguyễn Văn Minh" arrived as "Nguyễn Vă…" on the one row whose whole purpose is to be
+     read out loud. So here the name wraps instead of yielding. It costs height only when it
+     needs it: the stepper already makes the row 72px, which is two lines free. */
+  .p.vote .nm{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;
+    line-height:1.25}
+  /* The word "carries" used to live here, 54px of nowrap on a row whose whole content box
+     is 246px at 320. With .stp at 142, the seat at 22 and three gaps at 30, that was the
+     entire budget before the name was considered — and .nm is the only child that can
+     shrink, so it absorbed the shortfall and measured exactly 0. The row announced that
+     somebody was about to be hanged without saying who.
+     The fact is still carried three ways (the --wolf border, the --wolf name, and a fill
+     past the half-line) and stated in words in the bar note, which has room for it. What
+     is left here is the Sheriff's star, which is a fact nothing else shows. */
+  .p.vote .carries{font-size:var(--t-micro);font-weight:700;letter-spacing:.13em;
     color:var(--wolf);white-space:nowrap}
+  /* An empty flex child still costs a gap either side of it. */
+  .p.vote .carries:empty{display:none}
   /* The threshold used to sit in a card above the list and scroll away exactly when
      the count got interesting. It lives in the bar now, so it cannot leave. */
   .barnote{font-size:var(--t-small);color:var(--txt2);text-align:center;margin-bottom:var(--s2);
@@ -448,7 +473,7 @@
   /* a tally you can type into: eleven taps on + is not a counting method */
   .stp input[type=text]{flex:0 0 auto;width:50px;height:44px;padding:0;text-align:center;
     background:var(--surf2);border:1px solid var(--line);border-radius:var(--r-ctl);color:var(--txt);
-    font-family:var(--ui);font-size:var(--t-body);font-weight:700;letter-spacing:0}
+    font-family:var(--ui);font-size:var(--t-field);font-weight:700;letter-spacing:0}
   .stp input[type=text]:focus{outline:none;border-color:var(--moon);background:rgba(232,223,200,.08)}
   .stp .n{min-width:24px;text-align:center;font-weight:700;font-size:var(--t-body)}
   .grp{font-size:var(--t-micro);font-weight:700;letter-spacing:.16em;text-transform:uppercase;
@@ -533,9 +558,17 @@
   .bar{position:fixed;bottom:0;left:0;right:0;z-index:6;
     padding:var(--s4) var(--pad) calc(var(--s4) + env(safe-area-inset-bottom));
     background:#0A0810;border-top:1px solid var(--line)}
+  /* Wraps, because at 320 the day's two buttons need 291px of a 276px row and BOTH were
+     ellipsised — including "Treo cổ →", by six pixels. A second line is cheap here:
+     measureBar() reads offsetHeight, so --barh and the scroll clearance follow on their
+     own. It only ever wraps when the labels genuinely do not fit; at 360 they do. */
   .bar .in{max-width:calc(var(--col) - 2 * var(--pad));margin:0 auto;
-    display:flex;gap:var(--s2);align-items:stretch}
-  /* a long label must never break the row: it truncates instead */
+    display:flex;flex-wrap:wrap;gap:var(--s2);align-items:stretch}
+  /* Grow to fill whatever line you land on — a button alone on a wrapped line should not
+     sit at its content width with the rest of the row empty beside it. */
+  .bar .in .btn{flex:1 1 auto}
+  /* Truncation is now the last resort, for one label too long for a whole line of its own,
+     rather than the first answer to a crowded row. */
   .bar .in .btn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Where you are in the night, made ambient. It was a 10px tracked caption — "Roll call ·
      step 4 of 9" — beside an 18px role name the moderator had just read out; position in

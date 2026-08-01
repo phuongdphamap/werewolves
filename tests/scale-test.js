@@ -21,7 +21,11 @@ const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.m
 const root = (css.match(/:root\{[\s\S]*?\n  \}/) || [''])[0];
 
 console.log('ONE TYPE SCALE, EIGHT STEPS');
+/* t-field is a step like any other, but it is the one whose VALUE is externally fixed:
+   iOS Safari zooms any input rendering below 16px. It sits outside the ascending run
+   below for that reason — it is chosen by a browser, not by the scale. */
 const STEPS = ['t-micro','t-cap','t-small','t-body','t-lg','t-say','t-h','t-max'];
+const FIELD = 't-field';
 for (const name of STEPS)
   t(name + ' is declared', () =>
     new RegExp('--' + name + ':\\d').test(root) ? true : 'missing from :root');
@@ -46,7 +50,7 @@ t('and neither does any inline style in the app', () => {
 });
 t('every font-size points at a step that exists', () => {
   const used = [...css.matchAll(/font-size:var\(--([\w-]+)\)/g)].map(m => m[1]);
-  const unknown = [...new Set(used)].filter(n => !STEPS.includes(n) && n !== 'ctl-size');
+  const unknown = [...new Set(used)].filter(n => !STEPS.includes(n) && n !== 'ctl-size' && n !== FIELD);
   return unknown.length === 0 ? true : 'not on the scale: ' + unknown.join(', ');
 });
 t('the control token resolves to a step rather than its own number', () =>
@@ -59,6 +63,27 @@ t('the read-aloud line is still the largest thing on a night screen', () => {
     new RegExp('--' + ((r.match(/font-size:var\(--([\w-]+)\)/) || [])[1]) + ':([\\d.]+)px')) || [])[1]);
   return px(say) > px(ttl) ? true : 'the heading is no longer yielding to the line';
 });
+
+/* The one step a browser dictates. iOS Safari zooms the page whenever it focuses an input
+   below 16px and does not zoom back out on blur, so a 15px field made the vote tally slide
+   sideways mid-count. This is the check that keeps it from drifting back. */
+t('--t-field is declared and is at least 16px', () => {
+  const v = parseFloat((root.match(/--t-field:([\d.]+)px/) || [])[1]);
+  return v >= 16 ? true : 'fields render at ' + v + 'px, so iOS will zoom on focus';
+});
+t('every focusable field uses it', () => {
+  const rules = [
+    ['input[type=text]', /  input\[type=text\]\{[^}]*\}/],
+    ['its placeholder',  /input\[type=text\]::placeholder\{[^}]*\}/],
+    ['the tally box',    /\.stp input\[type=text\]\{[^}]*\}/],
+  ];
+  const bad = rules.filter(([, re]) => !/font-size:var\(--t-field\)/.test((css.match(re) || [''])[0]))
+                   .map(([name]) => name);
+  return bad.length === 0 ? true : 'below the zoom threshold: ' + bad.join(', ');
+});
+t('and nothing suppresses pinch-zoom to hide the symptom instead', () =>
+  !/maximum-scale|user-scalable/.test(html)
+    ? true : 'the viewport disables zoom, which fails WCAG 1.4.4 and iOS ignores anyway');
 
 console.log('\nTHREE RADII, TIED TO WHAT THEY ROUND');
 for (const name of ['r-ctl','r-grp','r-full'])

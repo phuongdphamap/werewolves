@@ -19,13 +19,21 @@ console.log('ONE SHARED SPEC');
 t('the control tokens are declared once', () =>
   /--ctl-size:var\(--t-body\); --ctl-weight:600; --ctl-track:[.\d]+em;/.test(src)
     ? true : 'tokens missing or changed shape');
+/* Family and tracking are still shared by every control — that is the voice. SIZE now
+   splits, and only because a browser forces it: a focusable input below 16px makes iOS
+   zoom the page and never zoom back. The buttons keep --ctl-size; the fields take
+   --t-field. One divergence, one reason, both named. */
 for (const [what, css] of [['the field', FIELD], ['the placeholder', PLACEHOLDER], ['.btn', BTN]]){
-  t(what + ' takes its size from the token', () =>
-    /font-size:var\(--ctl-size\)/.test(css) ? true : css || 'rule missing');
   t(what + ' takes its tracking from the token', () =>
     /letter-spacing:var\(--ctl-track\)/.test(css) ? true : css || 'rule missing');
   t(what + ' uses the UI family', () =>
     /font-family:var\(--ui\)/.test(css) ? true : css || 'rule missing');
+}
+t('the buttons take their size from the control token', () =>
+  /font-size:var\(--ctl-size\)/.test(BTN) ? true : BTN || 'rule missing');
+for (const [what, css] of [['the field', FIELD], ['the placeholder', PLACEHOLDER]]){
+  t(what + ' takes its size from the field token, which iOS dictates', () =>
+    /font-size:var\(--t-field\)/.test(css) ? true : css || 'rule missing');
 }
 t('no hard-coded control font-size survives', () => {
   const bad = [FIELD, PLACEHOLDER, BTN, ADD].filter(c => /font-size:\d/.test(c));

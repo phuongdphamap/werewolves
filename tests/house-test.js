@@ -146,7 +146,7 @@ t('it is said at the dawn announcement', () => {
 });
 t('and at the vote, before the button that commits it', () => {
   const day = (src.match(/function rDay\(\)\{[\s\S]*?\n  \}\n\}/) || [''])[0];
-  const iNote = day.indexOf('revealNote('), iHang = day.indexOf("'Hang '");
+  const iNote = day.indexOf('revealNote('), iHang = day.indexOf("'Hang \\u2192'");
   return (iNote > -1 && iHang > -1 && iNote < iHang)
     ? true : 'said after the tap, by which time the screen has moved on';
 });
