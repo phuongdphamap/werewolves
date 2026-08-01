@@ -255,7 +255,8 @@ function blank(){
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
     infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
-    selfHeal:null, hunterPoison:null, hunterElder:null, showCards:null, hunterNight:null, nightShotTaken:false, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
+    selfHeal:null, hunterPoison:null, hunterElder:null, showCards:null, hunterNight:null,
+    elderRevenge:null, voteMajority:null, nightShotTaken:false, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
     dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
 G = blank();
@@ -1594,7 +1595,7 @@ function houseRulesUI(){
                             'Follow the rule \u00b7 ' + (r.byRule ? 'yes' : 'no'))],
                   [true, T('Có','Yes')], [false, T('Không','No')]];
     for (const [val, lab] of opts){
-      const b = el('div','chip' + (G[r.key] === val ? ' sel' : ''), lab);
+      const b = el('div','chip' + ((G[r.key] ?? null) === val ? ' sel' : ''), lab);
       b.onclick = () => { snap(); G[r.key] = val; render(); };
       c.appendChild(b);
     }
