@@ -140,10 +140,15 @@ t('and it never reads synchronously, against a document render() just dirtied', 
           && calls.length > 0 && unscheduled.length === 0)
     ? true : 'offsetHeight is forced on the tap path: ' + unscheduled.join(' // ');
 });
+/* The fallback has to carry the same inset the bar does, or the first paint is short by
+   exactly the height of the home indicator. */
 t('the CSS still has a fallback for the frame before the first measurement', () => {
-  const wrap = rule(/\.wrap\{[^}]*\}/);
-  return /var\(--barh, *\d+px\)/.test(wrap)
-    ? true : 'the first paint would have no clearance at all: ' + wrap;
+  const w = (src.match(/\.wrap\{[^}]*\}/) || [''])[0];
+  if (!/var\(--barh, var\(--barh-guess\)\)/.test(w))
+    return 'the first paint would have no clearance at all: ' + w.replace(/\s+/g,' ');
+  const g = (src.match(/--barh-guess:[^;]*;/) || [''])[0];
+  return /env\(safe-area-inset-bottom\)/.test(g)
+    ? true : 'the guess ignores the inset the bar now carries: ' + g;
 });
 /* Found by measuring in a browser rather than by reading this: a hidden tab never runs a
    frame callback, and the app can do its whole first render in one — a phone that loaded

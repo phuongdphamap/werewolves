@@ -116,11 +116,44 @@ for (const [cls, id, how] of [['roles','lRoles','gap'],
 
 console.log('\nA COLLAPSIBLE SPACES ITSELF OUTSIDE A STACK TOO');
 t('.exp carries a bottom margin like .card', () => {
-  const r = (src.match(/\.exp\{[^}]*\}/) || [''])[0].replace(/\s+/g,' ');
+  // anchored to the component rule, not the `.stack > .card,.stack > .alert,.stack > .exp`
+  // reset, whose tail also reads as `.exp{margin-bottom:0}`
+  const r = (src.match(/\n  \.exp\{[^}]*\}/) || [''])[0].replace(/\s+/g,' ');
   return /margin-bottom:var\(--s3\)/.test(r) ? true : r || 'rule missing';
 });
 t('inside a stack that margin is zeroed, so it is 20px not 34px', () =>
   /\.stack > \*\{margin-bottom:0\}/.test(src) ? true : 'would compound');
+/* Two mechanisms for one gap. .card, .alert and .exp each declare a margin-bottom that
+   only ever applies OUTSIDE a stack, which is how nineteen type sizes started: a value
+   that is right half the time and invisible the other half. The stack owns the gap. */
+t('components inside a stack surrender their own bottom margin', () => {
+  const r = (src.match(/\.stack > \.card,\.stack > \.alert,\.stack > \.exp\{[^}]*\}/) || [''])[0];
+  return /margin-bottom:0/.test(r)
+    ? true : 'a container gap and a component margin both apply: ' + (r || 'rule missing');
+});
+t('and every component the app appends is covered by that reset', () => {
+  /* Only classes the app CONSTRUCTS can end up as a stack child; .tally, .barnote and the
+     reveal's parts are static markup that never lives in one, so they keep their own gap
+     legitimately. */
+  const own = [...src.matchAll(/\n  \.(\w+)\{[^}]*margin-bottom:var\(--s\d\)[^}]*\}/g)].map(m => m[1]);
+  const built = own.filter(c =>
+    new RegExp("el\\('div','" + c + "\\b").test(js) || new RegExp("className = '" + c + "'").test(js));
+  const reset = (src.match(/\.stack > \.card,\.stack > \.alert,\.stack > \.exp\{[^}]*\}/) || [''])[0];
+  const missing = built.filter(c => !reset.includes('.' + c));
+  return built.length > 0 && missing.length === 0
+    ? true : 'appended into stacks but not reset: ' + (missing.join(', ') || '(found none to check)');
+});
+/* Why the higher-specificity reset is needed at all: `.stack > *` and `.card` are both a
+   single class, so the cascade falls through to source order — and .card is declared
+   later. The generic rule has been losing this fight since it was written. */
+t('the generic rule alone would lose to the component', () => {
+  const iGeneric = src.indexOf('.stack > *{margin-bottom:0}');
+  const iCard = src.search(/\n  \.card\{/);
+  const iReset = src.indexOf('.stack > .card,.stack > .alert,.stack > .exp');
+  if (iGeneric < 0 || iCard < 0) return 'one of the two rules is missing';
+  return iCard > iGeneric && iReset > -1
+    ? true : 'the reset is gone, and .card would out-order the generic rule';
+});
 
 /* A collapsible's body holds one of two things: prose, which it spaces itself, or a
    component that arrives with its own spacing tokens — the house-rules panel. The prose

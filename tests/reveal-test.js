@@ -66,9 +66,12 @@ t('the Fox button appears only once there is an answer', () =>
 
 console.log('\nTHE FOX STILL TELLS YOU WHO IS BEING CHECKED');
 t('the trio is named on the step', () =>
-  /<b>Sniffing:<\/b>/.test(FOXSTEP) ? true : 'the moderator cannot see the group');
+  /T\('[^']*','Sniffing:'\)/.test(FOXSTEP) ? true : 'the moderator cannot see the group');
 t('and it explains how the trio is formed', () =>
   /plus their two living neighbours/.test(FOXSTEP) ? true : 'unexplained grouping');
+t('...in both languages, since it is a rules explanation', () =>
+  /T\('[^']*',\s*\n?\s*'The card he points at, plus their two living neighbours\.'\)/.test(FOXSTEP)
+    ? true : 'the Fox ruling is English-only mid-night');
 t('naming the trio is not the same as naming the answer', () =>
   !/CÓ SÓI|A WOLF|NO WOLF/.test(FOXSTEP) ? true : 'the verdict wording leaked into the step');
 

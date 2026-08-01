@@ -3,6 +3,10 @@
 // than no tool at all.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+/* causeLabel() and unplacedWolfCards() speak the interface language now, so the harness
+   supplies the two helpers they reach for. English, so the assertions below stay readable. */
+globalThis.T = (vi, en) => vi;      // the Vietnamese-first default, as shipped
+globalThis.rName = r => T(r.vi, r.name);
 
 function grab(name){
   const i = src.indexOf('function ' + name + '(');
@@ -34,6 +38,8 @@ const blocks = [
   src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','globalThis.CAUSE'),
   src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'),
   src.match(/const villageKilled = [^;]*;/)[0].replace('const villageKilled','globalThis.villageKilled'),
+  // the revenge is settable now, so kill() consults it
+  src.match(/const elderStripsPowers = [^;]*;/)[0].replace('const elderStripsPowers','globalThis.elderStripsPowers'),
   grab('teamOf').replace('function teamOf','globalThis.teamOf = function'),
   grab('neighbours').replace('function neighbours','globalThis.neighbours = function'),
   grab('clockwiseWolfFrom').replace('function clockwiseWolfFrom','globalThis.clockwiseWolfFrom = function'),
@@ -259,12 +265,12 @@ t('nor does the White Werewolf or the Knight’s rust', () =>
    switched off silently the first time somebody edited the copy or translated it. */
 console.log('\nA CAUSE IS A CODE, NOT A SENTENCE');
 t('every cause the app passes to kill() is a declared code', () => {
-  const passed = [...src.matchAll(/(?:kill|add)\([^,]+, *'([a-z]+)'/g)].map(m => m[1]);
+  const passed = [...src.matchAll(/(?:kill|add)\([^,\n]+, *'([a-z]+)'/g)].map(m => m[1]);
   const unknown = [...new Set(passed)].filter(c => !CAUSE[c]);
   return unknown.length === 0 ? true : 'undeclared, so it would render raw: ' + unknown.join(', ');
 });
 t('every village-caused code is one the app really passes somewhere', () => {
-  const passed = new Set([...src.matchAll(/(?:kill|add)\([^,]+, *'([a-z]+)'/g)].map(m => m[1]));
+  const passed = new Set([...src.matchAll(/(?:kill|add)\([^,\n]+, *'([a-z]+)'/g)].map(m => m[1]));
   const village = Object.keys(CAUSE).filter(c => CAUSE[c].village);
   const dead = village.filter(c => !passed.has(c));
   return dead.length === 0 ? true : 'these would never fire: ' + dead.join(', ');
@@ -280,9 +286,15 @@ t('the poisoned Hunter is decided on the code, not on /poison/', () => {
   return /cause === 'poison'/.test(fn) && !/\/poison\/\.test/.test(fn)
     ? true : 'still matching the prose: ' + fn;
 });
-t('a code with no label still renders as something, for an old save', () =>
-  (causeLabel('the tie') === 'the tie' && causeLabel(null) === 'dead')
-    ? true : 'a pre-code save would print undefined beside a dead player');
+/* The fallback is translated now, so the assertion is that it renders SOMETHING rather
+   than one particular word — an old save holding the display string must still print it,
+   and a missing cause must not reach the screen as "undefined". */
+t('a code with no label still renders as something, for an old save', () => {
+  const kept = causeLabel('the tie'), none = causeLabel(null);
+  return kept === 'the tie' && typeof none === 'string' && none.length > 0
+         && !/undefined/.test(none)
+    ? true : 'a pre-code save would print "' + none + '" beside a dead player';
+});
 t('Sisters are called on the first night and every night after', () => {
   mk(['sisters','sisters','wolf','wolf','villager']);
   G.night = 1; buildNight(); const a = names().filter(x=>x==='The Two Sisters').length;
@@ -571,7 +583,8 @@ t('skipping the Bodyguard stops dawn calling itself certain', () => {
 t('so does a card nobody would answer for', () => {
   mk(['guard','villager','wolf','wolf']);
   G.n.wolf = 'p1'; noteSkip('guard', 'card'); computeDawn();
-  return (G.dawnSure === false && /nobody answered/.test(G.dawnGaps.join(' ')))
+  // the gap list speaks the interface language; the harness runs it in Vietnamese
+  return (G.dawnSure === false && /nobody answered|kh\u00f4ng ai nh\u1ead?n/.test(G.dawnGaps.join(' ')))
     ? true : 'sure=' + G.dawnSure + ' gaps=' + JSON.stringify(G.dawnGaps);
 });
 t('a night with nothing skipped is still reported as certain', () => {

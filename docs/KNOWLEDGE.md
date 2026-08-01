@@ -496,31 +496,42 @@ glance without a whole block shouting. Twenty-four lines were demoted.
 
 ### Interface language
 
-`G.lang` ('vi' | 'en'), defaulting from `navigator.language`, chosen on the deck screen.
-Separate from `G.rules`, which it used to ride on (B-66). One helper:
+A **device preference**, not game state — it started in `G`, which is what a new game
+replaces, so "Same table, new game" forgot it (B-69). Both it and the tips setting now live
+in `mh.prefs`, beside `mh.games`, and out of the undo buffer and the save file: switching
+language is not a move Undo should reverse.
 
 ```js
-const vnUI = () => !G || G.lang !== 'en';
+const PREF_KEY = 'mh.prefs';
+const prefs = { lang: (/^vi\b/i.test(navigator.language || '') ? 'vi' : 'en'), tips: null };
+const vnUI = () => prefs.lang !== 'en';
 const T = (vi, en) => vnUI() ? vi : en;
-const rName = r => T(r.vi, r.name);          // was an inline ruleset test in nine places
+const rName = r => T(r.vi, r.name);       // was an inline ruleset test in nine places
 ```
 
-`!== 'en'` rather than `=== 'vi'`, so a save written before the field existed resumes in
-Vietnamese rather than flipping. Both languages survive only where the second one **is**
-the content: the read-aloud line (one tap away) and role names in the deck list, which a
-table argues about in both.
+`!== 'en'` rather than `=== 'vi'`, so an unreadable or absent preference lands on the
+Vietnamese-first default this app is written for. Only the two known values are accepted
+back out of storage. Separate from `G.rules`, which it used to ride on (B-66).
 
-**Still single-language:** the long explanatory prose — the two deck-screen essays, the
-route-choice collapsible, and the night/dawn/day guidance — exists in one language each.
-Every *label*, heading, button and house-rule note is paired. Finishing the prose is
-translation work, not plumbing.
+Both languages survive only where the second one **is** the content: the read-aloud line
+(one tap away) and role names in the deck list, which a table argues about in both.
+
+**Everything on screen goes through `T()`.** That includes the rules prose — the Fox's
+ruling, the Witch's potions, the dawn reasoning, the cause of every death — because one
+language plus twenty untranslated blocks is worse than the bilingual noise it replaced
+(B-70). `lang-test.js` walks every `.tell` and `.alert` construction and fails on any prose
+literal not reached through `T()`; that scan found two blocks the hand sweep missed.
+
+Still English-only: the long explanatory essays behind the deck-screen collapsibles, and
+the chronicle log. Both are reference rather than instruction, and neither is read out.
 
 ### The teaching layer retires itself
 
 `gamesPlayed` in `localStorage['mh.games']`, its own key so ending a game does not erase
-it. `teaching()` is the same tri-state shape as a house rule: `G.tips == null` decides
+it. `teaching()` is the same tri-state shape as a house rule: `prefs.tips == null` decides
 from experience (`gamesPlayed < 2`), true/false is the moderator overruling it, settable
-from the Roster. While it holds, collapsibles open themselves; `expShut` records an
+from the Roster. `null` means "not yet chosen **on this device**" rather than "not yet
+chosen in this game". While it holds, collapsibles open themselves; `expShut` records an
 explicit close so the default cannot reopen it. `tip()` gathers prose per screen and
 `flushTips()` emits **one** affordance rather than six.
 
@@ -585,6 +596,10 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-63 | "His card stays down" implied the Hunter could be **kept secret** | Copy I added one commit earlier. True about the card and wrong about the secret: a dead player points and somebody drops, which identifies him whatever the reveal rule says — and a Hunter voted out fires in daylight, where nothing can hide it. The screen now says so, and points at the one arrangement that does hide him: take the shot in the night. |
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
+| B-68 | The haptics button shipped as an **empty bordered box on every iPhone** | Reported from a phone. Two v5 findings interacted: P4 gave `.ico` `display:inline-flex` for its 44px floor, and P3 added a button hidden with the `hidden` attribute. An author `display` beats the UA stylesheet's `[hidden]{display:none}` regardless of specificity — author origin outranks user-agent origin — so on any browser without `navigator.vibrate` the control was never hidden. And `paintHaptic` returned *before* setting the label, so what remained was a bordered box with nothing in it. Fixed with a global `[hidden]{display:none !important}`, and by labelling before hiding so a future failure is at least readable. |
+| B-69 | Both moderator settings were **forgotten by the next game** | `G.lang` and `G.tips` lived in the object `blank()` replaces, so "Same table, new game" reset them: fold the tips away in your third game, start a fourth, and they are back. The asymmetry gave it away — `gamesPlayed`, the *automatic* guess, was given its own `localStorage` key precisely so it would outlive a game, while the two controls that overrule that guess were not. They are device preferences and now live in `mh.prefs`, out of the undo buffer and the save as well: switching language is not a move Undo should reverse. |
+| B-70 | Twenty rules blocks were **hard-coded English** after the language switch shipped | The old bilingual design was noisy, but a Vietnamese moderator could always read *something*. Picking one language turned redundancy into a gap: the interface says it speaks Vietnamese, then hands over the Fox's ruling in English, mid-night, in front of the table. Worst on the collect-the-deal screen, where a bare `.tell` sat four lines above correctly wrapped buttons — a Vietnamese action bar under an English instruction telling the moderator what to tap. Fixed by wrapping them, and by a structural scan that walks every `.tell` / `.alert` construction looking for prose never reached through `T()`. The scan found two more I had missed by hand. |
+| B-71 | `.stack`'s "children surrender their bottom margin" rule had **been losing since it was written** | Same cascade class as B-65, found while testing the fix for it. `.stack > *{margin-bottom:0}` and `.card{margin-bottom:var(--s3)}` are both a single class, so the tie falls through to source order — and `.card` is declared thirteen lines later. Every `.card`, `.alert` and `.exp` inside a stack was getting the container's gap **plus** its own. Fixed with a `.stack > .card,…` reset at (0,2,0). |
 | B-65 | Grouped rows shipped with their hairlines **declared and never drawn** | The C1 surface work gave `.group` a separator (`.group > * + *`) and reset the rows inside it (`.group > .p, .group > .r, .group > .dl { border: 0 }`). Both rules were present and correct-looking in the diff. But the reset is two classes (0,2,0) and the separator is one (0,1,0), so `border:0` won wherever it applied and every grouped container rendered as one undivided block. Source order does not help: specificity is resolved first. Found by measuring `borderTopWidth` on a real row in a browser, not by reading. The fix restores the hairline at (0,3,0) with `:not(:first-child)`. |
 | B-66 | The interface language was decided by the **ruleset** | `G.rules === 'vn'` chose both the night call order and every label, in nine places plus the read-aloud line. So a table that wanted the Miller's Hollow *rules* got an English *interface* as a side effect of a decision about the rules, and a Vietnamese moderator on the original order was handed English cards to read out. Two unrelated questions on one switch. Split into `G.lang`, defaulting from `navigator.language`. |
 | B-67 | The masking tip pointed at an affordance that had **moved** | It told the moderator to turn on night sounds "in the header". The sound control was moved into the Roster sheet some releases earlier. This is the second cost of a teaching layer this voluminous, and the review named it: nobody re-reads a tip they have learned to scroll past, so it keeps instructing people to use something that is not there. |
@@ -671,7 +686,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   824 assertions across 30 suites, 0 failing
+#   856 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -703,7 +718,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**824 assertions plus 57,000 generated decks.**
+**856 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
@@ -886,6 +901,33 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     is what makes it undetectable: at six essays per screen nobody proofreads, and the one
     stale line is indistinguishable from the rest. Retiring the layer after a couple of
     games is a correctness measure as much as a density one.
+
+29. **Two findings in the same release can combine into a third.** A 44px floor needed
+    `display:inline-flex`; a haptics control needed the `hidden` attribute. Each was
+    correct, tested, and shipped in the same version — and together they produced an empty
+    bordered box on every iPhone (B-68). Neither suite could have caught it, because
+    neither was wrong. When a release changes both a component's display and how something
+    is hidden, the interaction is the thing to check.
+
+30. **Ask which lifetime a piece of state has, not just where it is convenient.** `G.lang`
+    and `G.tips` went into the game object because a reload was the failure being fixed
+    (B-69). A reload is rare; a new game is the common case, and it threw them away. The
+    tell was already in the file: `gamesPlayed` had been given its own key for exactly this
+    reason, so the automatic guess outlived a game while the manual override did not.
+
+31. **Removing redundancy can remove a fallback.** Bilingual labels were noisy and the
+    review was right to cut them — but the noise was also insurance: a moderator could
+    always read one of the two. One language plus twenty untranslated blocks is worse than
+    the redundancy it replaced, and worse specifically for the users the new default aims
+    at (B-70). When a change makes something the *only* path, check that the path is
+    complete before shipping the deletion.
+
+32. **A cascade tie is decided by source order, and source order is not a design.** Two
+    single-class rules for the same property leave the winner to whichever was written
+    later — which is how the `.group` hairlines never drew (B-65) and how `.stack`'s
+    margin reset had been losing since the day it was written (B-71). Both looked correct
+    in the diff. If a rule exists to *override* another, give it more specificity, not a
+    later line.
 
 ---
 

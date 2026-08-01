@@ -145,12 +145,12 @@ t('a corrupt save cannot stop the app booting', () =>
 t('the prompt says what will be resumed', () =>
   /g\.players\.length \+ V\(/.test(src) && /\+ when \+/.test(src) && /\+ ago \+/.test(src)
     ? true : 'no context for the decision');
-/* It is the first thing a reloaded phone shows, and the moderator mid-game already chose
-   a language. T() reads the live G, which is still blank at this point, so the choice has
-   to come off the saved box rather than the browser default. */
-t('and it speaks the saved game’s language, not the browser’s', () =>
-  /const V = \(vi, en\) => g\.lang !== 'en' \? vi : en;/.test(src)
-    ? true : 'a resumed Vietnamese game could greet the table in English');
+/* The language stopped being part of the saved game and became a device preference, so
+   the resume prompt reads the same store every other screen does. Same device, same
+   moderator, same answer \u2014 and one fewer thing that can disagree with itself. */
+t('and it speaks the device language, like every other screen', () =>
+  /const V = T;/.test(src)
+    ? true : 'the resume prompt has its own idea of the language again');
 t('declining clears the save, so it is not asked again', () =>
   /no\.onclick  = \(\) => \{ dropSaved\(\)/.test(src) ? true : 'would nag on every reload');
 

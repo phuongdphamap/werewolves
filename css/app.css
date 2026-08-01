@@ -82,10 +82,20 @@
        and the big action button all share family, size and tracking. Only weight
        differs, and only by one step, so a placeholder still reads as empty. */
     --ctl-size:var(--t-body); --ctl-weight:600; --ctl-track:.005em;
+    /* Only used until measureBar() runs, which is one frame — but the bar has carried
+       env(safe-area-inset-bottom) since the inset fix, up to 34px on a notched iPhone, and
+       a flat 152px left the first paint short by exactly that much. */
+    --barh-guess:calc(152px + env(safe-area-inset-bottom));
     --pad:clamp(22px, 6.5vw, 34px);
     --col:500px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* The UA stylesheet's [hidden]{display:none} is in the user-agent origin, so ANY author
+     display wins over it regardless of specificity. .ico sets display:inline-flex for its
+     44px floor, which silently un-hid the haptics button on every browser without
+     navigator.vibrate — and paintHaptic returns before labelling it, so what shipped was a
+     bordered box with nothing in it. Reported from a phone. */
+  [hidden]{display:none !important}
   html,body{margin:0;min-height:100%}
   body{background:var(--bg);color:var(--txt);font-family:var(--ui);font-size:var(--t-body);line-height:1.55;
     -webkit-text-size-adjust:100%;overscroll-behavior-y:contain}
@@ -97,8 +107,8 @@
     /* Clearance is the bar's measured height, not a guess — the bar grows when a
        label wraps or a step counter appears, and the old fixed 152px left the last
        row under it. measureBar() keeps --barh in step. */
-    padding:0 var(--pad) calc(var(--barh, 152px) + var(--s5));
-    scroll-padding-bottom:calc(var(--barh, 152px) + var(--s5))}
+    padding:0 var(--pad) calc(var(--barh, var(--barh-guess)) + var(--s5));
+    scroll-padding-bottom:calc(var(--barh, var(--barh-guess)) + var(--s5))}
   /* on anything wider than the column, hairlines make it read as a deliberate
      panel rather than a box floating in the middle of the page */
   @media (min-width:560px){
@@ -170,6 +180,9 @@
      no reason to start anywhere. .card survives only for a genuine panel of controls. */
   .card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r-grp);
     padding:var(--s4);margin-bottom:var(--s3)}
+  /* Inside a stack the container owns the gap, so these give theirs up rather than
+     declaring a second one that only applies half the time. */
+  .stack > .card,.stack > .alert,.stack > .exp{margin-bottom:0}
   .card.tight{padding:var(--s3) var(--s3)}
   .group{background:var(--surf);border:1px solid var(--line);border-radius:var(--r-grp);
     overflow:hidden}
@@ -525,7 +538,13 @@
      Entry only; the class is removed to dismiss, and the frame it saves is worth more here
      than the symmetry. */
   @keyframes sheetIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes sheetOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(14px)}}
   .modal.on{animation:sheetIn .28s cubic-bezier(.2,.7,.3,1)}
+  /* Handing the phone back is as much a moment as handing it over, and it was the only
+     half of that exchange with no feedback at all. .going is set for the length of the
+     animation and then the class comes off, so nothing is left displayed. */
+  .modal.going{display:block;animation:sheetOut .2s cubic-bezier(.4,0,1,1) forwards}
+  .modal.seer.going{display:grid}
   .skick{font-size:var(--t-micro);font-weight:700;letter-spacing:.19em;text-transform:uppercase;
     color:var(--micro);margin-bottom:var(--s5)}
   .swho{font-size:var(--t-small);color:var(--txt2);margin-bottom:var(--s1)}

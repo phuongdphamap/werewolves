@@ -49,6 +49,37 @@ t('it is an animation, not a transition that could never run', () =>
   !/\.modal\{[^}]*transition:/.test(flat)
     ? true : 'a transition from display:none never fires');
 
+/* Handing the phone BACK is as much a moment as handing it over, and the dismissal was
+   the only half of the exchange with no feedback at all. */
+t('and it leaves as a sheet too, not as a cut', () =>
+  /@keyframes sheetOut\{/.test(css) && /\.modal\.going\{[^}]*animation:sheetOut/.test(flat)
+    ? true : 'the dismissal is still instant');
+t('the exit is quicker than the entry, so it does not delay the moderator', () => {
+  const inMs  = parseFloat((flat.match(/animation:sheetIn ([\d.]+)s/) || [])[1]) * 1000;
+  const outMs = parseFloat((flat.match(/animation:sheetOut ([\d.]+)s/) || [])[1]) * 1000;
+  return outMs > 0 && outMs < inMs ? true : 'in=' + inMs + 'ms out=' + outMs + 'ms';
+});
+t('.going holds the sheet visible while it animates', () =>
+  /\.modal\.going\{display:block/.test(flat) && /\.modal\.seer\.going\{display:grid\}/.test(flat)
+    ? true : 'display:none would cancel the animation before it drew a frame');
+/* The class has to come off with .on, or a "closed" sheet stays displayed forever —
+   and it has to come off even if the animation never fires, which is what a hidden tab
+   or prefers-reduced-motion collapsing the duration will do. */
+t('closing removes both classes, so nothing is left displayed', () => {
+  const fn = (js.match(/function closeSheet\(id, after\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /m\.classList\.remove\('going', 'on'\)/.test(fn)
+    ? true : 'the sheet would stay on screen after it is dismissed: ' + fn;
+});
+t('and a missing animationend cannot strand it open', () => {
+  const fn = (js.match(/function closeSheet\(id, after\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /setTimeout\(done,/.test(fn) && /clearTimeout\(backstop\)/.test(fn)
+    ? true : 'no backstop, so a hidden tab leaves the overlay up: ' + fn;
+});
+t('both sheets dismiss through the one path', () => {
+  const calls = (js.match(/closeSheet\(/g) || []).length - 1;   // minus the definition
+  return calls === 2 ? true : calls + ' call site(s); the reveal and the roster share it';
+});
+
 console.log('\nPROGRESS IS AMBIENT, AND SAID ONCE');
 t('the night carries a rule, not a caption', () => {
   const r = (css.match(/\.steps\{[^}]*\}/) || [''])[0];
