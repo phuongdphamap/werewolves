@@ -126,9 +126,21 @@ t('it is off-switchable', () => {
 });
 t('and the control is hidden where the browser cannot vibrate, not offered dead', () => {
   const p = (js.match(/function paintHaptic\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  return /if \(!canBuzz\(\)\)\{ b\.hidden = true; return; \}/.test(p)
+  return /b\.hidden = !canBuzz\(\);/.test(p)
     ? true : 'iOS would show a switch that does nothing: ' + p;
 });
+/* It shipped as an empty bordered box on every iPhone: paintHaptic returned before
+   labelling, and the hidden attribute lost to .ico's own display. Both halves are pinned
+   \u2014 the label is set unconditionally, and [hidden] is forced. */
+t('...and it is labelled before it is hidden, so a failure is readable', () => {
+  const p = (js.match(/function paintHaptic\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  const iText = p.indexOf('b.textContent'), iHide = p.indexOf('b.hidden');
+  return iText > -1 && iHide > iText
+    ? true : 'hidden is set before the label, so a stuck control is blank';
+});
+t('and an author display cannot un-hide it again', () =>
+  /\[hidden\]\{display:none !important\}/.test(css)
+    ? true : 'the UA rule loses to any author display, which is how this shipped');
 t('a throwing vibrate cannot take the render down with it', () => {
   const b = (js.match(/function buzz\(kind\)\{[\s\S]*?\n\}/) || [''])[0];
   return /try \{/.test(b) && /catch/.test(b) ? true : 'unguarded: ' + b;

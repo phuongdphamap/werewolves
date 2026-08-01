@@ -8,6 +8,12 @@
 // side has been placed.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+/* unplacedWolfCards() names cards in the interface language now — it used to hard-code
+   r.vi, which put Vietnamese card names inside English sentences. The harness can switch,
+   so the two naming assertions below run in both. */
+globalThis.LANG = 'vi';
+globalThis.T = (vi, en) => LANG === 'vi' ? vi : en;
+globalThis.rName = r => T(r.vi, r.name);
 
 eval(src.match(/const ROLES = \[[\s\S]*?\n\];/)[0].replace('const ROLES','globalThis.ROLES'));
 globalThis.R = {}; ROLES.forEach(r => R[r.id] = r);
@@ -49,11 +55,30 @@ t('one wolf card loose: it correctly refuses', () => {
 });
 t('and it names the missing card rather than the unknown players', () => {
   board({ wolf:2 }, ['wolf',null]);
+  globalThis.LANG = 'vi';
   return unplacedWolfCards() === 'Ma Sói' ? true : unplacedWolfCards();
+});
+/* It hard-coded r.vi, so an English interface got a Vietnamese card name dropped into the
+   middle of an English sentence. Both directions are pinned. */
+t('...in whichever language the interface is speaking', () => {
+  board({ wolf:2 }, ['wolf',null]);
+  globalThis.LANG = 'en';
+  const en = unplacedWolfCards();
+  globalThis.LANG = 'vi';
+  return en === 'Werewolf' ? true : 'English interface says "' + en + '"';
 });
 t('several missing copies are counted', () => {
   board({ wolf:3 }, ['wolf',null,null]);
+  globalThis.LANG = 'vi';
   return /Ma Sói ×2/.test(unplacedWolfCards()) ? true : unplacedWolfCards();
+});
+t('and the fallback when nothing is named is translated too', () => {
+  board({ wolf:1 }, ['wolf']);
+  globalThis.LANG = 'en';
+  const en = unplacedWolfCards();
+  globalThis.LANG = 'vi';
+  const vi = unplacedWolfCards();
+  return en !== vi && /wolf card/.test(en) ? true : 'en=' + en + ' vi=' + vi;
 });
 
 console.log('\nEVERY ROUTE ONTO THE WOLF SIDE IS COVERED');
@@ -100,7 +125,7 @@ t('plain villagers never block it, however many are unidentified', () => {
 console.log('\nTHE SAME GUARD IS USED EVERYWHERE A WOLF IS ASKED ABOUT');
 for (const [what, re] of [
   ['the Fox trio',            /if \(wolfSideKnown\(\)\)\{\s*\n\s*G\.n\.foxAns/],
-  ['the Bear Tamer growl',    /if \(!wolfSideKnown\(\)\)\{\s*\n\s*B\.appendChild\(el\('div','tell','Bear Tamer/],
+  ['the Bear Tamer growl',    /if \(!wolfSideKnown\(\)\)\{\s*\n\s*B\.appendChild\(el\('div','tell',\s*\n?\s*T\('[^']*','Bear Tamer/],
   ['the wolves\u2019 target list', /'whitewolf'\) && !wolfSideKnown\(\)/],
   ['the Knight\u2019s rust',       /if \(!wolfSideKnown\(\)\) log\('Not every wolf card is placed/],
   ['the victory check',       /if \(!wolfSideKnown\(\)\) return null;/],

@@ -6,6 +6,10 @@
 // override survives switching ruleset.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+/* causeLabel() and unplacedWolfCards() speak the interface language now, so the harness
+   supplies the two helpers they reach for. English, so the assertions below stay readable. */
+globalThis.T = (vi, en) => en;
+globalThis.rName = r => r.name;
 
 eval(src.match(/const ROLES = \[[\s\S]*?\n\];/)[0].replace('const ROLES','globalThis.ROLES'));
 globalThis.R = {}; ROLES.forEach(r => R[r.id] = r);

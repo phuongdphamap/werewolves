@@ -22,21 +22,56 @@ console.log('LANGUAGE IS NOT THE RULESET');
 t('there is a language flag of its own', () =>
   /lang: \(\/\^vi\\b\/i\.test\(navigator\.language \|\| ''\) \? 'vi' : 'en'\)/.test(js)
     ? true : 'no G.lang, or it does not default from the browser');
-t('it lives in the game state, so a table keeps it across a reload', () => {
+/* It is a DEVICE preference, not game state. In G it was reset by blank(), so "same
+   table, new game" forgot it \u2014 and it has no business in the undo buffer either:
+   switching language is not a move Undo should reverse. */
+t('it lives outside the game object, so a new game keeps it', () => {
   const b = (js.match(/function blank\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  return /lang:/.test(b) ? true : 'G.lang is not in blank(), so a resume loses it';
+  if (/lang:|tips:/.test(b)) return 'still in blank(), so a new game resets it';
+  return /const PREF_KEY = 'mh\.prefs';/.test(js)
+    ? true : 'no device store, so it is not persisted anywhere';
 });
+t('and it is not in the undo buffer or the save', () => {
+  // snap() serialises G; if the preference is not in G it cannot be in either
+  const b = (js.match(/function blank\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return !/lang:|tips:/.test(b) ? true : 'Undo would reverse a language switch';
+});
+/* Reading the store back is only half of it: a preference that is never written is a
+   control that works until you close the tab, which is the bug this finding was about. */
+t('choosing a preference writes it to the device', () => {
+  const fn = (js.match(/function setPref\(k, v\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /localStorage\.setItem\(PREF_KEY, JSON\.stringify\(prefs\)\)/.test(fn)
+    ? true : 'setPref updates memory only, so the setting dies with the tab: ' + fn;
+});
+t('and every control goes through that one writer', () => {
+  /* A direct prefs.x = … from a control would repaint and persist nothing. The two in the
+     load block are the other direction — reading the store back at start-up — so the scan
+     skips them by looking only after setPref is defined. */
+  const after = js.slice(js.indexOf('function setPref'));
+  const direct = [...after.matchAll(/prefs\.(lang|tips) = /g)].length;
+  const inSetter = /function setPref\(k, v\)\{\n  prefs\[k\] = v;/.test(js);
+  return direct === 0 && inSetter
+    ? true : direct + ' assignment(s) bypass setPref';
+});
+t('a corrupt or absent preference store cannot break start-up', () =>
+  /catch \(e\)\{ \/\* storage unavailable; the browser default stands \*\/ \}/.test(js)
+    ? true : 'an embedded viewer denying storage would throw before the first render');
+t('and only the two known values are accepted back out of it', () =>
+  /raw\.lang === 'vi' \|\| raw\.lang === 'en'/.test(js) &&
+  /raw\.tips === true \|\| raw\.tips === false/.test(js)
+    ? true : 'a hand-edited key could put anything into the language switch');
 t('one helper decides every label', () =>
   /const T = \(vi, en\) => vnUI\(\) \? vi : en;/.test(js) ? true : 'no T() helper');
 t('and it reads the language, never the ruleset', () => {
   const v = (js.match(/const vnUI = [^;]*;/) || [''])[0];
-  return /G\.lang !== 'en'/.test(v) && !/G\.rules/.test(v)
+  return /prefs\.lang !== 'en'/.test(v) && !/G\.rules/.test(v)
     ? true : 'the interface language is still decided by the rules: ' + v;
 });
-t('a missing G.lang falls back to Vietnamese, so an old save is not switched', () => {
+t('an unreadable preference falls back to Vietnamese rather than English', () => {
   const v = (js.match(/const vnUI = [^;]*;/) || [''])[0];
-  // !== 'en' rather than === 'vi': a save written before this existed has no lang at all
-  return /!== 'en'/.test(v) ? true : 'a pre-existing game would flip to English on resume: ' + v;
+  // !== 'en' rather than === 'vi', so anything unexpected lands on the Vietnamese-first
+  // default this app is written for
+  return /!== 'en'/.test(v) ? true : 'an unset preference would flip to English: ' + v;
 });
 t('role names go through one accessor', () =>
   /const rName = r => T\(r\.vi, r\.name\);/.test(js) ? true : 'no rName()');
@@ -54,9 +89,15 @@ t('which box a card came from follows the language too', () => {
 });
 t('the language is choosable, and before the labels it governs', () => {
   const r = (js.match(/function rRoles\(\)\{[\s\S]*?\n\}\n/) || [''])[0];
-  const iLang = r.indexOf("G.lang = k"), iRules = r.indexOf("G.rules = k");
+  const iLang = r.indexOf("setPref('lang', k)"), iRules = r.indexOf("G.rules = k");
   return iLang > -1 && iRules > -1 && iLang < iRules
     ? true : 'no language chooser, or it sits below the ruleset chooser';
+});
+t('and choosing it is not an undoable game move', () => {
+  const r = (js.match(/function rRoles\(\)\{[\s\S]*?\n\}\n/) || [''])[0];
+  const line = (r.match(/setPref\('lang'[^\n]*/) || [''])[0];
+  return !/snap\(\)/.test(line)
+    ? true : 'Undo would step back through language switches: ' + line;
 });
 
 console.log('\nTHE MIDDOT LABELS ARE GONE');
@@ -92,6 +133,62 @@ t('role names stay bilingual in the deck list, a table argues about both', () =>
   const r = (js.match(/function roleRow\(r, chosen\)\{[\s\S]*?\n  \}/) || [''])[0];
   return /rName\(r\)/.test(r) && /T\(r\.name, r\.vi\)/.test(r)
     ? true : 'the deck list lost one of the two names: ' + r;
+});
+
+/* THE STRUCTURAL CHECK. Wrapping the twenty blocks that were missed is the fix; this is
+   what stops the twenty-first. Picking one language turned the old bilingual redundancy
+   into a gap: the interface says it speaks Vietnamese, then hands over the Fox's ruling in
+   English, mid-night, in front of the table. That is worse than the noise it replaced, and
+   for exactly the moderators the default targets.
+
+   Same shape as the check that walks every bar item labelled Skip — which is the check
+   that would have caught this one. */
+console.log('\nNO ON-SCREEN BLOCK IS HARD-CODED IN ONE LANGUAGE');
+/* Every el('div','tell'…) / el('div','alert'…) construction, with its argument list. The
+   scan stops at the balanced close so a multi-line block is read whole rather than by its
+   first line — the review's own note about reading past the match. */
+function constructions(){
+  const out = [];
+  const re = /el\('div', *(?:'(?:tell|alert)[^']*'|[\w.() ?:'!]*?(?:tell|alert)[^)]*?),/g;
+  let m;
+  while ((m = re.exec(js))){
+    let d = 1, k = m.index + m[0].length - 1;
+    while (k < js.length && d > 0){
+      k++;
+      if (js[k] === '(') d++;
+      else if (js[k] === ')') d--;
+    }
+    out.push({ at: js.slice(0, m.index).split('\n').length, body: js.slice(m.index, k + 1) });
+  }
+  return out;
+}
+const blocks = constructions();
+t('the scan finds the blocks it is meant to police', () =>
+  blocks.length >= 25 ? true : 'only matched ' + blocks.length + ', so the pattern drifted');
+/* A literal counts as prose if it holds three or more space-separated words. Class-name
+   arguments ('tell ok'), separators and single words are not prose and are left alone. */
+const PROSE = /'([^'\n]*?[a-z]{2,} [a-z]{2,} [a-z]{2,}[^'\n]*?)'/g;
+t('none of them passes a bare English literal', () => {
+  const bad = [];
+  for (const b of blocks){
+    for (const m of b.body.matchAll(PROSE)){
+      // a prose literal is fine only if some T( is still open where it sits
+      const before = b.body.slice(0, m.index);
+      const open = (before.match(/\bT\(/g) || []).length -
+                   (before.match(/\bT\([^()]*\)/g) || []).length;
+      if (open <= 0){ bad.push(b.at + ': "' + m[1].slice(0, 44) + '..."'); break; }
+    }
+  }
+  return bad.length === 0
+    ? true : bad.length + ' block(s) speak one language only — ' + bad.join(' | ');
+});
+/* The sharpest instance was the collect-the-deal screen, where a bare .tell sat four lines
+   above correctly wrapped buttons: a Vietnamese action bar under an English instruction
+   telling the moderator what to tap. */
+t('the collect-the-deal instruction is wrapped, like the buttons under it', () => {
+  const fn = (js.match(/function rLearn\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /T\([\s\S]{0,160}?known \+ ' of ' \+ total/.test(fn)
+    ? true : 'the instruction is still English under a Vietnamese bar';
 });
 
 console.log('\nHEADINGS AND BUTTONS FOLLOW IT TOO');
@@ -142,7 +239,7 @@ t('storage being unavailable cannot break start-up', () =>
     ? true : 'an embedded viewer that denies storage would throw before the first render');
 t('the predicate is three-state, like a house rule', () => {
   const p = (js.match(/const teaching = [^;]*;/) || [''])[0];
-  return /G\.tips == null \? gamesPlayed < \d+ : G\.tips/.test(p)
+  return /prefs\.tips == null \? gamesPlayed < \d+ : prefs\.tips/.test(p)
     ? true : 'no override, so the guess about the moderator cannot be corrected: ' + p;
 });
 t('a collapsible opens itself while the device is still learning', () => {
@@ -172,7 +269,7 @@ t('every screen that pushes a tip also flushes one', () => {
 });
 t('the moderator can bring it back, or keep it away', () => {
   const u = (js.match(/function tipsUI\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  return /G\.tips = val/.test(u) && /\[null,/.test(u) && /\[true,/.test(u) && /\[false,/.test(u)
+  return /setPref\('tips', val\)/.test(u) && /\[null,/.test(u) && /\[true,/.test(u) && /\[false,/.test(u)
     ? true : 'no three-state control: ' + u;
 });
 t('and it says how many games it has counted, so the state is explicable', () => {

@@ -124,7 +124,7 @@ const TEAM_NAME = { village:'Village', wolf:'Werewolves', solo:'Alone' };
    where the second language IS the content: the read-aloud line, and role names, which a
    table argues about in both.
 ========================================================================== */
-const vnUI = () => !G || G.lang !== 'en';
+const vnUI = () => prefs.lang !== 'en';
 const T = (vi, en) => vnUI() ? vi : en;
 /* A role's name in the interface language. This was an inline ruleset test in nine
    places, which is what made choosing Miller's Hollow rename every card in the app. */
@@ -245,10 +245,6 @@ function blank(){
     witchHeal:true, witchPoison:true, foxPower:true, elderLife:true,
     powersLost:false, judgeUsed:false, houndSide:null, sheriffDone:false,
     infectNext:null, over:null, scapegoatVoters:null, scapegoatDay:null, assignTo:null, knewDeal:false, rules:'vn', lastGuard:null,
-    /* Set from the browser, then it is the moderator's choice. A table keeps its language
-       across a reload, so this lives in G rather than beside altLang. tips: null = decide
-       from how many games this device has finished, true/false = overruled. */
-    lang: (/^vi\b/i.test(navigator.language || '') ? 'vi' : 'en'), tips:null,
     selfHeal:null, hunterPoison:null, hunterElder:null, showCards:null, hunterNight:null, nightShotTaken:false, resume:'night', votes:{}, sheriffVote:null, showAllRoles:false, scope:'chars',
     dawnWhy:[], dawnSure:true, dawnEdit:false, elderAbsorbed:false };
 }
@@ -317,9 +313,31 @@ function countGame(){
   gamesPlayed++;
   try { localStorage.setItem(GAMES_KEY, String(gamesPlayed)); } catch (e){}
 }
-/* Nothing is ever deleted — it stops being the default. Two games, because the first one
-   teaches the flow and the second confirms it. */
-const teaching = () => G.tips == null ? gamesPlayed < 2 : G.tips;
+
+/* DEVICE PREFERENCES, not game state. Both of these started in G, which is what a new
+   game replaces \u2014 so "Same table, new game" forgot them, and the moderator most likely
+   to fold the tips away is the experienced one, who starts the most games. The asymmetry
+   gave it away: gamesPlayed, the automatic guess, was given its own key precisely so it
+   would outlive a game; the two controls that OVERRULE that guess were left in the object
+   that gets thrown away.
+
+   They also have no business in the undo buffer or the save file. Switching language is
+   not a move Undo should reverse. */
+const PREF_KEY = 'mh.prefs';
+const prefs = { lang: (/^vi\b/i.test(navigator.language || '') ? 'vi' : 'en'), tips: null };
+try {
+  const raw = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+  if (raw.lang === 'vi' || raw.lang === 'en') prefs.lang = raw.lang;
+  if (raw.tips === true || raw.tips === false) prefs.tips = raw.tips;
+} catch (e){ /* storage unavailable; the browser default stands */ }
+function setPref(k, v){
+  prefs[k] = v;
+  try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e){}
+}
+/* Nothing is ever deleted \u2014 it stops being the default. Two games, because the first one
+   teaches the flow and the second confirms it. null now means "not yet chosen on this
+   device" rather than "not yet chosen in this game". */
+const teaching = () => prefs.tips == null ? gamesPlayed < 2 : prefs.tips;
 function undo(){
   if (!undoStack.length) return;
   const s = undoStack.pop(); undoBytes -= s.length;
@@ -365,6 +383,18 @@ const hunterFiresPoisoned = () => G.hunterPoison == null ? G.rules !== 'vn' : G.
    card says he fires "if he is killed by any reason", which sounds absolute. Default is
    no shot — the shot is a power, and the power is gone. */
 const hunterFiresPowerless = () => G.hunterElder == null ? false : G.hunterElder;
+/* Does the Elder's death cost the village its powers AT ALL? Both rulesets print that it
+   does, so the default is yes under each. It is settable because the revenge is the
+   harshest rule in the box \u2014 one mis-aimed vote and seven cards stop working for the rest
+   of the game \u2014 and plenty of tables simply do not play it.
+
+   This sits ABOVE the Hunter question rather than beside it. Asked at a table: "is there
+   an option where the Hunter can shoot after the Elder dies, but the rest of the villagers
+   keep their skills?" There was not: hunterElder exempts the Hunter alone and leaves the
+   other six stripped. Turning this off is the answer to that question, and it makes the
+   Hunter row moot \u2014 which the panel now says out loud rather than leaving two settings
+   that look independent and are not. */
+const elderStripsPowers = () => G.elderRevenge == null ? true : G.elderRevenge;
 /* Is a dead player's card turned face up? Miller’s Hollow reveals every elimination,
    night or day, with no exception — which is why the Devoted Servant's window is defined
    as "before an eliminated player's card is revealed". Vietnamese tables commonly do not
@@ -388,10 +418,10 @@ function revealNote(dead){
   const idiot = (dead || []).filter(p => p && p.role === 'idiot' && p.revealed);
   const show = cardsShownOnDeath();
   const parts = [];
-  if (show) parts.push('<b>Turn their card face up</b> so the table sees who they were.');
-  else parts.push('<b>Leave their card face down.</b> Announce the name only — this table does not reveal.');
-  if (idiot.length) parts.push((show ? '' : 'Except ') + idiot.map(p => p.name).join(', ') +
-    ': the Village Idiot must be shown either way, or the village has no reason to spare him.');
+  if (show) parts.push(T('<b>L\u1eadt b\u00e0i c\u1ee7a h\u1ecd l\u00ean</b> cho c\u1ea3 b\u00e0n th\u1ea5y h\u1ecd l\u00e0 ai.', '<b>Turn their card face up</b> so the table sees who they were.'));
+  else parts.push(T('<b>\u0110\u1ec3 b\u00e0i \u00fap.</b> Ch\u1ec9 \u0111\u1ecdc t\u00ean \u2014 b\u00e0n n\u00e0y kh\u00f4ng l\u1eadt b\u00e0i.', '<b>Leave their card face down.</b> Announce the name only — this table does not reveal.'));
+  if (idiot.length) parts.push((show ? '' : T('Tr\u1eeb ','Except ')) + idiot.map(p => p.name).join(', ') +
+    T(': Th\u1eb1ng Ng\u1ed1c lu\u00f4n ph\u1ea3i l\u1eadt, kh\u00f4ng th\u00ec d\u00e2n l\u00e0ng kh\u00f4ng c\u00f3 l\u00fd do \u0111\u1ec3 tha.', ': the Village Idiot must be shown either way, or the village has no reason to spare him.'));
   return parts.join(' ');
 }
 const fmtN = n => (Math.round(n * 100) / 100).toString();
@@ -435,12 +465,12 @@ function targetPool(roleId){
 }
 function targetNote(roleId){
   switch (roleId){
-    case 'wolf':      return 'The pack cannot devour one of its own, so known werewolves are not listed.';
-    case 'whitewolf': return 'He devours only his own kind, so only werewolves are listed.';
-    case 'seer':      return 'She already knows her own card, so she is not listed.';
-    case 'piper':     return 'He wins when every other living player is charmed, so he is not listed.';
-    case 'wildchild': return 'He cannot be his own model.';
-    case 'guard':     return 'He may shield himself, but never the same person twice running.';
+    case 'wolf':      return T('B\u1ea7y kh\u00f4ng \u0103n \u0111\u1ed3ng lo\u1ea1i, n\u00ean nh\u1eefng con s\u00f3i \u0111\u00e3 bi\u1ebft kh\u00f4ng n\u1eb1m trong danh s\u00e1ch.', 'The pack cannot devour one of its own, so known werewolves are not listed.');
+    case 'whitewolf': return T('S\u00f3i Tr\u1eafng ch\u1ec9 \u0103n \u0111\u1ed3ng lo\u1ea1i, n\u00ean ch\u1ec9 li\u1ec7t k\u00ea ma s\u00f3i.', 'He devours only his own kind, so only werewolves are listed.');
+    case 'seer':      return T('Ti\u00ean Tri \u0111\u00e3 bi\u1ebft l\u00e1 c\u1ee7a m\u00ecnh, n\u00ean kh\u00f4ng c\u00f3 t\u00ean.', 'She already knows her own card, so she is not listed.');
+    case 'piper':     return T('Ng\u01b0\u1eddi Th\u1ed5i S\u00e1o th\u1eafng khi m\u1ecdi ng\u01b0\u1eddi kh\u00e1c b\u1ecb m\u00ea, n\u00ean kh\u00f4ng c\u00f3 t\u00ean.', 'He wins when every other living player is charmed, so he is not listed.');
+    case 'wildchild': return T('Kh\u00f4ng th\u1ec3 t\u1ef1 l\u1ea5y m\u00ecnh l\u00e0m h\u00ecnh m\u1eabu.', 'He cannot be his own model.');
+    case 'guard':     return T('C\u00f3 th\u1ec3 t\u1ef1 che ch\u1edf, nh\u01b0ng kh\u00f4ng \u0111\u01b0\u1ee3c che c\u00f9ng m\u1ed9t ng\u01b0\u1eddi hai \u0111\u00eam li\u1ec1n.', 'He may shield himself, but never the same person twice running.');
     default:          return '';
   }
 }
@@ -529,24 +559,43 @@ function setCount(id, v){
 }
 function checks(){
   const seats = G.players.length, cards = totalCards(), out = [];
-  if (seats < 6) out.push(['warn','Miller’s Hollow needs at least 6 players. Eight or more plays much better.']);
+  const plural = (n, vi, one, many) => T(vi, n > 1 ? many : one);
+  if (seats < 6) out.push(['warn', T(
+    'Miller\u2019s Hollow c\u1ea7n \u00edt nh\u1ea5t 6 ng\u01b0\u1eddi. T\u1eeb 8 tr\u1edf l\u00ean ch\u01a1i hay h\u01a1n nhi\u1ec1u.',
+    'Miller\u2019s Hollow needs at least 6 players. Eight or more plays much better.')]);
   if (cards !== seats) out.push(['no', cards < seats
-    ? (seats-cards) + ' more card' + (seats-cards>1?'s':'') + ' needed to cover every seat.'
-    : (cards-seats) + ' card' + (cards-seats>1?'s':'') + ' too many for this table.']);
+    ? T('Thi\u1ebfu ' + (seats-cards) + ' l\u00e1 n\u1eefa m\u1edbi \u0111\u1ee7 cho m\u1ecdi ch\u1ed7 ng\u1ed3i.',
+        (seats-cards) + ' more card' + (seats-cards>1?'s':'') + ' needed to cover every seat.')
+    : T('Th\u1eeba ' + (cards-seats) + ' l\u00e1 so v\u1edbi b\u00e0n n\u00e0y.',
+        (cards-seats) + ' card' + (cards-seats>1?'s':'') + ' too many for this table.')]);
   const w = wolfCards(), rec = recWolves(seats);
-  if (cards === seats && w === 0) out.push(['no','There are no werewolves in the deck.']);
+  if (cards === seats && w === 0) out.push(['no', T(
+    'B\u1ed9 b\u00e0i kh\u00f4ng c\u00f3 con ma s\u00f3i n\u00e0o.','There are no werewolves in the deck.')]);
   else if (cards === seats && seats >= 6 && w !== rec)
-    out.push(['warn','With ' + seats + ' players, ' + rec + ' ' + (rec > 1 ? 'werewolves' : 'werewolf') + ' is the usual balance. You have ' + w + '.']);
+    out.push(['warn', T(
+      'B\u00e0n ' + seats + ' ng\u01b0\u1eddi th\u00ec ' + rec + ' s\u00f3i l\u00e0 c\u00e2n b\u1eb1ng th\u01b0\u1eddng th\u1ea5y. B\u1ea1n \u0111ang \u0111\u1ec3 ' + w + '.',
+      'With ' + seats + ' players, ' + rec + ' ' + (rec > 1 ? 'werewolves' : 'werewolf') +
+      ' is the usual balance. You have ' + w + '.')]);
   for (const id in G.counts) if (R[id].only && R[id].only !== G.rules)
-    out.push(['warn', R[id].name + ' (' + R[id].vi + ') is not in the ' + RULESETS[G.rules].label +
-      ' box. Keep it if your table plays that way \u2014 the suggested deck and the shuffle leave it out.']);
-  if (G.counts.thief) out.push(['warn','The Thief needs two extra cards beyond the number of players. Pull them from the box and keep them aside.']);
-  if (G.counts.cupid && seats < 4) out.push(['no','Cupid needs at least 4 players.']);
-  if (G.counts.whitewolf && !G.counts.wolf) out.push(['warn','The White Werewolf has no pack to hunt with.']);
-  if (G.counts.sisters && G.counts.sisters !== 2) out.push(['no','The Two Sisters must be exactly two.']);
-  if (G.counts.brothers && G.counts.brothers !== 3) out.push(['no','The Three Brothers must be exactly three.']);
+    out.push(['warn', T(
+      R[id].vi + ' (' + R[id].name + ') kh\u00f4ng c\u00f3 trong h\u1ed9p ' + RULESETS[G.rules].label +
+        '. Gi\u1eef l\u1ea1i n\u1ebfu b\u00e0n b\u1ea1n ch\u01a1i th\u1ebf \u2014 b\u1ed9 \u0111\u1ec1 xu\u1ea5t v\u00e0 x\u00e1o b\u00e0i s\u1ebd b\u1ecf n\u00f3 ra.',
+      R[id].name + ' (' + R[id].vi + ') is not in the ' + RULESETS[G.rules].label +
+        ' box. Keep it if your table plays that way \u2014 the suggested deck and the shuffle leave it out.')]);
+  if (G.counts.thief) out.push(['warn', T(
+    '\u0102n tr\u1ed9m c\u1ea7n hai l\u00e1 d\u01b0 ngo\u00e0i s\u1ed1 ng\u01b0\u1eddi ch\u01a1i. L\u1ea5y ch\u00fang ra kh\u1ecfi h\u1ed9p v\u00e0 \u0111\u1ec3 ri\u00eang.',
+    'The Thief needs two extra cards beyond the number of players. Pull them from the box and keep them aside.')]);
+  if (G.counts.cupid && seats < 4) out.push(['no', T(
+    'Th\u1ea7n T\u00ecnh Y\u00eau c\u1ea7n \u00edt nh\u1ea5t 4 ng\u01b0\u1eddi.','Cupid needs at least 4 players.')]);
+  if (G.counts.whitewolf && !G.counts.wolf) out.push(['warn', T(
+    'S\u00f3i Tr\u1eafng kh\u00f4ng c\u00f3 b\u1ea7y n\u00e0o \u0111\u1ec3 \u0111i s\u0103n c\u00f9ng.','The White Werewolf has no pack to hunt with.')]);
+  if (G.counts.sisters && G.counts.sisters !== 2) out.push(['no', T(
+    'Hai Ch\u1ecb Em ph\u1ea3i \u0111\u00fang hai l\u00e1.','The Two Sisters must be exactly two.')]);
+  if (G.counts.brothers && G.counts.brothers !== 3) out.push(['no', T(
+    'Ba Anh Em ph\u1ea3i \u0111\u00fang ba l\u00e1.','The Three Brothers must be exactly three.')]);
   if (cards === seats && !out.some(o => o[0]==='no'))
-    out.push(['ok','Deck is ready: ' + cards + ' cards for ' + seats + ' players.']);
+    out.push(['ok', T('B\u1ed9 b\u00e0i \u0111\u00e3 s\u1eb5n s\u00e0ng: ' + cards + ' l\u00e1 cho ' + seats + ' ng\u01b0\u1eddi.',
+      'Deck is ready: ' + cards + ' cards for ' + seats + ' players.')]);
   return out;
 }
 
@@ -632,27 +681,32 @@ function stepInfo(s){
    powers when the Elder is the one who dies. A werewolf kill does not: surviving one
    attack is the whole point of the card, and a second one is an ordinary death. */
 const CAUSE = {
-  wolves: { label:'werewolves' },
-  white:  { label:'the White Werewolf' },
-  rust:   { label:'the Knight’s rust' },
-  grief:  { label:'grief' },
-  night:  { label:'the night' },
-  vote:   { label:'the village vote',   village:true },
-  tie:    { label:'the tie',            village:true },
-  poison: { label:'the Witch’s poison', village:true },
-  shot:   { label:'the Hunter’s shot',  village:true },
+  wolves: { label:'werewolves',          vi:'ma s\u00f3i' },
+  white:  { label:'the White Werewolf',  vi:'S\u00f3i Tr\u1eafng' },
+  rust:   { label:'the Knight\u2019s rust',  vi:'ki\u1ebfm r\u1ec9 c\u1ee7a Hi\u1ec7p S\u0129' },
+  grief:  { label:'grief',               vi:'\u0111au bu\u1ed3n' },
+  night:  { label:'the night',           vi:'\u0111\u00eam' },
+  vote:   { label:'the village vote',    vi:'phi\u1ebfu c\u1ee7a d\u00e2n l\u00e0ng', village:true },
+  tie:    { label:'the tie',             vi:'phi\u1ebfu ho\u00e0',            village:true },
+  poison: { label:'the Witch\u2019s poison', vi:'thu\u1ed1c \u0111\u1ed9c c\u1ee7a Ph\u00f9 Thu\u1ef7', village:true },
+  shot:   { label:'the Hunter\u2019s shot',  vi:'ph\u00e1t s\u00fang c\u1ee7a Th\u1ee3 S\u0103n', village:true },
 };
 // A game saved before causes carried codes holds the display string itself, and those
 // players are already dead, so the string is all it was ever going to be used for.
-const causeLabel = c => (CAUSE[c] && CAUSE[c].label) || c || 'dead';
+const causeLabel = c => (CAUSE[c] && T(CAUSE[c].vi, CAUSE[c].label)) || c || T('ch\u1ebft','dead');
 const villageKilled = c => !!(CAUSE[c] && CAUSE[c].village);
 
 function kill(p, cause){
   if (!p || !p.alive) return [];
   p.alive = false; p.cause = cause;
   if (p.role === 'elder' && !G.powersLost && villageKilled(cause)){
-    G.powersLost = true;
-    log('The village killed the Elder — by ' + causeLabel(cause) + '. Every villager power is extinguished.');
+    if (elderStripsPowers()){
+      G.powersLost = true;
+      log('The village killed the Elder \u2014 by ' + causeLabel(cause) + '. Every villager power is extinguished.');
+    } else {
+      log('The village killed the Elder \u2014 by ' + causeLabel(cause) +
+          '. By house rule the villagers keep their powers.');
+    }
   }
   const chain = [{ p, cause }];
   if (p.lover) for (const q of G.players) if (q.alive && q.lover) chain.push(...kill(q, 'grief'));
@@ -674,12 +728,16 @@ function computeDawn(){
   if (G.n.wolf){
     const v = byId(G.n.wolf);
     if (v && v.alive){
-      why.push('The pack chose <b>' + v.name + '</b>.');
+      why.push(T('B\u1ea7y s\u00f3i ch\u1ecdn <b>','The pack chose <b>') + v.name + '</b>.');
       if (G.n.guard === G.n.wolf){
-        why.push('The Bodyguard was shielding ' + v.name + ' \u2014 the attack fails.');
-        if (G.n.witchSave) why.push('The Witch also drank for ' + v.name + '. Both protected the same person \u2014 apply your house rule if you use one.');
+        why.push(T('B\u1ea3o V\u1ec7 \u0111ang che ch\u1edf ','The Bodyguard was shielding ') + v.name +
+          T(' \u2014 \u0111\u00f2n t\u1ea5n c\u00f4ng th\u1ea5t b\u1ea1i.',' \u2014 the attack fails.'));
+        if (G.n.witchSave) why.push(T('Ph\u00f9 Thu\u1ef7 c\u0169ng c\u1ee9u ','The Witch also drank for ') + v.name +
+          T('. Hai ng\u01b0\u1eddi c\u00f9ng b\u1ea3o v\u1ec7 m\u1ed9t ng\u01b0\u1eddi \u2014 \u00e1p d\u1ee5ng lu\u1eadt nh\u00e0 n\u1ebfu b\u00e0n b\u1ea1n c\u00f3.',
+            '. Both protected the same person \u2014 apply your house rule if you use one.'));
       } else if (G.n.witchSave){
-        why.push('The Witch spent her cure on ' + v.name + ' \u2014 the attack fails.');
+        why.push(T('Ph\u00f9 Thu\u1ef7 d\u00f9ng thu\u1ed1c c\u1ee9u cho ','The Witch spent her cure on ') + v.name +
+          T(' \u2014 \u0111\u00f2n t\u1ea5n c\u00f4ng th\u1ea5t b\u1ea1i.',' \u2014 the attack fails.'));
       } else if (v.role === 'elder' && G.elderLife){
         /* Recorded, not spent. This function produces a read model \u2014 deaths, reasoning,
            certainty \u2014 and applyDawn commits it after taking the snapshot Undo returns to.
@@ -687,15 +745,20 @@ function computeDawn(){
            state where it was already gone; and a moderator who then adjusted the dawn to
            kill the Elder killed him having also spent the life meant to save him. */
         G.elderAbsorbed = true;
-        why.push('But ' + v.name + ' is the Elder. His second life absorbs it, and is spent when you announce the dawn.');
+        why.push(T('Nh\u01b0ng ','But ') + v.name +
+          T(' l\u00e0 Tr\u01b0\u1edfng L\u00e3o. M\u1ea1ng th\u1ee9 hai h\u1ee9ng \u0111\u00f2n n\u00e0y, v\u00e0 m\u1ea5t khi b\u1ea1n c\u00f4ng b\u1ed1 r\u1ea1ng s\u00e1ng.',
+            ' is the Elder. His second life absorbs it, and is spent when you announce the dawn.'));
       } else {
         add(G.n.wolf, 'wolves');
       }
     }
   }
-  if (G.n.witchKill){ add(G.n.witchKill, 'poison'); why.push('The Witch poisoned <b>' + nm(G.n.witchKill) + '</b>.'); }
-  if (G.n.white){ add(G.n.white, 'white'); why.push('The White Werewolf devoured <b>' + nm(G.n.white) + '</b>.'); }
-  if (G.infectNext){ add(G.infectNext, 'rust'); why.push('The Knight\u2019s rust reached <b>' + nm(G.infectNext) + '</b>.'); }
+  if (G.n.witchKill){ add(G.n.witchKill, 'poison');
+    why.push(T('Ph\u00f9 Thu\u1ef7 \u0111\u1ea7u \u0111\u1ed9c <b>','The Witch poisoned <b>') + nm(G.n.witchKill) + '</b>.'); }
+  if (G.n.white){ add(G.n.white, 'white');
+    why.push(T('S\u00f3i Tr\u1eafng \u0103n <b>','The White Werewolf devoured <b>') + nm(G.n.white) + '</b>.'); }
+  if (G.infectNext){ add(G.infectNext, 'rust');
+    why.push(T('Ki\u1ebfm r\u1ec9 c\u1ee7a Hi\u1ec7p S\u0129 lan t\u1edbi <b>','The Knight\u2019s rust reached <b>') + nm(G.infectNext) + '</b>.'); }
 
   // grief is a consequence of the rules, so name it here rather than let it surprise anyone
   for (const d of out.slice()){
@@ -703,24 +766,28 @@ function computeDawn(){
     if (q0 && q0.lover) for (const q of G.players)
       if (q.alive && q.lover && q.id !== q0.id && !out.some(o => o.id === q.id)){
         add(q.id, 'grief');
-        why.push('<b>' + q.name + '</b> is their Lover and dies of grief.');
+        why.push('<b>' + q.name + '</b>' +
+          T(' l\u00e0 ng\u01b0\u1eddi y\u00eau c\u1ee7a h\u1ecd v\u00e0 ch\u1ebft v\u00ec \u0111au bu\u1ed3n.',' is their Lover and dies of grief.'));
       }
   }
 
   // the only honest reasons to ask the moderator anything
   const gaps = [];
-  const vi = id => R[id] ? R[id].vi : id;
+  const vi = id => R[id] ? rName(R[id]) : id;
   const sk = G.n.skipped || [], nc = G.n.noCard || [];
   if (G.counts.wolf && !G.n.wolf && !sk.includes('wolf') && !nc.includes('wolf'))
-    gaps.push('the pack never named a victim');
-  if (sk.length) gaps.push('skipped tonight: ' + sk.map(vi).join(', '));
+    gaps.push(T('b\u1ea7y s\u00f3i ch\u01b0a ch\u1ecdn n\u1ea1n nh\u00e2n','the pack never named a victim'));
+  if (sk.length) gaps.push(T('\u0111\u00eam nay b\u1ecf qua: ','skipped tonight: ') + sk.map(vi).join(', '));
   // A skipped ACTION and a card nobody would answer for are different failures, and the
   // second one used to be recorded nowhere at all.
-  if (nc.length) gaps.push('nobody answered for ' + nc.map(vi).join(', ') + ', so ' +
-    (nc.length > 1 ? 'those cards' : 'that card') + ' could not act');
+  if (nc.length) gaps.push(T('kh\u00f4ng ai nh\u1eadn ','nobody answered for ') + nc.map(vi).join(', ') +
+    T(', n\u00ean l\u00e1 \u0111\u00f3 kh\u00f4ng ra tay \u0111\u01b0\u1ee3c',
+      ', so ' + (nc.length > 1 ? 'those cards' : 'that card') + ' could not act'));
   const unplacedRules = ['elder','knight'].filter(id => (G.counts[id] || 0) > withRole(id).length);
-  if (unplacedRules.length) gaps.push('the ' + unplacedRules.map(vi).join(' and ') +
-    ' card is not placed, so that rule may not have applied');
+  if (unplacedRules.length) gaps.push(T('l\u00e1 ','the ') +
+    unplacedRules.map(vi).join(T(' v\u00e0 ',' and ')) +
+    T(' ch\u01b0a bi\u1ebft ai c\u1ea7m, n\u00ean lu\u1eadt \u0111\u00f3 c\u00f3 th\u1ec3 ch\u01b0a \u00e1p d\u1ee5ng',
+      ' card is not placed, so that rule may not have applied'));
   G.dawn = out; G.dawnWhy = why; G.dawnSure = gaps.length === 0; G.dawnGaps = gaps;
   // Set once, on entering dawn. rDawn used to force it true on every render while the
   // dawn was uncertain, which made the collapse unreachable.
@@ -742,12 +809,15 @@ function computeDawn(){
 function hunterWouldFire(p, cause){
   if (!p || p.role !== 'hunter') return { fires:false };
   if (powerGone(p) && !hunterFiresPowerless())
-    return { fires:false, why: p.name + ' was the Hunter, but the village killed the Elder \u2014 the ' +
-      'gun is as dead as every other villager power. No shot. ' +
-      'Change that under House rules if your table plays otherwise.' };
+    return { fires:false, why: p.name + T(
+      ' l\u00e0 Th\u1ee3 S\u0103n, nh\u01b0ng d\u00e2n l\u00e0ng \u0111\u00e3 gi\u1ebft Tr\u01b0\u1edfng L\u00e3o \u2014 kh\u1ea9u s\u00fang ch\u1ebft theo m\u1ecdi ph\u00e9p kh\u00e1c c\u1ee7a d\u00e2n. Kh\u00f4ng b\u1eafn. \u0110\u1ed5i \u1edf Lu\u1eadt nh\u00e0 n\u1ebfu b\u00e0n b\u1ea1n ch\u01a1i kh\u00e1c.',
+      ' was the Hunter, but the village killed the Elder \u2014 the gun is as dead as every ' +
+      'other villager power. No shot. Change that under House rules if your table plays otherwise.') };
   if (!hunterFiresPoisoned() && cause === 'poison')
-    return { fires:false, why: p.name + ' was the Hunter, but the poison gave no time to aim \u2014 no ' +
-      'shot. Change that under House rules if your table plays otherwise.' };
+    return { fires:false, why: p.name + T(
+      ' l\u00e0 Th\u1ee3 S\u0103n, nh\u01b0ng thu\u1ed1c \u0111\u1ed9c kh\u00f4ng cho k\u1ecbp gi\u01b0\u01a1ng s\u00fang \u2014 kh\u00f4ng b\u1eafn. \u0110\u1ed5i \u1edf Lu\u1eadt nh\u00e0 n\u1ebfu b\u00e0n b\u1ea1n ch\u01a1i kh\u00e1c.',
+      ' was the Hunter, but the poison gave no time to aim \u2014 no shot. ' +
+      'Change that under House rules if your table plays otherwise.') };
   return { fires:true };
 }
 function registerDeaths(chain){
@@ -1110,6 +1180,9 @@ function render(){
     day:T('B\u1ecf phi\u1ebfu', 'The vote'), sheriff:T('B\u1ea7u Tr\u01b0\u1edfng L\u00e0ng', 'Electing the badge'),
     hunter:T('Th\u1ee3 S\u0103n b\u1eafn', 'The Hunter fires'),
     scapegoat:T('V\u1eadt T\u1ebf Th\u1ea7n ch\u1ecdn', 'The Scapegoat chooses') }[G.phase] || '';
+  $('nSayLbl').textContent = T('\u0110\u1ecdc to','Read aloud');
+  $('bUndo').textContent = T('Ho\u00e0n t\u00e1c','Undo');
+  $('bRoster').textContent = T('Danh s\u00e1ch','Roster');
   $('hTtl').textContent = pos;
   $('hPh').textContent = prog;
   $('hPh').hidden = !prog;
@@ -1166,8 +1239,8 @@ function rRoles(){
   pc.appendChild(el('div','grp', T('Ng\u00f4n ng\u1eef', 'Language')));
   const lc = el('div','chips');
   for (const [k, lab] of [['vi','Ti\u1ebfng Vi\u1ec7t'], ['en','English']]){
-    const b = el('div','chip' + ((G.lang === 'en' ? 'en' : 'vi') === k ? ' sel' : ''), lab);
-    b.onclick = () => { snap(); G.lang = k; render(); };
+    const b = el('div','chip' + (prefs.lang === k ? ' sel' : ''), lab);
+    b.onclick = () => { setPref('lang', k); render(); };
     lc.appendChild(b);
   }
   pc.appendChild(lc);
@@ -1326,10 +1399,12 @@ function rDeal(){
   const mh = G.rules === 'mh';
   // Only what you must do right now stays open. The reasoning folds away.
   $('dealNote').innerHTML =
-    'Shuffle these <b>' + totalCards() + '</b> cards and deal one face down to each of the <b>' +
-    G.players.length + '</b> players.' +
-    (G.counts.thief ? ' Keep the <b>two extra cards</b> for the Thief aside.' : '') +
-    '<br><br>Then choose whether to learn the deal now, or stay blind and find out during the night.';
+    T('X\u00e1o <b>' + totalCards() + '</b> l\u00e1 n\u00e0y v\u00e0 chia \u00fap m\u1ed7i ng\u01b0\u1eddi m\u1ed9t l\u00e1 cho \u0111\u1ee7 <b>' + G.players.length + '</b> ng\u01b0\u1eddi.',
+      'Shuffle these <b>' + totalCards() + '</b> cards and deal one face down to each of the <b>' +
+      G.players.length + '</b> players.') +
+    (G.counts.thief ? T(' \u0110\u1ec3 ri\u00eang <b>hai l\u00e1 d\u01b0</b> cho \u0102n tr\u1ed9m.',
+      ' Keep the <b>two extra cards</b> for the Thief aside.') : '') +
+    '<br><br>' + T('Sau \u0111\u00f3 ch\u1ecdn: ghi l\u1ea1i b\u1ed9 b\u00e0i ngay b\u00e2y gi\u1edd, hay c\u1ee9 m\u00f9 v\u00e0 t\u00ecm ra trong \u0111\u00eam.', 'Then choose whether to learn the deal now, or stay blind and find out during the night.');
   bar([{ t: T('Quay l\u1ea1i','Back'), sec:true, on:() => { snap(); G.phase='roles'; render(); } },
        { t: T('Ghi l\u1ea1i b\u1ed9 b\u00e0i \u2192','Collect the deal \u2192'), on:() => { snap(); G.phase='learn'; render(); } }]);
   // must live in a container that gets cleared, or every visit appends another
@@ -1366,6 +1441,18 @@ function houseRulesUI(){
   const wrap = el('div', null, '');
   const byTradition = G.rules !== 'vn';
   const rows = [
+    { key:'elderRevenge', q:'Tr\u01b0\u1edfng L\u00e3o b\u1ecb d\u00e2n gi\u1ebft \u2014 d\u00e2n l\u00e0ng c\u00f3 m\u1ea5t ph\u00e9p kh\u00f4ng?',
+      en:'Does killing the Elder cost the village its powers at all?',
+      now:elderStripsPowers(), byRule:true,
+      note:'Hai b\u1ed9 lu\u1eadt \u0111\u1ec1u in l\u00e0 <b>c\u00f3</b>: d\u00e2n gi\u1ebft Tr\u01b0\u1edfng L\u00e3o th\u00ec to\u00e0n b\u1ed9 ph\u00e9p c\u1ee7a d\u00e2n l\u00e0ng m\u1ea5t s\u1ea1ch. ' +
+           '\u0110\u00e2y l\u00e0 lu\u1eadt n\u1eb7ng nh\u1ea5t trong h\u1ed9p \u2014 m\u1ed9t l\u1ea7n b\u1ecf phi\u1ebfu sai l\u00e0 b\u1ea3y l\u00e1 ng\u1eebng ho\u1ea1t \u0111\u1ed9ng c\u1ea3 v\u00e1n \u2014 ' +
+           'n\u00ean nhi\u1ec1u b\u00e0n b\u1ecf h\u1eb3n. Ch\u1ecdn <b>Kh\u00f4ng</b> th\u00ec Th\u1ee3 S\u0103n v\u1eabn b\u1eafn, Th\u1eb1ng Ng\u1ed1c v\u1eabn tho\u00e1t, ' +
+           'v\u00e0 c\u00e2u h\u1ecfi ngay b\u00ean d\u01b0\u1edbi kh\u00f4ng c\u00f2n \u00fd ngh\u0129a.',
+      noteEn:'Both rulesets print <b>yes</b>: if the village kills the Elder, every villager ' +
+             'power is extinguished. It is the harshest rule in the box \u2014 one mis-aimed vote ' +
+             'and seven cards stop working for the rest of the game \u2014 so plenty of tables ' +
+             'drop it. Choose <b>No</b> and the Hunter still fires, the Idiot still walks away, ' +
+             'and the question directly below this one stops mattering.' },
     { key:'selfHeal', q:'Phù Thuỷ tự cứu mình?',
       en:'May the Witch use her cure on herself?',
       now:witchMaySaveSelf(), byRule:byTradition,
@@ -1467,7 +1554,7 @@ function rLearn(){
   const known = G.players.filter(p => p.role).length, total = G.players.length;
   if (G.assignTo){
     const p = byId(G.assignTo);
-    B.appendChild(el('div','grp','What card does ' + p.name + ' hold?'));
+    B.appendChild(el('div','grp', T(p.name + ' c\u1ea7m l\u00e1 g\u00ec?', 'What card does ' + p.name + ' hold?')));
     const c = el('div','chips');
     for (const r of ROLES){
       if (!G.counts[r.id]) continue;                 // only cards in this deck
@@ -1484,7 +1571,8 @@ function rLearn(){
     return;
   }
   B.appendChild(el('div','tell' + (known === total ? ' ok' : ''),
-    known + ' of ' + total + ' cards recorded. Tap a player to set their card.'));
+    T('\u0110\u00e3 ghi ' + known + '/' + total + ' l\u00e1. B\u1ea5m v\u00e0o m\u1ed9t ng\u01b0\u1eddi \u0111\u1ec3 \u0111\u1eb7t l\u00e1 c\u1ee7a h\u1ecd.',
+      known + ' of ' + total + ' cards recorded. Tap a player to set their card.')));
   const ros = el('div','ros group');
   G.players.forEach((p,i) => ros.appendChild(playerRow(p, i, () => { G.assignTo = p.id; render(); })));
   B.appendChild(ros);
@@ -1562,18 +1650,19 @@ function rNight(){
      night reads that as the power still working, which is how it came back as a bug. */
   if (s.hush){
     const why = {
-      dead:      'This card is out of the game.',
-      spent:     'This card has nothing left to spend.',
-      powerless: 'The village killed the Elder, so every villager power is gone.',
-    }[s.hush] || 'Nothing will happen on this call.';
+      dead:      T('L\u00e1 n\u00e0y \u0111\u00e3 ra kh\u1ecfi v\u00e1n.', 'This card is out of the game.'),
+      spent:     T('L\u00e1 n\u00e0y kh\u00f4ng c\u00f2n g\u00ec \u0111\u1ec3 d\u00f9ng.', 'This card has nothing left to spend.'),
+      powerless: T('D\u00e2n l\u00e0ng \u0111\u00e3 gi\u1ebft Tr\u01b0\u1edfng L\u00e3o, n\u00ean m\u1ecdi ph\u00e9p c\u1ee7a d\u00e2n \u0111\u1ec1u m\u1ea5t.', 'The village killed the Elder, so every villager power is gone.'),
+    }[s.hush] || T('L\u01b0\u1ee3t g\u1ecdi n\u00e0y s\u1ebd kh\u00f4ng c\u00f3 g\u00ec x\u1ea3y ra.', 'Nothing will happen on this call.');
     $('nTitle').innerHTML += '<span class="hushTag">' +
       T('kh\u00f4ng ai th\u1ee9c', 'nobody wakes') + '</span>';
     $('nSub').textContent = why + ' Say the line anyway, leave the same pause, then carry on.';
-    H.appendChild(el('div','alert no','<b>Nobody will open their eyes.</b> ' + why +
-      ' Nothing you read next is acted on — say it for the table, not for a player.' +
+    H.appendChild(el('div','alert no',
+      T('<b>Kh\u00f4ng ai m\u1edf m\u1eaft \u0111\u00e2u.</b> ', '<b>Nobody will open their eyes.</b> ') + why +
+      T(' Nh\u1eefng g\u00ec b\u1ea1n \u0111\u1ecdc ti\u1ebfp theo kh\u00f4ng ai th\u1ef1c hi\u1ec7n \u2014 \u0111\u1ecdc cho c\u1ea3 b\u00e0n nghe, kh\u00f4ng ph\u1ea3i cho m\u1ed9t ng\u01b0\u1eddi.', ' Nothing you read next is acted on — say it for the table, not for a player.') +
       '<p class="note">' + (s.hush === 'powerless'
-        ? 'The lost powers are public, but how many calls vanish with them is not — that would tell the table how many powered village cards the deck held.'
-        : 'Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.') +
+        ? T('Vi\u1ec7c m\u1ea5t ph\u00e9p l\u00e0 c\u00f4ng khai, nh\u01b0ng c\u00f3 bao nhi\u00eau l\u01b0\u1ee3t g\u1ecdi bi\u1ebfn m\u1ea5t th\u00ec kh\u00f4ng \u2014 \u0111\u00f3 l\u00e0 c\u00e1ch c\u1ea3 b\u00e0n \u0111o\u00e1n \u0111\u01b0\u1ee3c b\u1ed9 b\u00e0i c\u00f3 m\u1ea5y l\u00e1 d\u00e2n c\u00f3 ph\u00e9p.', 'The lost powers are public, but how many calls vanish with them is not — that would tell the table how many powered village cards the deck held.')
+        : T('B\u1ecf h\u1eb3n l\u01b0\u1ee3t g\u1ecdi l\u00e0 n\u00f3i cho c\u1ea3 b\u00e0n bi\u1ebft ai \u0111\u00e3 ch\u1ebft, r\u1ed3i h\u1ecd lo\u1ea1i tr\u1eeb d\u1ea7n ra nh\u1eefng ng\u01b0\u1eddi c\u00f2n l\u1ea1i.', 'Skipping the call would tell the table who is gone, and let them narrow the rest by elimination.')) +
       '</p>'));
     bar([{ t: T('Ti\u1ebfp \u2192','Next \u2192'), wide:true, on:() => { G.si++; render(); } }]);
     return;
@@ -1608,14 +1697,19 @@ function rNight(){
 
   const lg = liveWith('littlegirl').filter(p => !powerGone(p));
   if (s.role === 'wolf' && lg.length)
-    B.appendChild(el('div','tell','The Little Girl (' + lg.map(p=>p.name).join(', ') + ') may be peeking. Watch her.'));
+    B.appendChild(el('div','tell', T(
+      'B\u00e9 G\u00e1i (' + lg.map(p=>p.name).join(', ') + ') c\u00f3 th\u1ec3 \u0111ang h\u00e9 m\u1eaft nh\u00ecn tr\u1ed9m. \u0110\u1ec3 \u00fd c\u00f4 b\u00e9.',
+      'The Little Girl (' + lg.map(p=>p.name).join(', ') + ') may be peeking. Watch her.')));
 
   /* --- specials --- */
   if (info.special === 'witch'){
     const v = G.n.wolf ? byId(G.n.wolf) : null;
-    B.appendChild(el('div','tell','<b>Tonight\u2019s victim:</b> ' + (v ? v.name : 'nobody chosen yet') +
-      '<p class="note">Healing potion ' + (G.witchHeal ? 'available' : 'spent') +
-      ' \u00b7 Poison ' + (G.witchPoison ? 'available' : 'spent') + '</p>'));
+    const gone = () => T('\u0111\u00e3 d\u00f9ng','spent'), left = () => T('c\u00f2n','available');
+    B.appendChild(el('div','tell',
+      '<b>' + T('N\u1ea1n nh\u00e2n \u0111\u00eam nay:','Tonight\u2019s victim:') + '</b> ' +
+      (v ? v.name : T('ch\u01b0a ch\u1ecdn ai','nobody chosen yet')) +
+      '<p class="note">' + T('Thu\u1ed1c c\u1ee9u ','Healing potion ') + (G.witchHeal ? left() : gone()) +
+      ' \u00b7 ' + T('Thu\u1ed1c \u0111\u1ed9c ','Poison ') + (G.witchPoison ? left() : gone()) + '</p>'));
     const she = holders[0] || null;                    // the Witch herself
     const selfVictim = !!(she && v && v.id === she.id);
     if (G.witchHeal && v){
@@ -1623,20 +1717,20 @@ function rNight(){
       // lets her drink her own cure; Vietnamese play does not.
       const blockSelf = selfVictim && !witchMaySaveSelf();
       if (selfVictim) B.appendChild(el('div', blockSelf ? 'alert no' : 'tell', blockSelf
-        ? 'The victim is the Witch herself. Vietnamese rules do not let her drink her own cure \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.'
-        : 'The victim is the Witch herself. Miller’s Hollow allows her to save herself.'));
+        ? T('N\u1ea1n nh\u00e2n ch\u00ednh l\u00e0 Ph\u00f9 Thu\u1ef7. Lu\u1eadt Vi\u1ec7t Nam kh\u00f4ng cho c\u00f4 t\u1ef1 u\u1ed1ng thu\u1ed1c c\u1ee9u \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.', 'The victim is the Witch herself. Vietnamese rules do not let her drink her own cure \u2014 <b>kh\u00f4ng \u0111\u01b0\u1ee3c t\u1ef1 c\u1ee9u</b>.')
+        : T('N\u1ea1n nh\u00e2n ch\u00ednh l\u00e0 Ph\u00f9 Thu\u1ef7. Miller\u2019s Hollow cho ph\u00e9p c\u00f4 t\u1ef1 c\u1ee9u.', 'The victim is the Witch herself. Miller’s Hollow allows her to save herself.')));
       const b = el('button','btn sm sec', (G.n.witchSave ? '\u2713 Saving ' : 'Save ') + v.name);
       b.disabled = blockSelf;
       b.onclick = () => { G.n.witchSave = !G.n.witchSave; render(); };
       B.appendChild(b);
       if (blockSelf){
-        const allow = el('button','btn sm sec','Our table allows self-rescue');
+        const allow = el('button','btn sm sec', T('B\u00e0n n\u00e0y cho t\u1ef1 c\u1ee9u','Our table allows self-rescue'));
         allow.onclick = () => { snap(); G.selfHeal = true; render(); };
         B.appendChild(allow);
       }
     }
     if (G.witchPoison){
-      B.appendChild(el('div','grp','Poison someone (optional)'));
+      B.appendChild(el('div','grp', T('\u0110\u1ea7u \u0111\u1ed9c ai \u0111\u00f3 (kh\u00f4ng b\u1eaft bu\u1ed9c)','Poison someone (optional)')));
       const c = el('div','chips');
       // She is never offered to herself. No ruleset has a witch poisoning herself,
       // and leaving her in the list is one mis-tap away from a nonsense entry.
@@ -1648,7 +1742,9 @@ function rNight(){
       B.appendChild(c);
       if (she) tip(she.name + ' is not listed \u2014 the Witch cannot poison herself.');
       if (G.n.witchKill && G.n.witchKill === G.n.wolf && !G.n.witchSave)
-        B.appendChild(el('div','tell','That is already the wolves\u2019 victim tonight. The poison would be spent for nothing.'));
+        B.appendChild(el('div','tell', T(
+          '\u0110\u00f3 \u0111\u00e3 l\u00e0 n\u1ea1n nh\u00e2n c\u1ee7a b\u1ea7y s\u00f3i \u0111\u00eam nay. Thu\u1ed1c \u0111\u1ed9c s\u1ebd m\u1ea5t kh\u00f4ng.',
+          'That is already the wolves\u2019 victim tonight. The poison would be spent for nothing.')));
     }
     flushTips(B, 'night');
     bar([{ t: T('B\u1ecf qua','Skip'), sec:true, on:() => skipStep() },
@@ -1659,7 +1755,7 @@ function rNight(){
     return;
   }
   if (info.special === 'hound'){
-    B.appendChild(el('div','grp','Which side did they choose?'));
+    B.appendChild(el('div','grp', T('H\u1ecd ch\u1ecdn phe n\u00e0o?','Which side did they choose?')));
     const c = el('div','chips');
     for (const side of ['village','wolf']){
       const b = el('div','chip' + (G.houndSide===side?' sel':''), side==='wolf' ? 'Werewolf' : 'Villager');
@@ -1672,9 +1768,12 @@ function rNight(){
     return;
   }
   if (info.special === 'thief'){
-    B.appendChild(el('div','tell','Show him the two spare cards. If he swaps, set his new card below.' +
-      '<p class="note">If both spares are Werewolves he <b>must</b> take one.</p>'));
-    B.appendChild(el('div','grp','He swapped for'));
+    B.appendChild(el('div','tell', T(
+      'Cho anh ta xem hai l\u00e1 d\u01b0. N\u1ebfu \u0111\u1ed5i th\u00ec ch\u1ecdn l\u00e1 m\u1edbi \u1edf d\u01b0\u1edbi.',
+      'Show him the two spare cards. If he swaps, set his new card below.') +
+      '<p class="note">' + T('N\u1ebfu c\u1ea3 hai l\u00e1 d\u01b0 \u0111\u1ec1u l\u00e0 Ma S\u00f3i th\u00ec anh ta <b>b\u1eaft bu\u1ed9c</b> ph\u1ea3i l\u1ea5y m\u1ed9t.',
+        'If both spares are Werewolves he <b>must</b> take one.') + '</p>'));
+    B.appendChild(el('div','grp', T('Anh ta \u0111\u1ed5i l\u1ea5y','He swapped for')));
     const th = withRole('thief')[0];
     const c = el('div','chips');
     for (const r of ROLES){
@@ -1695,8 +1794,9 @@ function rNight(){
   const pickN = info.pick || 0;
   if (!pickN){
     B.appendChild(el('div','tell', roll
-      ? 'Noted. Nothing more to do tonight \u2014 this card acts when the moment comes.'
-      : 'Nothing to record for this step.'));
+      ? T('\u0110\u00e3 ghi. \u0110\u00eam nay kh\u00f4ng c\u00f2n g\u00ec ph\u1ea3i l\u00e0m \u2014 l\u00e1 n\u00e0y ra tay khi \u0111\u1ebfn l\u00fac.',
+          'Noted. Nothing more to do tonight \u2014 this card acts when the moment comes.')
+      : T('B\u01b0\u1edbc n\u00e0y kh\u00f4ng c\u00f3 g\u00ec \u0111\u1ec3 ghi.', 'Nothing to record for this step.')));
     bar([{ t: T('Ti\u1ebfp \u2192','Next \u2192'), wide:true, on:() => { snap(); if (info.say) log(info.name + ' was called.'); G.si++; render(); } }]);
     return;
   }
@@ -1716,12 +1816,15 @@ function rNight(){
     G.n['sel_' + s.role] = chosen; render();
   }}));
   B.appendChild(c);
-  if (!pool.length) B.appendChild(el('div','alert no','There is nobody they may legally point at tonight. Skip this step.'));
+  if (!pool.length) B.appendChild(el('div','alert no', T(
+    '\u0110\u00eam nay kh\u00f4ng c\u00f3 ai h\u1ee3p l\u1ec7 \u0111\u1ec3 ch\u1ec9 v\u00e0o. B\u1ecf qua b\u01b0\u1edbc n\u00e0y.',
+    'There is nobody they may legally point at tonight. Skip this step.')));
   const tn = targetNote(s.role);
   if (tn) B.appendChild(el('p','note', tn));
   if ((s.role === 'wolf' || s.role === 'whitewolf') && !wolfSideKnown())
-    B.appendChild(el('div','tell', unplacedWolfCards() +
-      ' still unaccounted for, so I cannot promise this list excludes every wolf \u2014 check it against the real deal.'));
+    B.appendChild(el('div','tell', unplacedWolfCards() + T(
+      ' ch\u01b0a bi\u1ebft ai c\u1ea7m, n\u00ean t\u00f4i kh\u00f4ng d\u00e1m ch\u1eafc danh s\u00e1ch n\u00e0y \u0111\u00e3 lo\u1ea1i h\u1ebft s\u00f3i \u2014 \u0111\u1ed1i chi\u1ebfu v\u1edbi b\u00e0i th\u1eadt.',
+      ' still unaccounted for, so I cannot promise this list excludes every wolf \u2014 check it against the real deal.')));
   if (info.after) B.appendChild(el('p','note', info.after));
   if (blocked) B.appendChild(el('p','note','Cannot shield ' + byId(blocked).name + ' again \u2014 they were protected last night.'));
 
@@ -1738,13 +1841,15 @@ function rNight(){
     const vnAnswerable = G.rules === 'vn' && wolfSideKnown();
     if (t.role || vnAnswerable){
       B.appendChild(el('div','tell ok', G.rules === 'vn'
-        ? 'She only needs to know whether they are on the werewolf side, and I know every wolf. Answer on the screen \u2014 touch nothing on the table.'
-        : 'I know this card. Answer her on the screen \u2014 touch nothing on the table, so nobody can feel their card being lifted.'));
-      const sb = el('button','btn wide','Show her the answer');
+        ? T('C\u00f4 ch\u1ec9 c\u1ea7n bi\u1ebft ng\u01b0\u1eddi \u0111\u00f3 c\u00f3 ph\u1ea3i phe s\u00f3i kh\u00f4ng, m\u00e0 t\u00f4i bi\u1ebft h\u1ebft s\u00f3i r\u1ed3i. Tr\u1ea3 l\u1eddi tr\u00ean m\u00e0n h\u00ecnh \u2014 kh\u00f4ng \u0111\u1ee5ng v\u00e0o b\u00e0i tr\u00ean b\u00e0n.', 'She only needs to know whether they are on the werewolf side, and I know every wolf. Answer on the screen \u2014 touch nothing on the table.')
+        : T('T\u00f4i bi\u1ebft l\u00e1 n\u00e0y. Tr\u1ea3 l\u1eddi c\u00f4 tr\u00ean m\u00e0n h\u00ecnh \u2014 kh\u00f4ng \u0111\u1ee5ng v\u00e0o b\u00e0i, \u0111\u1ec3 kh\u00f4ng ai c\u1ea3m th\u1ea5y b\u00e0i m\u00ecnh b\u1ecb nh\u1ea5c l\u00ean.', 'I know this card. Answer her on the screen \u2014 touch nothing on the table, so nobody can feel their card being lifted.')));
+      const sb = el('button','btn wide', T('Cho c\u00f4 xem c\u00e2u tr\u1ea3 l\u1eddi','Show her the answer'));
       sb.onclick = () => showSeer(t);
       B.appendChild(sb);
     } else {
-      B.appendChild(el('div','tell','I have never seen ' + t.name + '\u2019s card, so you must read it at the table.'));
+      B.appendChild(el('div','tell', T(
+        'T\u00f4i ch\u01b0a t\u1eebng th\u1ea5y l\u00e1 c\u1ee7a ' + t.name + ', n\u00ean b\u1ea1n ph\u1ea3i xem b\u00e0i ngay t\u1ea1i b\u00e0n.',
+        'I have never seen ' + t.name + '\u2019s card, so you must read it at the table.')));
       tip('<b>Read it without giving it away.</b><br>' +
         '\u00b7 Turn on <b>\u266b night sounds</b> in the Roster. Rain covers the card and your footsteps.<br>' +
         '\u00b7 Walk the <b>whole circle</b>, every night, whether or not you need to read anything.<br>' +
@@ -1767,16 +1872,22 @@ function rNight(){
   if (info.special === 'fox' && chosen.length === 1){
     const t = byId(chosen[0]), grp = [t, ...neighbours(t)];
     // always name the trio, so the moderator knows who is being checked
-    B.appendChild(el('div','tell','<b>Sniffing:</b> ' + grp.map(p=>p.name).join(' \u00b7 ') +
-      '<p class="note">The card he points at, plus their two living neighbours.</p>'));
+    B.appendChild(el('div','tell',
+      '<b>' + T('\u0110ang ng\u1eedi:','Sniffing:') + '</b> ' + grp.map(p=>p.name).join(' \u00b7 ') +
+      '<p class="note">' + T('Ng\u01b0\u1eddi anh ta ch\u1ec9, c\u1ed9ng hai ng\u01b0\u1eddi s\u1ed1ng b\u00ean c\u1ea1nh.',
+        'The card he points at, plus their two living neighbours.') + '</p>'));
     // I do not need to know what these three hold — only whether any is a wolf.
     if (wolfSideKnown()){
       G.n.foxAns = grp.some(isWolf);
-      B.appendChild(el('div','tell ok','Every wolf card is placed, so I can answer this with certainty. Show him on the screen \u2014 touch nothing on the table.'));
+      B.appendChild(el('div','tell ok', T(
+        'M\u1ecdi l\u00e1 s\u00f3i \u0111\u1ec1u \u0111\u00e3 c\u00f3 ch\u1ee7, n\u00ean t\u00f4i tr\u1ea3 l\u1eddi ch\u1eafc ch\u1eafn \u0111\u01b0\u1ee3c. Cho anh ta xem tr\u00ean m\u00e0n h\u00ecnh \u2014 kh\u00f4ng \u0111\u1ee5ng v\u00e0o b\u00e0i.',
+        'Every wolf card is placed, so I can answer this with certainty. Show him on the screen \u2014 touch nothing on the table.')));
     } else {
       needAnswer = G.n.foxAns == null;
-      B.appendChild(el('div','tell','I cannot be certain yet: <b>' + unplacedWolfCards() +
-        '</b> still unaccounted for. Look at those three cards yourself, then tell me what you found \u2014 I will not guess.'));
+      B.appendChild(el('div','tell',
+        T('Ch\u01b0a ch\u1eafc \u0111\u01b0\u1ee3c: <b>','I cannot be certain yet: <b>') + unplacedWolfCards() +
+        T('</b> ch\u01b0a bi\u1ebft ai c\u1ea7m. B\u1ea1n t\u1ef1 xem ba l\u00e1 \u0111\u00f3 r\u1ed3i cho t\u00f4i bi\u1ebft \u2014 t\u00f4i kh\u00f4ng \u0111o\u00e1n b\u1eeba.',
+          '</b> still unaccounted for. Look at those three cards yourself, then tell me what you found \u2014 I will not guess.')));
       const yn = el('div','chips');
       const y = el('div','chip' + (G.n.foxAns === true ? ' sel' : ''), 'A werewolf is among them');
       y.onclick = () => { G.n.foxAns = true; render(); };
@@ -1786,7 +1897,7 @@ function rNight(){
     }
     // the same button the Seer gets, once there is an answer to give
     if (G.n.foxAns != null){
-      const fb = el('button','btn wide','Show him the answer');
+      const fb = el('button','btn wide', T('Cho anh ta xem c\u00e2u tr\u1ea3 l\u1eddi','Show him the answer'));
       fb.onclick = () => showFox(grp, G.n.foxAns);
       B.appendChild(fb);
     }
@@ -1845,29 +1956,33 @@ function rDawn(){
     'The rules have already settled the night. Read it out, then move to the day.');
   const B = $('dwBody'); B.innerHTML = '';
   const un = unassigned();
-  if (un.length) B.appendChild(el('div','tell','Still unknown: ' + un.map(p=>p.name).join(', ') +
-    '. Set their cards from the Roster when you learn them.'));
+  if (un.length) B.appendChild(el('div','tell',
+    T('Ch\u01b0a bi\u1ebft: ','Still unknown: ') + un.map(p=>p.name).join(', ') +
+    T('. \u0110\u1eb7t l\u00e1 c\u1ee7a h\u1ecd t\u1eeb Danh s\u00e1ch khi b\u1ea1n bi\u1ebft.', '. Set their cards from the Roster when you learn them.')));
   for (const b of liveWith('beartamer').filter(p => !powerGone(p))){
     const nb = neighbours(b);
     if (!wolfSideKnown()){
-      B.appendChild(el('div','tell','Bear Tamer <b>' + b.name + '</b> \u2014 ' + unplacedWolfCards() +
-        ' still unaccounted for, so I cannot tell you whether to growl. Check yourself.'));
+      B.appendChild(el('div','tell',
+        T('Ng\u01b0\u1eddi D\u1ea1y G\u1ea5u <b>','Bear Tamer <b>') + b.name + '</b> \u2014 ' + unplacedWolfCards() +
+        T(' ch\u01b0a bi\u1ebft ai c\u1ea7m, n\u00ean t\u00f4i kh\u00f4ng bi\u1ebft c\u00f3 ph\u1ea3i g\u1ea7m hay kh\u00f4ng. B\u1ea1n t\u1ef1 ki\u1ec3m tra.', ' still unaccounted for, so I cannot tell you whether to growl. Check yourself.')));
     } else {
       const growl = nb.some(isWolf);
       // the growl is one of the two or three things that genuinely stop the moderator
       B.appendChild(el('div', growl ? 'alert' : 'tell ok',
-        'Bear Tamer <b>' + b.name + '</b> \u2014 neighbours ' + nb.map(p=>p.name).join(' & ') + '. ' +
-        (growl ? '<b>GROWL.</b>' : 'Stay silent.')));
+        T('Ng\u01b0\u1eddi D\u1ea1y G\u1ea5u <b>','Bear Tamer <b>') + b.name + '</b> \u2014 ' +
+        T('h\u00e0ng x\u00f3m ','neighbours ') + nb.map(p=>p.name).join(' & ') + '. ' +
+        (growl ? T('<b>G\u1ea6M L\u00caN.</b>','<b>GROWL.</b>') : T('Im l\u1eb7ng.','Stay silent.'))));
     }
   }
   const on = G.dawn.filter(d => d.on);
   // State the outcome. The rules already decided it; the moderator just reads it out.
-  B.appendChild(el('div','grp','Announce'));
+  B.appendChild(el('div','grp', T('C\u00f4ng b\u1ed1','Announce')));
   const head = on.length
-    ? on.map(d => byId(d.id).name).join(' and ') + (on.length > 1 ? ' are dead.' : ' is dead.')
-    : 'Nobody died in the night.';
+    ? on.map(d => byId(d.id).name).join(T(' v\u00e0 ',' and ')) +
+      T(' \u0111\u00e3 ch\u1ebft.', on.length > 1 ? ' are dead.' : ' is dead.')
+    : T('\u0110\u00eam qua kh\u00f4ng ai ch\u1ebft.','Nobody died in the night.');
   const say = el('div','say');
-  say.innerHTML = '<div class="lbl">Read aloud</div><p>' + head + '</p>';
+  say.innerHTML = '<div class="lbl">' + T('\u0110\u1ecdc to','Read aloud') + '</div><p>' + head + '</p>';
   B.appendChild(say);
   // What to do with the cards. Said here because this is the moment the deaths become
   // public, and the app used to leave it entirely unstated.
@@ -1895,20 +2010,22 @@ function rDawn(){
   // render, so the collapse was unreachable and the announcement was read with the whole
   // adjust list and the add-someone chip set underneath it.
   if (!G.dawnSure)
-    B.appendChild(el('div','tell','I cannot be certain tonight \u2014 ' + G.dawnGaps.join('; ') +
-      '. Check the outcome below before you announce it.'));
+    B.appendChild(el('div','tell',
+      T('\u0110\u00eam nay t\u00f4i kh\u00f4ng d\u00e1m ch\u1eafc \u2014 ','I cannot be certain tonight \u2014 ') +
+      G.dawnGaps.join('; ') +
+      T('. Ki\u1ec3m tra k\u1ebft qu\u1ea3 b\u00ean d\u01b0\u1edbi tr\u01b0\u1edbc khi c\u00f4ng b\u1ed1.', '. Check the outcome below before you announce it.')));
 
   if (!G.dawnEdit){
-    const adj = el('button','btn sec sm','Something else happened \u2014 adjust');
+    const adj = el('button','btn sec sm', T('C\u00f3 chuy\u1ec7n kh\u00e1c x\u1ea3y ra \u2014 s\u1eeda','Something else happened \u2014 adjust'));
     adj.onclick = () => { G.dawnEdit = true; render(); };
     B.appendChild(adj);
   } else {
     // Opening it once was only half the fix: there was no way back, so an uncertain dawn
     // was still read out with the whole adjust list and the chip set underneath it.
-    const hide = el('button','btn sec sm','The list is right \u2014 hide it');
+    const hide = el('button','btn sec sm', T('Danh s\u00e1ch \u0111\u00fang r\u1ed3i \u2014 \u1ea9n \u0111i','The list is right \u2014 hide it'));
     hide.onclick = () => { G.dawnEdit = false; render(); };
     B.appendChild(hide);
-    B.appendChild(el('div','grp','Adjust \u2014 tap to include or exclude'));
+    B.appendChild(el('div','grp', T('S\u1eeda \u2014 b\u1ea5m \u0111\u1ec3 th\u00eam ho\u1eb7c b\u1ecf','Adjust \u2014 tap to include or exclude')));
     const ag = el('div','group');
     for (const d of G.dawn){
       const p = byId(d.id);
@@ -1920,7 +2037,7 @@ function rDawn(){
       ag.appendChild(row);
     }
     B.appendChild(ag);
-    B.appendChild(el('div','grp','Add someone the rules did not cover'));
+    B.appendChild(el('div','grp', T('Th\u00eam ng\u01b0\u1eddi m\u00e0 lu\u1eadt kh\u00f4ng x\u1eed \u0111\u1ebfn','Add someone the rules did not cover')));
     const c = el('div','chips');
     for (const p of alive()){
       if (G.dawn.some(d => d.id === p.id)) continue;
@@ -1929,7 +2046,9 @@ function rDawn(){
     B.appendChild(c);
   }
   if (on.some(d => byId(d.id).role === 'hunter'))
-    B.appendChild(el('div','tell','The Hunter is among the dead \u2014 he fires before the day begins.'));
+    B.appendChild(el('div','tell', T(
+      'Th\u1ee3 S\u0103n n\u1eb1m trong s\u1ed1 ng\u01b0\u1eddi ch\u1ebft \u2014 anh ta b\u1eafn tr\u01b0\u1edbc khi tr\u1eddi s\u00e1ng h\u1eb3n.',
+      'The Hunter is among the dead \u2014 he fires before the day begins.')));
   bar([{ t: T('C\u00f4ng b\u1ed1 r\u1ea1ng s\u00e1ng \u2192','Announce the dawn \u2192'), wide:true, on:applyDawn }]);
 }
 function icSpanD(p){ return pIcon(p); }
@@ -1943,15 +2062,18 @@ function rDay(){
   show('sDay');
   $('dyTitle').textContent = T('Ng\u00e0y ','Day ') + G.day;
   const A = alive();
-  $('dySub').textContent = A.length + ' still alive, ' + A.filter(isWolf).length + ' of them not what they seem.';
+  $('dySub').textContent = T(
+    'C\u00f2n ' + A.length + ' ng\u01b0\u1eddi s\u1ed1ng, ' + A.filter(isWolf).length + ' trong s\u1ed1 \u0111\u00f3 kh\u00f4ng nh\u01b0 v\u1ebb ngo\u00e0i.',
+    A.length + ' still alive, ' + A.filter(isWolf).length + ' of them not what they seem.');
   const B = $('dyBody'); B.innerHTML = '';
 
   if (G.day === 1 && !G.sheriffDone){
     const vn = G.rules === 'vn';
     B.appendChild(el('div','tell','<b>' + T('B\u1ea7u Trưởng Làng','Elect the Sheriff') +
-      '</b><p class="note">Their vote is worth <b>' + SHERIFF_WEIGHT() +
-      '</b>, and on dying they name their successor.</p>'));
-    B.appendChild(collapsible('sheriff', 'What the badge actually does',
+      '</b><p class="note">' + T('Phi\u1ebfu c\u1ee7a h\u1ecd n\u1eb7ng <b>','Their vote is worth <b>') +
+      SHERIFF_WEIGHT() +
+      T('</b>, v\u00e0 khi ch\u1ebft h\u1ecd ch\u1ec9 \u0111\u1ecbnh ng\u01b0\u1eddi k\u1ebf nhi\u1ec7m.</p>', '</b>, and on dying they name their successor.</p>')));
+    B.appendChild(collapsible('sheriff', T('Ph\u00f9 hi\u1ec7u th\u1ef1c s\u1ef1 l\u00e0m \u0111\u01b0\u1ee3c g\u00ec','What the badge actually does'),
       '<p>This is <b>not a card</b> \u2014 it is a title the village votes on, so anyone can hold it. ' +
       'A werewolf can be elected, and often tries to be.</p>' +
       '<p>\u00b7 Their vote is worth <b>' + SHERIFF_WEIGHT() + '</b> in every day vote.<br>' +
@@ -1961,7 +2083,7 @@ function rDay(){
       '<p>' + (vn
         ? 'Vietnamese tables usually weight the badge at 1.5 so it cannot outvote two villagers on its own. Miller’s Hollow uses a flat double.'
         : 'Miller’s Hollow gives a flat double vote. Vietnamese and 狼人杀 tables usually use 1.5 instead.') + '</p>'));
-    B.appendChild(el('div','grp','Who was elected?'));
+    B.appendChild(el('div','grp', T('Ai \u0111\u01b0\u1ee3c b\u1ea7u?','Who was elected?')));
     const c = el('div','chips');
     for (const p of A) c.appendChild(chip(p, { on:() => { snap(); p.sheriff = true; G.sheriffDone = true;
       log(p.name + ' was elected Sheriff.'); render(); } }));
@@ -1972,11 +2094,13 @@ function rDay(){
   }
   const jd = liveWith('judge').filter(p => !powerGone(p));
   if (jd.length && !G.judgeUsed){
-    B.appendChild(el('div','tell','Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.'));
+    B.appendChild(el('div','tell', T(
+      'C\u00f3 Quan To\u00e0 N\u00f3i L\u1eafp trong v\u00e1n (' + jd.map(p=>p.name).join(', ') + '). \u0110\u1ec3 \u00fd d\u1ea5u hi\u1ec7u \u2014 h\u00f4m nay anh ta c\u00f3 th\u1ec3 \u0111\u00f2i b\u1ea7u l\u1ea1i.',
+      'Stuttering Judge in play (' + jd.map(p=>p.name).join(', ') + '). Watch for the sign \u2014 he may demand a second vote today.')));
     /* G.judgeUsed was written nowhere: initialised, read here, never set. So the alert
        stood for the whole game and the flag was decoration. His power is once per game,
        and the moderator is the only person who sees the sign, so they record it. */
-    const jb = el('button','btn sec sm','He gave the sign \u2014 second vote today');
+    const jb = el('button','btn sec sm', T('Anh ta \u0111\u00e3 ra d\u1ea5u \u2014 b\u1ea7u l\u1ea1i h\u00f4m nay','He gave the sign \u2014 second vote today'));
     jb.onclick = () => { snap(); G.judgeUsed = true; G.votes = {}; G.sheriffVote = null;
       log('The Stuttering Judge demanded a second vote. The tally was cleared for it.'); render(); };
     B.appendChild(jb);
@@ -1984,9 +2108,13 @@ function rDay(){
     B.appendChild(el('p','note','The Stuttering Judge has spent his second vote \u2014 once per game, and it is gone.'));
   }
   const sc = liveWith('scapegoat').filter(p => !powerGone(p));
-  if (sc.length) B.appendChild(el('div','tell','If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.'));
-  if (scapegoatBinds()) B.appendChild(el('div','tell','Only these may vote today: <b>' +
-    G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b><p class="note">The Scapegoat named them as he died yesterday. Tomorrow the whole village speaks again.</p>'));
+  if (sc.length) B.appendChild(el('div','tell', T(
+    'N\u1ebfu phi\u1ebfu ho\u00e0, V\u1eadt T\u1ebf Th\u1ea7n (' + sc.map(p=>p.name).join(', ') + ') ch\u1ebft thay v\u00e0 ch\u1ecdn ai \u0111\u01b0\u1ee3c b\u1ecf phi\u1ebfu ng\u00e0y mai.',
+    'If the vote ties, the Scapegoat (' + sc.map(p=>p.name).join(', ') + ') dies instead and chooses who may vote tomorrow.')));
+  if (scapegoatBinds()) B.appendChild(el('div','tell',
+    T('H\u00f4m nay ch\u1ec9 nh\u1eefng ng\u01b0\u1eddi n\u00e0y \u0111\u01b0\u1ee3c b\u1ecf phi\u1ebfu: <b>','Only these may vote today: <b>') +
+    G.scapegoatVoters.map(i=>byId(i).name).join(', ') + '</b><p class="note">' +
+    T('V\u1eadt T\u1ebf Th\u1ea7n \u0111\u00e3 ch\u1ec9 \u0111\u1ecbnh h\u1ecd l\u00fac ch\u1ebft h\u00f4m qua. Ng\u00e0y mai c\u1ea3 l\u00e0ng l\u1ea1i \u0111\u01b0\u1ee3c n\u00f3i.', 'The Scapegoat named them as he died yesterday. Tomorrow the whole village speaks again.') + '</p>'));
   if (G.powersLost){
     // name the route, because "by the village" covers the vote, the poison and the shot
     const eld = G.players.find(p => p.role === 'elder' && !p.alive);
@@ -1994,39 +2122,45 @@ function rDay(){
        "the night calls stop", which is how the rule came to be half-implemented in the
        first place — the Hunter kept firing and the Idiot kept surviving the rope. */
     const stripped = [
-      liveWith('hunter').length && !hunterFiresPowerless() && 'the Hunter does not fire',
-      liveWith('idiot').length    && 'the Idiot is hanged like anyone else',
-      liveWith('scapegoat').length&& 'the Scapegoat no longer dies for a tie',
-      liveWith('beartamer').length&& 'the Bear Tamer does not growl',
-      liveWith('knight').length   && 'the Knight’s rust does not spread',
-      liveWith('judge').length    && 'the Judge cannot call a second vote',
-      liveWith('littlegirl').length && 'the Little Girl cannot peek',
+      liveWith('hunter').length && !hunterFiresPowerless() &&
+        T('Th\u1ee3 S\u0103n kh\u00f4ng b\u1eafn','the Hunter does not fire'),
+      liveWith('idiot').length    && T('Th\u1eb1ng Ng\u1ed1c b\u1ecb treo nh\u01b0 m\u1ecdi ng\u01b0\u1eddi','the Idiot is hanged like anyone else'),
+      liveWith('scapegoat').length&& T('V\u1eadt T\u1ebf Th\u1ea7n kh\u00f4ng c\u00f2n ch\u1ebft thay khi ho\u00e0','the Scapegoat no longer dies for a tie'),
+      liveWith('beartamer').length&& T('Ng\u01b0\u1eddi D\u1ea1y G\u1ea5u kh\u00f4ng g\u1ea7m','the Bear Tamer does not growl'),
+      liveWith('knight').length   && T('ki\u1ebfm r\u1ec9 c\u1ee7a Hi\u1ec7p S\u0129 kh\u00f4ng lan','the Knight’s rust does not spread'),
+      liveWith('judge').length    && T('Quan To\u00e0 kh\u00f4ng \u0111\u00f2i \u0111\u01b0\u1ee3c v\u00f2ng b\u1ea7u th\u1ee9 hai','the Judge cannot call a second vote'),
+      liveWith('littlegirl').length && T('B\u00e9 G\u00e1i kh\u00f4ng h\u00e9 m\u1eaft \u0111\u01b0\u1ee3c','the Little Girl cannot peek'),
     ].filter(Boolean);
-    B.appendChild(el('div','alert no','The Elder died by ' +
-      (eld && eld.cause ? causeLabel(eld.cause) : 'the village') +
-      '. <b>Every villager power is gone</b> — no village card is called at night' +
-      (stripped.length ? ', and ' + stripped.join(', ') : '') + '.' +
-      '<p class="note">The Sheriff’s badge is a title, not a card, so whoever holds it keeps it.</p>'));
+    B.appendChild(el('div','alert no',
+      T('Tr\u01b0\u1edfng L\u00e3o ch\u1ebft v\u00ec ','The Elder died by ') +
+      (eld && eld.cause ? causeLabel(eld.cause) : T('d\u00e2n l\u00e0ng','the village')) +
+      T('. <b>To\u00e0n b\u1ed9 ph\u00e9p c\u1ee7a d\u00e2n l\u00e0ng \u0111\u00e3 m\u1ea5t</b> \u2014 \u0111\u00eam kh\u00f4ng g\u1ecdi l\u00e1 d\u00e2n n\u00e0o', '. <b>Every villager power is gone</b> — no village card is called at night') +
+      (stripped.length ? T(', v\u00e0 ',', and ') + stripped.join(', ') : '') + '.' +
+      '<p class="note">' + T('Ph\u00f9 hi\u1ec7u Tr\u01b0\u1edfng L\u00e0ng l\u00e0 ch\u1ee9c danh ch\u1ee9 kh\u00f4ng ph\u1ea3i l\u00e1 b\u00e0i, n\u00ean ai \u0111ang gi\u1eef th\u00ec v\u1eabn gi\u1eef.', 'The Sheriff’s badge is a title, not a card, so whoever holds it keeps it.') + '</p>'));
   }
 
   const sh = A.find(p => p.sheriff);
-  if (sh) B.appendChild(el('div','tell ok','<b>' + sh.name + '</b> holds the badge — count their hand as <b>' +
-    SHERIFF_WEIGHT() + '</b>. If they die today they name the next holder.'));
+  if (sh) B.appendChild(el('div','tell ok', '<b>' + sh.name +
+    T('</b> gi\u1eef ph\u00f9 hi\u1ec7u \u2014 t\u00ednh tay c\u1ee7a h\u1ecd l\u00e0 <b>', '</b> holds the badge — count their hand as <b>') +
+    SHERIFF_WEIGHT() +
+    T('</b>. N\u1ebfu h\u00f4m nay h\u1ecd ch\u1ebft th\u00ec h\u1ecd ch\u1ec9 \u0111\u1ecbnh ng\u01b0\u1eddi gi\u1eef ti\u1ebfp theo.', '</b>. If they die today they name the next holder.')));
   /* A vote only bites if it clears half the voting weight. Counting that by hand
      is exactly what a moderator gets wrong, especially with a weighted badge and
      a silenced Idiot, so the app does the arithmetic. */
   const voters = eligibleVoters(), TP = totalPower(), thr = TP / 2;
   const wt = G.rules === 'vn' ? 1.5 : 2;
   G.votes = G.votes || {};
-  B.appendChild(el('div','grp','Count the vote'));
+  B.appendChild(el('div','grp', T('\u0110\u1ebfm phi\u1ebfu','Count the vote')));
   // The threshold itself is pinned into the action bar by refresh(); this card keeps
   // only the things you read once, at the start.
   if (sh || scapegoatBinds())
     B.appendChild(el('div','tell',
-      (sh ? '<b>' + sh.name + '</b> holds the badge, so their hand counts ' + wt + '. ' +
-            'Tap the badge beside whoever they voted for.' : '') +
+      (sh ? '<b>' + sh.name + '</b>' +
+            T(' gi\u1eef ph\u00f9 hi\u1ec7u, n\u00ean tay c\u1ee7a h\u1ecd t\u00ednh l\u00e0 ' + wt + '. B\u1ea5m ng\u00f4i sao b\u00ean c\u1ea1nh ng\u01b0\u1eddi h\u1ecd b\u1ecf phi\u1ebfu.',
+              ' holds the badge, so their hand counts ' + wt + '. Tap the badge beside whoever they voted for.') : '') +
       (scapegoatBinds() ? (sh ? '<p class="note">' : '') +
-            'The Scapegoat has silenced everyone else today.' + (sh ? '</p>' : '') : '')));
+            T('V\u1eadt T\u1ebf Th\u1ea7n \u0111\u00e3 b\u1ecbt mi\u1ec7ng t\u1ea5t c\u1ea3 nh\u1eefng ng\u01b0\u1eddi c\u00f2n l\u1ea1i h\u00f4m nay.',
+              'The Scapegoat has silenced everyone else today.') + (sh ? '</p>' : '') : '')));
 
   // Rows are built once and a light refresh updates only the derived numbers, so
   // typing in a box never rebuilds it and never loses the caret.
@@ -2123,17 +2257,23 @@ function rDay(){
     wasPassing = passing;
     verdict.className = 'tell' + (passing ? ' ok' : '');
     verdict.innerHTML = passing
-      ? '<b>' + lead[0].name + '</b> has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.' +
+      ? '<b>' + lead[0].name + '</b>' +
+        T(' \u0111\u01b0\u1ee3c ' + fmtN(best) + '/' + fmtN(TP) + ' \u2014 qu\u00e1 b\u00e1n. Phi\u1ebfu c\u00f3 hi\u1ec7u l\u1ef1c.',
+          ' has ' + fmtN(best) + ' of ' + fmtN(TP) + ' \u2014 over half. The vote carries.') +
         // said before the button, not after: once it is tapped the screen has moved on
         '<p class="note">' + revealNote([lead[0]]) + '</p>'
       : lead.length > 1 && best > 0
-        ? 'Tied on ' + fmtN(best) + ': <b>' + lead.map(x=>x.name).join(', ') + '</b>. Nobody clears half.'
-        : best === 0 ? 'No votes recorded yet.'
-          : '<b>' + lead[0].name + '</b> leads on ' + fmtN(best) + ', but that is not more than ' +
-            fmtN(thr) + '. As it stands the vote fails.';
+        ? T('Ho\u00e0 ' + fmtN(best) + ' phi\u1ebfu: <b>','Tied on ' + fmtN(best) + ': <b>') +
+          lead.map(x=>x.name).join(', ') +
+          T('</b>. Kh\u00f4ng ai qu\u00e1 b\u00e1n.', '</b>. Nobody clears half.')
+        : best === 0 ? T('Ch\u01b0a ghi phi\u1ebfu n\u00e0o.', 'No votes recorded yet.')
+          : '<b>' + lead[0].name + '</b>' +
+            T(' d\u1eabn v\u1edbi ' + fmtN(best) + ', nh\u01b0ng ch\u01b0a qu\u00e1 ' + fmtN(thr) + '. Nh\u01b0 hi\u1ec7n t\u1ea1i phi\u1ebfu kh\u00f4ng c\u00f3 hi\u1ec7u l\u1ef1c.',
+              ' leads on ' + fmtN(best) + ', but that is not more than ' + fmtN(thr) + '. As it stands the vote fails.');
     twice.style.display = cast > TP ? '' : 'none';
-    twice.innerHTML = 'You have recorded ' + fmtN(cast) + ' of a possible ' + fmtN(TP) +
-      '. Somebody has voted twice.';
+    twice.innerHTML = T(
+      'B\u1ea1n \u0111\u00e3 ghi ' + fmtN(cast) + ' tr\u00ean t\u1ed1i \u0111a ' + fmtN(TP) + '. C\u00f3 ng\u01b0\u1eddi b\u1ecf phi\u1ebfu hai l\u1ea7n.',
+      'You have recorded ' + fmtN(cast) + ' of a possible ' + fmtN(TP) + '. Somebody has voted twice.');
 
     const opts = [];
     if (passing) opts.push({ t: T('Treo c\u1ed5 ','Hang ') + lead[0].name + ' \u2192', on:() => resolveVote(lead[0]) });
@@ -2144,8 +2284,9 @@ function rDay(){
       G.votes = {}; G.sheriffVote = null; G.resume = 'night'; proceed(); } });
     bar(opts);
     // Pinned last: bar() clears the note, so this has to follow it.
-    barNote(fmtN(cast) + ' of <b>' + fmtN(TP) + '</b> cast · a name needs <b' +
-      (passing ? ' class="hit"' : '') + '>more than ' + fmtN(thr) + '</b>');
+    barNote(fmtN(cast) + T(' / <b>',' of <b>') + fmtN(TP) +
+      T('</b> phi\u1ebfu \u00b7 c\u1ea7n <b','</b> cast \u00b7 a name needs <b') +
+      (passing ? ' class="hit"' : '') + '>' + T('h\u01a1n ','more than ') + fmtN(thr) + '</b>');
   }
   // A blur can change the ordering that was held back while typing.
   for (const c of cells) c.box.addEventListener('blur', () => refresh());
@@ -2188,37 +2329,39 @@ function renderHunter(){
   show('sDay');
   const priv = !!G.pending.nightShot;
   const hp = byId(priv ? G.pending.nightShot : G.pending.hunterId);
-  const cause = causeLabel(G.pending.hunterCause) || 'his death';
-  $('dyTitle').textContent = priv ? 'The Hunter fires \u2014 quietly' : 'The Hunter fires';
+  const cause = causeLabel(G.pending.hunterCause) || T('c\u00e1i ch\u1ebft c\u1ee7a m\u00ecnh','his death');
+  $('dyTitle').textContent = priv
+    ? T('Th\u1ee3 S\u0103n b\u1eafn \u2014 l\u1eb7ng l\u1ebd','The Hunter fires \u2014 quietly')
+    : T('Th\u1ee3 S\u0103n b\u1eafn','The Hunter fires');
   $('dySub').textContent = priv
-    ? 'The pack took the Hunter tonight. Nobody has opened their eyes yet, so the shot is ' +
-      'taken now and both deaths are read out together at dawn.'
-    : (hp ? hp.name + ' is dead \u2014 ' + cause + '. ' : '') +
-      'The shot is not optional: he must take one living player with him.';
+    ? T('B\u1ea7y s\u00f3i \u0111\u00e3 \u0103n Th\u1ee3 S\u0103n \u0111\u00eam nay. Ch\u01b0a ai m\u1edf m\u1eaft, n\u00ean l\u1ea5y m\u1ee5c ti\u00eau ngay b\u00e2y gi\u1edd v\u00e0 s\u00e1ng ra \u0111\u1ecdc c\u1ea3 hai c\u00e1i ch\u1ebft c\u00f9ng l\u00fac.',
+        'The pack took the Hunter tonight. Nobody has opened their eyes yet, so the shot is taken now and both deaths are read out together at dawn.')
+    : (hp ? hp.name + T(' \u0111\u00e3 ch\u1ebft \u2014 ',' is dead \u2014 ') + cause + '. ' : '') +
+      T('Ph\u00e1t s\u00fang kh\u00f4ng ph\u1ea3i l\u1ef1a ch\u1ecdn: anh ta ph\u1ea3i k\u00e9o theo m\u1ed9t ng\u01b0\u1eddi c\u00f2n s\u1ed1ng.',
+        'The shot is not optional: he must take one living player with him.');
   const B = $('dyBody'); B.innerHTML = '';
 
   /* How the shot physically happens \u2014 the thing the screen never said. "Tap whoever he
      points at" assumed the moderator already knew they were meant to ask a dead player to
      point, out loud, in front of everybody. */
   if (hp) B.appendChild(el('div','tell', priv
-    ? '<b>Wake him and nobody else.</b> Touch his shoulder, let him point at one living ' +
-      'player, then have him close his eyes again. Say nothing aloud.' +
-      '<p class="note">He is dead either way \u2014 this only decides whether the table learns ' +
-      'it was him. At dawn you will name two deaths and explain neither.</p>'
-    : '<b>Say it out loud: ' + hp.name + ' was the Hunter, and he takes somebody with him.</b>' +
+    ? T('<b>\u0110\u00e1nh th\u1ee9c m\u1ed7i m\u00ecnh anh ta.</b> Ch\u1ea1m vai, cho anh ta ch\u1ec9 v\u00e0o m\u1ed9t ng\u01b0\u1eddi c\u00f2n s\u1ed1ng, r\u1ed3i b\u1ea3o nh\u1eafm m\u1eaft l\u1ea1i. Kh\u00f4ng n\u00f3i g\u00ec th\u00e0nh ti\u1ebfng.',
+        '<b>Wake him and nobody else.</b> Touch his shoulder, let him point at one living player, then have him close his eyes again. Say nothing aloud.') +
+      '<p class="note">' + T('Anh ta ch\u1ebft \u0111\u1eb1ng n\u00e0o c\u0169ng ch\u1ebft \u2014 vi\u1ec7c n\u00e0y ch\u1ec9 quy\u1ebft \u0111\u1ecbnh c\u1ea3 b\u00e0n c\u00f3 bi\u1ebft \u0111\u00f3 l\u00e0 anh ta hay kh\u00f4ng. S\u00e1ng ra b\u1ea1n \u0111\u1ecdc hai c\u00e1i ch\u1ebft v\u00e0 kh\u00f4ng gi\u1ea3i th\u00edch g\u00ec.', 'He is dead either way \u2014 this only decides whether the table learns ' +
+      'it was him. At dawn you will name two deaths and explain neither.') + '</p>'
+    : T('<b>N\u00f3i to l\u00ean: ','<b>Say it out loud: ') + hp.name +
+      T(' l\u00e0 Th\u1ee3 S\u0103n, v\u00e0 anh ta k\u00e9o theo m\u1ed9t ng\u01b0\u1eddi.</b>', ' was the Hunter, and he takes somebody with him.</b>') +
       '<p class="note">' + revealNote([hp]) +
-      ' He chooses, not you \u2014 let him point at a living player in front of everyone, then ' +
-      'tap that person below. He is already dead and out of the game, so there is nothing ' +
-      'left to keep from him.' +
+      T(' Anh ta ch\u1ecdn, kh\u00f4ng ph\u1ea3i b\u1ea1n \u2014 cho anh ta ch\u1ec9 v\u00e0o m\u1ed9t ng\u01b0\u1eddi c\u00f2n s\u1ed1ng tr\u01b0\u1edbc m\u1eb7t c\u1ea3 b\u00e0n, r\u1ed3i b\u1ea5m v\u00e0o ng\u01b0\u1eddi \u0111\u00f3. Anh ta \u0111\u00e3 ch\u1ebft v\u00e0 ra kh\u1ecfi v\u00e1n r\u1ed3i, n\u00ean kh\u00f4ng c\u00f2n g\u00ec ph\u1ea3i gi\u1ea5u anh ta n\u1eefa.',
+        ' He chooses, not you \u2014 let him point at a living player in front of everyone, then tap that person below. He is already dead and out of the game, so there is nothing left to keep from him.') +
       (cardsShownOnDeath() ? '' :
-        ' Note that the shot identifies him whatever the card rule says: a dead player ' +
-        'points and somebody drops. If your table wants him hidden, take the shot in the ' +
-        'night instead \u2014 see House rules.') + '</p>'));
+        T(' L\u01b0u \u00fd ph\u00e1t s\u00fang t\u1ef1 n\u00f3 l\u1ed9 danh t\u00ednh anh ta d\u00f9 lu\u1eadt l\u1eadt b\u00e0i th\u1ebf n\u00e0o: m\u1ed9t ng\u01b0\u1eddi ch\u1ebft ch\u1ec9 tay v\u00e0 m\u1ed9t ng\u01b0\u1eddi n\u1eefa g\u1ee5c xu\u1ed1ng. B\u00e0n n\u00e0o mu\u1ed1n gi\u1ea5u anh ta th\u00ec l\u1ea5y m\u1ee5c ti\u00eau trong \u0111\u00eam \u2014 xem Lu\u1eadt nh\u00e0.',
+          ' Note that the shot identifies him whatever the card rule says: a dead player points and somebody drops. If your table wants him hidden, take the shot in the night instead \u2014 see House rules.')) + '</p>'));
 
   const targets = alive().filter(p => !hp || p.id !== hp.id);
 
   if (!targets.length){
-    B.appendChild(el('div','tell','There is nobody left for him to hit.'));
+    B.appendChild(el('div','tell', T('Kh\u00f4ng c\u00f2n ai \u0111\u1ec3 anh ta b\u1eafn.','There is nobody left for him to hit.')));
     bar([{ t: T('Ti\u1ebfp t\u1ee5c \u2192','Continue \u2192'), wide:true, on:() => { snap();
       G.pending.hunterId = null; G.pending.nightShot = null;
       // marked taken here too, or dawn would queue the same empty shot a second time
@@ -2226,7 +2369,9 @@ function renderHunter(){
     return;
   }
 
-  B.appendChild(el('div','tell','He <b>must</b> choose somebody. The rules give him no option to spare the village \u2014 tap whoever he points at.'));
+  B.appendChild(el('div','tell', T(
+    'Anh ta <b>b\u1eaft bu\u1ed9c</b> ph\u1ea3i ch\u1ecdn m\u1ed9t ng\u01b0\u1eddi. Lu\u1eadt kh\u00f4ng cho anh ta tha cho l\u00e0ng \u2014 b\u1ea5m v\u00e0o ng\u01b0\u1eddi anh ta ch\u1ec9.',
+    'He <b>must</b> choose somebody. The rules give him no option to spare the village \u2014 tap whoever he points at.')));
   const c = el('div','chips');
   for (const p of targets) c.appendChild(chip(p, { on:() => {
     snap();
@@ -2247,7 +2392,7 @@ function renderHunter(){
   B.appendChild(c);
 
   // a moderator still needs an escape hatch, but it should be labelled honestly
-  const esc = el('button','btn sec sm','House rule: he fired wide and hit nobody');
+  const esc = el('button','btn sec sm', T('Lu\u1eadt nh\u00e0: anh ta b\u1eafn tr\u01b0\u1ee3t, kh\u00f4ng tr\u00fang ai','House rule: he fired wide and hit nobody'));
   esc.onclick = () => { snap();
     G.pending.hunterId = null; G.pending.hunterCause = null;
     log('By house rule the Hunter\u2019s shot hit nobody.');
@@ -2258,8 +2403,9 @@ function renderHunter(){
 }
 function renderSheriff(){
   show('sDay');
-  $('dyTitle').textContent = 'The badge passes';
-  $('dySub').textContent = 'The badge does not die with them. They name whoever carries it next — or destroy it so nobody does.';
+  $('dyTitle').textContent = T('Ph\u00f9 hi\u1ec7u \u0111\u1ed5i ch\u1ee7','The badge passes');
+  $('dySub').textContent = T(
+    'Ph\u00f9 hi\u1ec7u kh\u00f4ng ch\u1ebft theo h\u1ecd. H\u1ecd ch\u1ec9 \u0111\u1ecbnh ng\u01b0\u1eddi gi\u1eef ti\u1ebfp \u2014 ho\u1eb7c hu\u1ef7 lu\u00f4n \u0111\u1ec3 kh\u00f4ng ai gi\u1eef.', 'The badge does not die with them. They name whoever carries it next — or destroy it so nobody does.');
   const B = $('dyBody'); B.innerHTML = '';
   G.players.forEach(p => p.sheriff = false);
   const c = el('div','chips');
@@ -2273,8 +2419,9 @@ function renderSheriff(){
 }
 function renderScapegoat(){
   show('sDay');
-  $('dyTitle').textContent = 'The Scapegoat decides';
-  $('dySub').textContent = 'As he dies he names who may vote tomorrow. Tap everyone who keeps their voice.';
+  $('dyTitle').textContent = T('V\u1eadt T\u1ebf Th\u1ea7n quy\u1ebft \u0111\u1ecbnh','The Scapegoat decides');
+  $('dySub').textContent = T(
+    'L\u00fac ch\u1ebft anh ta ch\u1ec9 \u0111\u1ecbnh ai \u0111\u01b0\u1ee3c b\u1ecf phi\u1ebfu ng\u00e0y mai. B\u1ea5m v\u00e0o t\u1ea5t c\u1ea3 nh\u1eefng ng\u01b0\u1eddi gi\u1eef \u0111\u01b0\u1ee3c ti\u1ebfng n\u00f3i.', 'As he dies he names who may vote tomorrow. Tap everyone who keeps their voice.');
   const B = $('dyBody'); B.innerHTML = '';
   const pick = G.pending.sg || [];
   const c = el('div','chips');
@@ -2300,7 +2447,7 @@ function toNight(){
 /* ---- end ---- */
 function rEnd(){
   show('sEnd');
-  $('enTitle').textContent = G.over.who + ' win';
+  $('enTitle').textContent = G.over.who + T(' th\u1eafng',' win');
   $('enSub').textContent = G.over.why;
   const C = $('enCard'); C.innerHTML = '';
   $('enChronicle').textContent = T('To\u00e0n b\u1ed9 nh\u1eadt k\u00fd', 'Full chronicle');
@@ -2332,8 +2479,8 @@ function tipsUI(){
                 [true, T('Lu\u00f4n hi\u1ec7n','Always show')],
                 [false, T('\u1ea8n','Hide')]];
   for (const [val, lab] of opts){
-    const b = el('div','chip' + (G.tips === val ? ' sel' : ''), lab);
-    b.onclick = () => { snap(); G.tips = val; openRoster(); };
+    const b = el('div','chip' + (prefs.tips === val ? ' sel' : ''), lab);
+    b.onclick = () => { setPref('tips', val); openRoster(); };
     c.appendChild(b);
   }
   wrap.appendChild(c);
@@ -2355,7 +2502,7 @@ function openRoster(){
   const B = $('rosBody'); B.innerHTML = '';
   if (G.assignTo){
     const p = byId(G.assignTo);
-    B.appendChild(el('div','grp','Set the card for ' + p.name));
+    B.appendChild(el('div','grp', T('\u0110\u1eb7t l\u00e1 cho ' + p.name, 'Set the card for ' + p.name)));
     const c = el('div','chips');
     const none = el('div','chip','Unknown');
     none.onclick = () => { snap(); p.role = null; G.assignTo = null; openRoster(); };
@@ -2444,9 +2591,9 @@ function unplacedWolfCards(){
   const out = [];
   for (const id of ['wolf','whitewolf','wolfhound','wildchild']){
     const want = G.counts[id] || 0, have = withRole(id).length;
-    if (want > have) out.push(R[id].vi + (want - have > 1 ? ' \u00d7' + (want-have) : ''));
+    if (want > have) out.push(rName(R[id]) + (want - have > 1 ? ' \u00d7' + (want-have) : ''));
   }
-  return out.length ? out.join(', ') : 'a wolf card';
+  return out.length ? out.join(', ') : T('m\u1ed9t l\u00e1 s\u00f3i','a wolf card');
 }
 function wolfSideKnown(){
   for (const id of ['wolf','whitewolf'])
@@ -2525,9 +2672,25 @@ function holdShow(on){
   b.addEventListener('blur', () => holdShow(false));
 }
 $('bAltLang').onclick = () => { altLang = !altLang; render(); };
-$('bSeerDone').onclick = () => { holdShow(false); $('mSeer').classList.remove('on'); };
+/* Handing the phone BACK is as much a moment as handing it over, and it was the only half
+   of the exchange with no feedback. .going runs the exit for its duration and then comes
+   off with .on, so nothing is left displayed if the animation never fires \u2014 a hidden tab,
+   or prefers-reduced-motion collapsing it to 0.01ms. */
+function closeSheet(id, after){
+  const m = $(id);
+  if (!m.classList.contains('on')) return;
+  m.classList.add('going');
+  const done = () => {
+    clearTimeout(backstop);
+    m.classList.remove('going', 'on');
+    if (after) after();
+  };
+  const backstop = setTimeout(done, 260);
+  m.addEventListener('animationend', done, { once: true });
+}
+$('bSeerDone').onclick = () => { holdShow(false); closeSheet('mSeer'); };
 $('bRoster').onclick = () => { G.assignTo = null; openRoster(); };
-$('bCloseR').onclick = () => { G.assignTo = null; $('mRoster').classList.remove('on'); render(); };
+$('bCloseR').onclick = () => { G.assignTo = null; closeSheet('mRoster', render); };
 function paintSound(){
   $('bSound').innerHTML = icon('music') + (soundOn ? T('B\u1eadt','On') : T('T\u1eaft','Off'));
   // --moon is "this control is on" everywhere else in the app; amber used to mean
@@ -2545,10 +2708,12 @@ paintSound();
    is the ask; a dead toggle would be degrading dishonestly. */
 function paintHaptic(){
   const b = $('bHaptic');
-  if (!canBuzz()){ b.hidden = true; return; }
-  b.hidden = false;
-  b.textContent = hapticOn ? T('Rung', 'Buzz') : T('Rung tắt', 'No buzz');
+  // Labelled before it is hidden, deliberately. The first version returned early and left
+  // the text unset, so the moment the hidden attribute lost to .ico's display, what
+  // shipped was an empty bordered box rather than a wrong-but-readable button.
+  b.textContent = hapticOn ? T('Rung', 'Buzz') : T('Rung t\u1eaft', 'No buzz');
   b.classList.toggle('on', hapticOn);
+  b.hidden = !canBuzz();
 }
 $('bHaptic').onclick = () => { hapticOn = !hapticOn; paintHaptic(); buzz('tap'); };
 paintHaptic();
@@ -2571,7 +2736,7 @@ $('iName').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventD
   const box = loadSaved();
   if (!box) return;
   const g = box.g;
-  const V = (vi, en) => g.lang !== 'en' ? vi : en;
+  const V = T;                    // language is a device preference now, not the game's
   const mins = Math.round((Date.now() - box.at) / 60000);
   const when = g.phase === 'night' || g.phase === 'dawn' ? V('\u0110\u00eam ', 'Night ') + g.night
              : g.phase === 'day' || g.phase === 'hunter' || g.phase === 'sheriff' ||

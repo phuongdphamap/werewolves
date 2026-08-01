@@ -9,6 +9,10 @@
 // with a power, does that power still fire after the village has killed the Elder.
 const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
+/* causeLabel() and unplacedWolfCards() speak the interface language now, so the harness
+   supplies the two helpers they reach for. English, so the assertions below stay readable. */
+globalThis.T = (vi, en) => en;
+globalThis.rName = r => r.name;
 
 function grab(name){
   const i = src.indexOf('function ' + name + '(');
@@ -43,6 +47,8 @@ const blocks = [
   src.match(/const CAUSE = \{[\s\S]*?\n\};/)[0].replace('const CAUSE','globalThis.CAUSE'),
   src.match(/const causeLabel = [^;]*;/)[0].replace('const causeLabel','globalThis.causeLabel'),
   src.match(/const villageKilled = [^;]*;/)[0].replace('const villageKilled','globalThis.villageKilled'),
+  // the revenge is settable now, so kill() consults it
+  src.match(/const elderStripsPowers = [^;]*;/)[0].replace('const elderStripsPowers','globalThis.elderStripsPowers'),
   src.match(/const witchMaySaveSelf[\s\S]*?hunterPoison;/)[0]
     .replace('const witchMaySaveSelf','globalThis.witchMaySaveSelf')
     .replace('const hunterFiresPoisoned','globalThis.hunterFiresPoisoned'),
@@ -98,6 +104,59 @@ t('hanging the Elder sets the flag', () => {
   table(['elder','hunter','wolf','wolf']);
   hangTheElder();
   return G.powersLost === true ? true : 'the rule never fired at all';
+});
+
+/* Asked at a table: "is there an option where the Hunter can shoot after the Elder dies,
+   but the rest of the villagers keep their skills?" There was not — hunterElder exempts
+   the Hunter alone and leaves the other six stripped. The revenge itself is settable now.
+   Both rulesets print it, so the default is on under each; it is the harshest rule in the
+   box and plenty of tables simply do not play it. */
+console.log('\nTHE REVENGE ITSELF IS A HOUSE RULE');
+t('both rulesets still print it, so the default strips', () => {
+  for (const rules of ['vn','mh']){
+    table(['elder','hunter','wolf','wolf']); G.rules = rules; G.elderRevenge = null;
+    hangTheElder();
+    if (G.powersLost !== true) return 'the default stopped stripping under ' + rules;
+  }
+  return true;
+});
+t('a table that turns it off keeps every villager power', () => {
+  table(['elder','hunter','wolf','wolf']); G.elderRevenge = false;
+  hangTheElder();
+  return G.powersLost === false ? true : 'the override was ignored';
+});
+t('...which is what makes the Hunter fire without exempting him by name', () => {
+  table(['elder','hunter','wolf','wolf']);
+  G.elderRevenge = false; G.hunterElder = null;      // no Hunter-specific exemption
+  hangTheElder();
+  const h = G.players.find(p => p.role === 'hunter');
+  return hunterWouldFire(h, 'vote').fires
+    ? true : 'the answer to the question asked at the table still does not work';
+});
+t('and the Idiot, the Scapegoat and the rest come with him', () => {
+  table(['elder','idiot','scapegoat','beartamer','wolf','wolf']);
+  G.elderRevenge = false;
+  hangTheElder();
+  const gone = ['idiot','scapegoat','beartamer']
+    .filter(r => powerGone(G.players.find(p => p.role === r)));
+  return gone.length === 0 ? true : 'still stripped: ' + gone.join(', ');
+});
+t('turning it back on restores the published rule', () => {
+  table(['elder','hunter','wolf','wolf']); G.elderRevenge = true; G.rules = 'mh';
+  hangTheElder();
+  return G.powersLost === true ? true : 'an explicit yes did not strip';
+});
+t('the log says which way it went, so the table is not guessing', () => {
+  table(['elder','hunter','wolf','wolf']); G.elderRevenge = false;
+  hangTheElder();
+  return LOG.some(l => /keep their powers/.test(l))
+    ? true : 'nothing recorded that the revenge was skipped: ' + JSON.stringify(LOG);
+});
+t('a werewolf kill is still untouched by the setting', () => {
+  table(['elder','hunter','wolf','wolf']); G.elderRevenge = true;
+  kill(G.players.find(p => p.role === 'elder'), 'wolves');
+  return G.powersLost === false
+    ? true : 'a wolf kill stripped the village because the setting was on';
 });
 t('and a werewolf kill still does not', () => {
   table(['elder','hunter','wolf','wolf']);
@@ -184,7 +243,9 @@ t('it does not claim a tradition it has not got', () => {
 });
 t('overruling it also stops the day screen claiming the gun is gone', () => {
   const day = grab('rDay');
-  return /the Hunter does not fire/.test(day) && /!hunterFiresPowerless\(\)[^\n]*the Hunter does not fire/.test(day)
+  // the phrase is a T() pair now, so the gate and the text are on different lines
+  return /the Hunter does not fire/.test(day) &&
+         /!hunterFiresPowerless\(\)[\s\S]{0,120}?the Hunter does not fire/.test(day)
     ? true : 'the alert would contradict the house rule the table just set';
 });
 t('the other powers are unaffected by this ruling', () => {
