@@ -1776,8 +1776,10 @@ function rNight(){
        is true \u2014 and the button says which kind of skip this is, because a card nobody
        admits to holding is a gap in what the app knows, not a card that did nothing. */
     B.appendChild(el('p','note', have + ' of ' + need + ' identified.'));
-    tip('If nobody answers, skip: I will say at dawn that I could not be sure, call this ' +
-      'card again tomorrow night, and take it from the Roster if you learn it before then.');
+    tip(T('N\u1ebfu kh\u00f4ng ai nh\u1eadn th\u00ec b\u1ecf qua: r\u1ea1ng s\u00e1ng t\u00f4i s\u1ebd n\u00f3i l\u00e0 t\u00f4i kh\u00f4ng d\u00e1m ch\u1eafc, ' +
+        '\u0111\u00eam mai g\u1ecdi l\u1ea1i l\u00e1 n\u00e0y, v\u00e0 n\u1ebfu b\u1ea1n bi\u1ebft tr\u01b0\u1edbc \u0111\u00f3 th\u00ec \u0111\u1eb7t t\u1eeb Danh s\u00e1ch.',
+      'If nobody answers, skip: I will say at dawn that I could not be sure, call this ' +
+      'card again tomorrow night, and take it from the Roster if you learn it before then.'));
     flushTips(B, 'night');
     bar([{ t: T('Kh\u00f4ng ai tr\u1ea3 l\u1eddi \u00b7 b\u1ecf qua','Nobody answered \u00b7 skip'),
            sec:true, on:() => skipStep('card') }]);
@@ -1833,7 +1835,8 @@ function rNight(){
           on:() => { G.n.witchKill = G.n.witchKill===p.id ? null : p.id; render(); } }));
       }
       B.appendChild(c);
-      if (she) tip(she.name + ' is not listed \u2014 the Witch cannot poison herself.');
+      if (she) tip(T(she.name + ' kh\u00f4ng c\u00f3 trong danh s\u00e1ch \u2014 Ph\u00f9 Thu\u1ef7 kh\u00f4ng t\u1ef1 \u0111\u1ea7u \u0111\u1ed9c m\u00ecnh \u0111\u01b0\u1ee3c.',
+        she.name + ' is not listed \u2014 the Witch cannot poison herself.'));
       if (G.n.witchKill && G.n.witchKill === G.n.wolf && !G.n.witchSave)
         B.appendChild(el('div','tell', T(
           '\u0110\u00f3 \u0111\u00e3 l\u00e0 n\u1ea1n nh\u00e2n c\u1ee7a b\u1ea7y s\u00f3i \u0111\u00eam nay. Thu\u1ed1c \u0111\u1ed9c s\u1ebd m\u1ea5t kh\u00f4ng.',
@@ -1922,10 +1925,14 @@ function rNight(){
   if (blocked) B.appendChild(el('p','note','Cannot shield ' + byId(blocked).name + ' again \u2014 they were protected last night.'));
 
   if (s.role === 'seer'){
-    tip(G.rules === 'vn' ? 'She is called after the pack here, so I already know every wolf and can answer on screen.' : 'She is called before the pack on purpose \u2014 she must commit without knowing tonight\u2019s victim. The Witch is called last for the opposite reason.');
+    tip(G.rules === 'vn'
+      ? T('\u1ede \u0111\u00e2y Ti\u00ean Tri \u0111\u01b0\u1ee3c g\u1ecdi sau b\u1ea7y s\u00f3i, n\u00ean t\u00f4i \u0111\u00e3 bi\u1ebft h\u1ebft s\u00f3i v\u00e0 tr\u1ea3 l\u1eddi \u0111\u01b0\u1ee3c ngay tr\u00ean m\u00e0n h\u00ecnh.', 'She is called after the pack here, so I already know every wolf and can answer on screen.')
+      : T('Ti\u00ean Tri \u0111\u01b0\u1ee3c g\u1ecdi tr\u01b0\u1edbc b\u1ea7y s\u00f3i l\u00e0 c\u00f3 ch\u1ee7 \u00fd \u2014 c\u00f4 ph\u1ea3i ch\u1ecdn m\u00e0 ch\u01b0a bi\u1ebft n\u1ea1n nh\u00e2n \u0111\u00eam nay. Ph\u00f9 Thu\u1ef7 \u0111\u01b0\u1ee3c g\u1ecdi cu\u1ed1i c\u00f9ng v\u00ec l\u00fd do ng\u01b0\u1ee3c l\u1ea1i.', 'She is called before the pack on purpose \u2014 she must commit without knowing tonight\u2019s victim. The Witch is called last for the opposite reason.'));
   }
   if (s.role === 'fox'){
-    tip(G.rules === 'vn' ? 'He is called after the pack here, so I already know every wolf and can answer without you touching a card.' : 'Miller’s Hollow calls him before the pack. He is asleep while the wolves choose, so it costs him nothing \u2014 but on the first night I may not know the pack yet, and I will ask rather than guess.');
+    tip(G.rules === 'vn'
+      ? T('\u1ede \u0111\u00e2y C\u00e1o \u0111\u01b0\u1ee3c g\u1ecdi sau b\u1ea7y s\u00f3i, n\u00ean t\u00f4i \u0111\u00e3 bi\u1ebft h\u1ebft s\u00f3i v\u00e0 tr\u1ea3 l\u1eddi \u0111\u01b0\u1ee3c m\u00e0 b\u1ea1n kh\u00f4ng ph\u1ea3i \u0111\u1ee5ng v\u00e0o b\u00e0i.', 'He is called after the pack here, so I already know every wolf and can answer without you touching a card.')
+      : T('Miller\u2019s Hollow g\u1ecdi C\u00e1o tr\u01b0\u1edbc b\u1ea7y s\u00f3i. Anh ta ng\u1ee7 trong l\u00fac s\u00f3i ch\u1ecdn n\u00ean kh\u00f4ng thi\u1ec7t g\u00ec \u2014 nh\u01b0ng \u0111\u00eam \u0111\u1ea7u ti\u00ean t\u00f4i c\u00f3 th\u1ec3 ch\u01b0a bi\u1ebft b\u1ea7y s\u00f3i, v\u00e0 t\u00f4i s\u1ebd h\u1ecfi ch\u1ee9 kh\u00f4ng \u0111o\u00e1n.', 'Miller’s Hollow calls him before the pack. He is asleep while the wolves choose, so it costs him nothing \u2014 but on the first night I may not know the pack yet, and I will ask rather than guess.'));
   }
   // The Seer's look is how a moderator reads a card mid-night. If the app has
   // never seen that card, it asks, and remembers it from then on.
@@ -1943,12 +1950,18 @@ function rNight(){
       B.appendChild(el('div','tell', T(
         'T\u00f4i ch\u01b0a t\u1eebng th\u1ea5y l\u00e1 c\u1ee7a ' + t.name + ', n\u00ean b\u1ea1n ph\u1ea3i xem b\u00e0i ngay t\u1ea1i b\u00e0n.',
         'I have never seen ' + t.name + '\u2019s card, so you must read it at the table.')));
-      tip('<b>Read it without giving it away.</b><br>' +
+      tip(T('<b>\u0110\u1ecdc b\u00e0i m\u00e0 kh\u00f4ng \u0111\u1ec3 l\u1ed9.</b><br>' +
+        '\u00b7 B\u1eadt <b>\u266b ti\u1ebfng \u0111\u00eam</b> trong Danh s\u00e1ch. M\u01b0a che ti\u1ebfng l\u1eadt b\u00e0i v\u00e0 ti\u1ebfng ch\u00e2n b\u1ea1n.<br>' +
+        '\u00b7 \u0110i <b>h\u1ebft m\u1ed9t v\u00f2ng</b>, \u0111\u00eam n\u00e0o c\u0169ng v\u1eady, d\u00f9 c\u00f3 c\u1ea7n \u0111\u1ecdc g\u00ec hay kh\u00f4ng.<br>' +
+        '\u00b7 Ch\u1ea1m v\u00e0o <b>ba b\u1ed1n l\u00e1</b>, kh\u00f4ng ch\u1ec9 l\u00e1 c\u1ea7n xem. Ch\u1ec9 b\u1ea1n bi\u1ebft l\u00e1 n\u00e0o m\u1edbi quan tr\u1ecdng.<br>' +
+        '\u00b7 T\u1ed1t h\u01a1n n\u1eefa: <b>thu h\u1ebft b\u00e0i</b> sau l\u1ea7n l\u1eadt \u0111\u1ea7u v\u00e0 x\u1ebfp theo th\u1ee9 t\u1ef1 ch\u1ed7 ng\u1ed3i tr\u00ean \u0111\u00f9i. ' +
+        'Khi \u0111\u00f3 kh\u00f4ng c\u00f2n g\u00ec \u1edf ch\u1ed7 n\u00e0o \u0111\u1ec3 nh\u1ea5c, v\u00e0 b\u1ea1n \u0111\u1ecdc \u0111\u01b0\u1ee3c b\u1ea5t k\u1ef3 l\u00e1 n\u00e0o trong im l\u1eb7ng.',
+        '<b>Read it without giving it away.</b><br>' +
         '\u00b7 Turn on <b>\u266b night sounds</b> in the Roster. Rain covers the card and your footsteps.<br>' +
         '\u00b7 Walk the <b>whole circle</b>, every night, whether or not you need to read anything.<br>' +
         '\u00b7 Touch <b>three or four cards</b>, not just theirs. Only you know which one mattered.<br>' +
         '\u00b7 Better still: <b>collect all the cards</b> after the first reveal and keep them stacked in ' +
-        'seat order in your lap. Then there is nothing at any seat to lift, and you can read any card in silence.');
+        'seat order in your lap. Then there is nothing at any seat to lift, and you can read any card in silence.'));
       B.appendChild(el('p','note','Tap what you saw and I will answer on screen from now on \u2014 you will never need to read that card again.'));
       const rc = el('div','chips');
       for (const r of ROLES){

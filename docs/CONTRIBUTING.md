@@ -213,7 +213,7 @@ If you touch typography, check a string with stacked diacritics renders in one f
 
 ## Testing
 
-904 assertions across 30 suites, in about three seconds. No dependencies — they read
+907 assertions across 30 suites, in about three seconds. No dependencies — they read
 `index.html`, `sw.js` and the manifest as text and assert against them:
 
 ```bash
