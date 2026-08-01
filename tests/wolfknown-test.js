@@ -127,7 +127,8 @@ for (const [what, re] of [
   ['the Fox trio',            /if \(wolfSideKnown\(\)\)\{\s*\n\s*G\.n\.foxAns/],
   ['the Bear Tamer growl',    /if \(!wolfSideKnown\(\)\)\{\s*\n\s*B\.appendChild\(el\('div','tell',\s*\n?\s*T\('[^']*','Bear Tamer/],
   ['the wolves\u2019 target list', /'whitewolf'\) && !wolfSideKnown\(\)/],
-  ['the Knight\u2019s rust',       /if \(!wolfSideKnown\(\)\) log\('Not every wolf card is placed/],
+  // the log line is a T() pair now; the guard is what is being pinned
+  ['the Knight\u2019s rust',       /if \(!wolfSideKnown\(\)\) log\(T\(/],
   ['the victory check',       /if \(!wolfSideKnown\(\)\) return null;/],
   ['the Seer\u2019s answer',       /G\.rules === 'vn' && wolfSideKnown\(\)/],
 ]) t(what + ' uses it', () => re.test(src) ? true : 'still using the wrong predicate');

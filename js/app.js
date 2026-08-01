@@ -525,11 +525,19 @@ const acts1 = r => !!(r.pick || r.special || r.every || r.id === 'judge');
 const liveWith = id => G.players.filter(p => p.alive && p.role === id);
 const withRole = id => G.players.filter(p => p.role === id);
 const unassigned = () => G.players.filter(p => !p.role);
+/* The chronicle's left column. Written at the moment the entry is, like the entry itself
+   — see the note on log() below. */
 function label(){
-  if (G.phase === 'night' || G.phase === 'dawn') return 'Night ' + G.night;
-  if (G.phase === 'day' || G.phase === 'hunter' || G.phase === 'sheriff' || G.phase === 'scapegoat') return 'Day ' + G.day;
-  return 'Setup';
+  if (G.phase === 'night' || G.phase === 'dawn') return T('\u0110\u00eam ', 'Night ') + G.night;
+  if (G.phase === 'day' || G.phase === 'hunter' || G.phase === 'sheriff' || G.phase === 'scapegoat')
+    return T('Ng\u00e0y ', 'Day ') + G.day;
+  return T('Chu\u1ea9n b\u1ecb', 'Setup');
 }
+/* An entry is rendered to a string HERE, in the language in force when it happened, and
+   never re-rendered. That is safe because the language chooser lives on the deck screen
+   and is unreachable once the first night starts: a game cannot change language midway,
+   so a chronicle cannot end up half in each. A resumed save from a game played in the
+   other language keeps its own words, which is what a record should do. */
 function log(t, when){ G.log.push({ w: when || label(), t }); }
 function neighbours(p){
   const n = G.players.length, i = G.players.findIndex(x => x.id === p.id), out = [];
@@ -682,7 +690,8 @@ function thiefTakes(th, r){
   if (!G.counts.thief) delete G.counts.thief;
   G.counts[r.id] = (G.counts[r.id] || 0) + 1;
   th.role = r.id;
-  log('The Thief became ' + r.name + '. That card is in play now, and the Thief is not.');
+    log(T('\u0102n tr\u1ed9m \u0111\u00e3 th\u00e0nh ' + rName(r) + '. L\u00e1 \u0111\u00f3 gi\u1edd \u1edf trong v\u00e1n, c\u00f2n \u0102n tr\u1ed9m th\u00ec kh\u00f4ng.',
+      'The Thief became ' + r.name + '. That card is in play now, and the Thief is not.'));
 }
 function stepInfo(s){
   if (s.role === '__lovers') return { name:'The Lovers', vi:'Cặp Đôi',  id:'__lovers',
@@ -725,17 +734,19 @@ function kill(p, cause){
   if (p.role === 'elder' && !G.powersLost && villageKilled(cause)){
     if (elderStripsPowers()){
       G.powersLost = true;
-      log('The village killed the Elder \u2014 by ' + causeLabel(cause) + '. Every villager power is extinguished.');
+      log(T('D\u00e2n l\u00e0ng \u0111\u00e3 gi\u1ebft Tr\u01b0\u1edfng L\u00e3o \u2014 b\u1eb1ng ' + causeLabel(cause) + '. To\u00e0n b\u1ed9 ph\u00e9p c\u1ee7a d\u00e2n l\u00e0ng t\u1eaft ng\u1ee5m.',
+        'The village killed the Elder \u2014 by ' + causeLabel(cause) + '. Every villager power is extinguished.'));
     } else {
-      log('The village killed the Elder \u2014 by ' + causeLabel(cause) +
-          '. By house rule the villagers keep their powers.');
+      log(T('D\u00e2n l\u00e0ng \u0111\u00e3 gi\u1ebft Tr\u01b0\u1edfng L\u00e3o \u2014 b\u1eb1ng ' + causeLabel(cause) + '. Theo lu\u1eadt nh\u00e0, d\u00e2n l\u00e0ng v\u1eabn gi\u1eef ph\u00e9p.',
+        'The village killed the Elder \u2014 by ' + causeLabel(cause) + '. By house rule the villagers keep their powers.'));
     }
   }
   const chain = [{ p, cause }];
   if (p.lover) for (const q of G.players) if (q.alive && q.lover) chain.push(...kill(q, 'grief'));
   if (p.model){
     const wc = G.players.find(x => x.role === 'wildchild' && x.alive);
-    if (wc && !wc.turned){ wc.turned = true; log(wc.name + ' has become a werewolf \u2014 their model is dead.'); }
+    if (wc && !wc.turned){ wc.turned = true; log(T(wc.name + ' \u0111\u00e3 ho\u00e1 th\u00e0nh ma s\u00f3i \u2014 h\u00ecnh m\u1eabu c\u1ee7a c\u1eadu ta \u0111\u00e3 ch\u1ebft.',
+      wc.name + ' has become a werewolf \u2014 their model is dead.')); }
   }
   return chain;
 }
@@ -846,7 +857,8 @@ function hunterWouldFire(p, cause){
 function registerDeaths(chain){
   if (chain.length) buzz('death');
   for (const c of chain){
-    log(c.p.name + ' died \u2014 ' + (c.cause === 'grief' ? 'of grief' : causeLabel(c.cause)) + '.');
+    log(c.p.name + T(' ch\u1ebft \u2014 ', ' died \u2014 ') +
+      (c.cause === 'grief' ? T('v\u00ec \u0111au bu\u1ed3n', 'of grief') : causeLabel(c.cause)) + '.');
     // a shot already taken privately in the night is not owed a second time at dawn
     if (c.p.role === 'hunter' && !G.pending.hunterId && !G.nightShotTaken){
       const v = hunterWouldFire(c.p, c.cause);
@@ -875,7 +887,8 @@ function applyDawn(){
     const eld = G.players.find(p => p.role === 'elder' && p.alive);
     if (eld && !G.dawn.some(d => d.on && d.id === eld.id)){
       G.elderLife = false;
-      log('The Elder’s second life absorbed the attack, and is now spent.');
+      log(T('M\u1ea1ng th\u1ee9 hai c\u1ee7a Tr\u01b0\u1edfng L\u00e3o \u0111\u00e3 h\u1ee9ng \u0111\u00f2n, v\u00e0 gi\u1edd \u0111\u00e3 m\u1ea5t.',
+        'The Elder\u2019s second life absorbed the attack, and is now spent.'));
     }
     G.elderAbsorbed = false;
   }
@@ -886,20 +899,24 @@ function applyDawn(){
     if (!p || !p.alive) continue;
     // the rust is a villager power too, so the Elder's revenge takes it with the rest
     if (p.role === 'knight' && d.cause === 'wolves'){
-      if (powerGone(p)) log(p.name + ' was the Knight, but the sword lost its bite with every other villager power. No rust.');
+      if (powerGone(p)) log(T(p.name + ' l\u00e0 Hi\u1ec7p S\u0129, nh\u01b0ng thanh ki\u1ebfm c\u00f9n theo m\u1ecdi ph\u00e9p kh\u00e1c c\u1ee7a d\u00e2n. Kh\u00f4ng c\u00f3 r\u1ec9 s\u00e9t.',
+        p.name + ' was the Knight, but the sword lost its bite with every other villager power. No rust.'));
       else knightDied = p;
     }
     registerDeaths(kill(p, d.cause));
   }
   if (knightDied){
     const w = clockwiseWolfFrom(knightDied);
-    if (w){ G.infectNext = w.id; log('The rust will take ' + w.name + ' tomorrow night.'); }
-    if (!wolfSideKnown()) log('Not every wolf card is placed, so confirm the rust target against the real deal.');
+    if (w){ G.infectNext = w.id;
+      log(T('R\u1ec9 s\u00e9t s\u1ebd l\u1ea5y ' + w.name + ' v\u00e0o \u0111\u00eam mai.', 'The rust will take ' + w.name + ' tomorrow night.')); }
+    if (!wolfSideKnown()) log(T('Ch\u01b0a bi\u1ebft h\u1ebft l\u00e1 s\u00f3i ai c\u1ea7m, n\u00ean h\u00e3y \u0111\u1ed1i chi\u1ebfu m\u1ee5c ti\u00eau r\u1ec9 s\u00e9t v\u1edbi b\u00e0i th\u1eadt.',
+      'Not every wolf card is placed, so confirm the rust target against the real deal.'));
   }
-  if (!G.dawn.some(d => d.on)) log('Nobody died in the night.');
+  if (!G.dawn.some(d => d.on)) log(T('\u0110\u00eam qua kh\u00f4ng ai ch\u1ebft.', 'Nobody died in the night.'));
   if (G.night === 1){
     const ang = G.players.find(p => p.role === 'angel' && !p.alive);
-    if (ang) return finish({ who:'The Angel', why: ang.name + ' wanted exactly this and got it before the first dawn.' });
+    if (ang) return finish({ who: T('Thi\u00ean Th\u1ea7n', 'The Angel'),
+      why: ang.name + T(' mu\u1ed1n \u0111\u00fang \u0111i\u1ec1u n\u00e0y v\u00e0 \u0111\u1ea1t \u0111\u01b0\u1ee3c tr\u01b0\u1edbc c\u1ea3 r\u1ea1ng s\u00e1ng \u0111\u1ea7u ti\u00ean.', ' wanted exactly this and got it before the first dawn.') });
   }
   G.votes = {}; G.sheriffVote = null;
   G.resume = 'day';
@@ -907,7 +924,8 @@ function applyDawn(){
 }
 function checkWin(){
   const a = alive();
-  if (!a.length) return { who:'Nobody', why:'Every soul in Miller’s Hollow is dead.' };
+  if (!a.length) return { who: T('Kh\u00f4ng ai', 'Nobody'),
+    why: T('Kh\u00f4ng c\u00f2n m\u1ed9t linh h\u1ed3n n\u00e0o \u1edf Miller\u2019s Hollow.', 'Every soul in Miller’s Hollow is dead.') };
   // Counting the two sides needs only the wolf cards placed — not every villager
   // identified. Demanding the latter froze results for whole games.
   if (!wolfSideKnown()) return null;
@@ -926,30 +944,35 @@ function checkWin(){
      'village' against 'none', looked mixed, and handed Cupid the win a second way. */
   const lovers = a.filter(p => p.lover);
   if (a.length === 2 && lovers.length === 2 && sideOf(lovers[0]) !== sideOf(lovers[1]))
-    return { who:'The Lovers', why: lovers.map(p=>p.name).join(' and ') +
-      ' are the last two alive, they belong to each other, and they were never on the same side.' };
+    return { who: T('C\u1eb7p \u0110\u00f4i', 'The Lovers'),
+      why: lovers.map(p=>p.name).join(T(' v\u00e0 ', ' and ')) +
+      T(' l\u00e0 hai ng\u01b0\u1eddi cu\u1ed1i c\u00f9ng c\u00f2n s\u1ed1ng, h\u1ecd thu\u1ed9c v\u1ec1 nhau, v\u00e0 ch\u01b0a bao gi\u1edd c\u00f9ng m\u1ed9t phe.', ' are the last two alive, they belong to each other, and they were never on the same side.') };
   const piper = a.find(p => p.role === 'piper');
   if (piper && a.length > 1 && a.every(p => p.role === 'piper' || p.charmed))
-    return { who:'The Pied Piper', why: piper.name + ' has charmed every living soul.' };
+    return { who: T('Ng\u01b0\u1eddi Th\u1ed5i S\u00e1o', 'The Pied Piper'),
+      why: piper.name + T(' \u0111\u00e3 m\u00ea ho\u1eb7c m\u1ecdi linh h\u1ed3n c\u00f2n s\u1ed1ng.', ' has charmed every living soul.') };
   const ww = a.find(p => p.role === 'whitewolf');
-  if (ww && a.length === 1) return { who:'The White Werewolf', why: ww.name + ' stands alone.' };
+  if (ww && a.length === 1) return { who: T('S\u00f3i Tr\u1eafng', 'The White Werewolf'),
+    why: ww.name + T(' \u0111\u1ee9ng m\u1ed9t m\u00ecnh.', ' stands alone.') };
   const wolves = a.filter(isWolf), others = a.filter(p => !isWolf(p));
-  if (!wolves.length) return { who:'The Village', why:'Not one werewolf is left breathing.' };
+  if (!wolves.length) return { who: T('D\u00e2n l\u00e0ng', 'The Village'),
+    why: T('Kh\u00f4ng c\u00f2n con ma s\u00f3i n\u00e0o th\u1edf.', 'Not one werewolf is left breathing.') };
   // Once the pack matches the village it can no longer be outvoted, so the game
   // is already decided and there is no point grinding out the last few nights.
   // Vietnamese play ends it there; Miller’s Hollow makes them finish the job.
   const parity = G.rules === 'vn' && wolves.length >= others.length;
   if (!others.length || parity){
     if (ww && wolves.length > 1) return null;      // the White Werewolf still wants to be alone
-    return { who:'The Werewolves', why: others.length
-      ? 'The pack is ' + wolves.length + ' against ' + others.length + '. They can no longer be outvoted.'
-      : 'No villagers remain.' };
+    return { who: T('Ma S\u00f3i', 'The Werewolves'), why: others.length
+      ? T('B\u1ea7y s\u00f3i ' + wolves.length + ' \u0111\u1ea5u ' + others.length + '. Kh\u00f4ng ai b\u1ecf phi\u1ebfu \u00e1p \u0111\u1ea3o \u0111\u01b0\u1ee3c h\u1ecd n\u1eefa.',
+          'The pack is ' + wolves.length + ' against ' + others.length + '. They can no longer be outvoted.')
+      : T('Kh\u00f4ng c\u00f2n d\u00e2n l\u00e0ng n\u00e0o.', 'No villagers remain.') };
   }
   return null;
 }
 function finish(w){
   G.over = w; G.phase = 'end';
-  log(w.who + ' win. ' + w.why);
+  log(w.who + T(' th\u1eafng. ', ' win. ') + w.why);
   countGame();                 // one more game this device does not need taught through
   buzz('death');
   render();
@@ -1481,7 +1504,7 @@ function rDeal(){
       'seat there is nothing for anyone to feel being lifted.</p>')));
   const extra = el('button','btn sec wide', T('Bỏ qua — tìm ra trong đêm','Skip \u2014 find out during the night'));
   extra.onclick = () => { snap(); G.knewDeal = false; G.night=1; G.phase='night';
-    buildNight(); log('Night falls on Miller’s Hollow.','Night 1'); render(); };
+    buildNight(); log(T('\u0110\u00eam bu\u00f4ng xu\u1ed1ng Miller\u2019s Hollow.', 'Night falls on Miller\u2019s Hollow.'), T('\u0110\u00eam 1','Night 1')); render(); };
   A.appendChild(extra);
 }
 
@@ -1601,8 +1624,9 @@ function autoFillLastCard(){
   }
   if (short.length !== 1) return null;          // ambiguous, so leave it alone
   left[0].role = short[0];
-  log(left[0].name + ' holds the last card, the ' +
-    rName(R[short[0]]) + '.', 'Setup');
+  log(T(left[0].name + ' c\u1ea7m l\u00e1 cu\u1ed1i c\u00f9ng, ' + rName(R[short[0]]) + '.',
+        left[0].name + ' holds the last card, the ' + rName(R[short[0]]) + '.'),
+      T('Chu\u1ea9n b\u1ecb','Setup'));
   return R[short[0]];
 }
 
@@ -1647,8 +1671,8 @@ function rLearn(){
               : T('C\u00f2n ' + (total-known) + ' ng\u01b0\u1eddi ch\u01b0a ghi', (total-known) + ' still to record'),
          off: known !== total,
          on:() => { snap(); G.knewDeal = true; G.night=1; G.phase='night'; buildNight();
-           log('The deal was collected before play, so the table is fully known.','Setup');
-           log('Night falls on Miller’s Hollow.','Night 1'); render(); } }]);
+           log(T('B\u1ed9 b\u00e0i \u0111\u00e3 \u0111\u01b0\u1ee3c ghi tr\u01b0\u1edbc khi ch\u01a1i, n\u00ean app bi\u1ebft h\u1ebft c\u1ea3 b\u00e0n.', 'The deal was collected before play, so the table is fully known.'), T('Chu\u1ea9n b\u1ecb','Setup'));
+           log(T('\u0110\u00eam bu\u00f4ng xu\u1ed1ng Miller\u2019s Hollow.', 'Night falls on Miller\u2019s Hollow.'), T('\u0110\u00eam 1','Night 1')); render(); } }]);
 }
 
 /* ---- night ---- */
@@ -1829,7 +1853,7 @@ function rNight(){
     for (const side of ['village','wolf']){
       const b = el('div','chip' + (G.houndSide===side?' sel':''), side==='wolf' ? 'Werewolf' : 'Villager');
       b.onclick = () => { snap(); G.houndSide = side;
-        log('The Wolf Hound chose the ' + (side==='wolf'?'pack':'village') + '.'); G.si++; render(); };
+        log(T('S\u00f3i Ch\u00f3 \u0111\u00e3 ch\u1ecdn ' + (side==='wolf'?'b\u1ea7y s\u00f3i':'d\u00e2n l\u00e0ng') + '.', 'The Wolf Hound chose the ' + (side==='wolf'?'pack':'village') + '.')); G.si++; render(); };
       c.appendChild(b);
     }
     B.appendChild(c);
@@ -1866,7 +1890,7 @@ function rNight(){
       ? T('\u0110\u00e3 ghi. \u0110\u00eam nay kh\u00f4ng c\u00f2n g\u00ec ph\u1ea3i l\u00e0m \u2014 l\u00e1 n\u00e0y ra tay khi \u0111\u1ebfn l\u00fac.',
           'Noted. Nothing more to do tonight \u2014 this card acts when the moment comes.')
       : T('B\u01b0\u1edbc n\u00e0y kh\u00f4ng c\u00f3 g\u00ec \u0111\u1ec3 ghi.', 'Nothing to record for this step.')));
-    bar([{ t: T('Ti\u1ebfp \u2192','Next \u2192'), wide:true, on:() => { snap(); if (info.say) log(info.name + ' was called.'); G.si++; render(); } }]);
+    bar([{ t: T('Ti\u1ebfp \u2192','Next \u2192'), wide:true, on:() => { snap(); if (info.say) log(T(T(info.vi, info.name) + ' \u0111\u00e3 \u0111\u01b0\u1ee3c g\u1ecdi.', info.name + ' was called.')); G.si++; render(); } }]);
     return;
   }
 
@@ -1930,7 +1954,7 @@ function rNight(){
       for (const r of ROLES){
         const b = el('div','chip', icOf(r.id) + r.name);
         b.onclick = () => { snap(); t.role = r.id;
-          log('The Seer saw that ' + t.name + ' is the ' + r.name + '.'); render(); };
+          log(T('Ti\u00ean Tri th\u1ea5y ' + t.name + ' l\u00e0 ' + rName(r) + '.', 'The Seer saw that ' + t.name + ' is the ' + r.name + '.')); render(); };
         rc.appendChild(b);
       }
       B.appendChild(rc);
@@ -1982,28 +2006,31 @@ function applyStep(s, chosen){
   const info = stepInfo(s);
   const nm = ids => ids.map(i => byId(i).name).join(' and ');
   switch (s.role){
-    case 'wolf': G.n.wolf = chosen[0]; log('The pack chose ' + byId(chosen[0]).name + '.'); break;
-    case 'whitewolf': G.n.white = chosen[0]; log('The White Werewolf marked ' + byId(chosen[0]).name + '.'); break;
-    case 'seer': log('The Seer looked at ' + byId(chosen[0]).name + '.'); break;
+    case 'wolf': G.n.wolf = chosen[0]; log(T('B\u1ea7y s\u00f3i ch\u1ecdn ' + byId(chosen[0]).name + '.', 'The pack chose ' + byId(chosen[0]).name + '.')); break;
+    case 'whitewolf': G.n.white = chosen[0]; log(T('S\u00f3i Tr\u1eafng \u0111\u00e1nh d\u1ea5u ' + byId(chosen[0]).name + '.', 'The White Werewolf marked ' + byId(chosen[0]).name + '.')); break;
+    case 'seer': log(T('Ti\u00ean Tri soi ' + byId(chosen[0]).name + '.', 'The Seer looked at ' + byId(chosen[0]).name + '.')); break;
     case 'cupid':
       G.players.forEach(p => p.lover = false);
       chosen.forEach(i => byId(i).lover = true);
-      log('Cupid joined ' + nm(chosen) + '.'); break;
+      log(T('Th\u1ea7n T\u00ecnh Y\u00eau n\u1ed1i ' + nm(chosen) + '.', 'Cupid joined ' + nm(chosen) + '.')); break;
     case 'wildchild':
       G.players.forEach(p => p.model = false);
       byId(chosen[0]).model = true;
-      log('The Wild Child took ' + byId(chosen[0]).name + ' as a model.'); break;
+      log(T('\u0110\u1ee9a Tr\u1ebb Hoang l\u1ea5y ' + byId(chosen[0]).name + ' l\u00e0m h\u00ecnh m\u1eabu.', 'The Wild Child took ' + byId(chosen[0]).name + ' as a model.')); break;
     case 'piper':
       chosen.forEach(i => byId(i).charmed = true);
-      log('The Piper charmed ' + nm(chosen) + '.'); break;
-    case 'guard': G.n.guard = chosen[0]; log('The Bodyguard shielded ' + byId(chosen[0]).name + '.'); break;
+      log(T('Ng\u01b0\u1eddi Th\u1ed5i S\u00e1o m\u00ea ho\u1eb7c ' + nm(chosen) + '.', 'The Piper charmed ' + nm(chosen) + '.')); break;
+    case 'guard': G.n.guard = chosen[0]; log(T('B\u1ea3o V\u1ec7 che ch\u1edf ' + byId(chosen[0]).name + '.', 'The Bodyguard shielded ' + byId(chosen[0]).name + '.')); break;
     case 'fox': {
       const t = byId(chosen[0]), grp = [t, ...neighbours(t)];
       const hit = G.n.foxAns != null ? G.n.foxAns : grp.some(isWolf);
       if (!hit) G.foxPower = false;
-      log('The Fox sniffed ' + t.name + ' \u2014 ' + (hit ? 'a wolf was among them' : 'nothing, and lost his power') + '.');
+      log(T('C\u00e1o ng\u1eedi ' + t.name + ' \u2014 ' +
+              (hit ? 'c\u00f3 s\u00f3i trong ba ng\u01b0\u1eddi' : 'kh\u00f4ng c\u00f3, v\u00e0 m\u1ea5t ph\u00e9p') + '.',
+            'The Fox sniffed ' + t.name + ' \u2014 ' +
+              (hit ? 'a wolf was among them' : 'nothing, and lost his power') + '.'));
       break; }
-    default: if (info.say) log(info.name + ' was called.');
+    default: if (info.say) log(T(T(info.vi, info.name) + ' \u0111\u00e3 \u0111\u01b0\u1ee3c g\u1ecdi.', info.name + ' was called.'));
   }
 }
 function finishRollCall(){
@@ -2011,9 +2038,9 @@ function finishRollCall(){
   const left = unassigned(), v = G.counts.villager || 0;
   if (left.length && left.length === v){
     left.forEach(p => p.role = 'villager');
-    log('The remaining ' + left.length + ' are Simple Villagers.');
+    log(T(left.length + ' ng\u01b0\u1eddi c\u00f2n l\u1ea1i l\u00e0 D\u00e2n l\u00e0ng.', 'The remaining ' + left.length + ' are Simple Villagers.'));
   } else if (left.length){
-    log(left.length + ' card' + (left.length>1?'s':'') + ' still unaccounted for.');
+    log(T('C\u00f2n ' + left.length + ' l\u00e1 ch\u01b0a bi\u1ebft ai c\u1ea7m.', left.length + ' card' + (left.length>1?'s':'') + ' still unaccounted for.'));
   }
   G.phase = 'dawn'; computeDawn(); render();
 }
@@ -2168,10 +2195,10 @@ function rDay(){
     B.appendChild(el('div','grp', T('Ai \u0111\u01b0\u1ee3c b\u1ea7u?','Who was elected?')));
     const c = el('div','chips');
     for (const p of A) c.appendChild(chip(p, { on:() => { snap(); p.sheriff = true; G.sheriffDone = true;
-      log(p.name + ' was elected Sheriff.'); render(); } }));
+      log(T(p.name + ' \u0111\u01b0\u1ee3c b\u1ea7u l\u00e0m Tr\u01b0\u1edfng L\u00e0ng.', p.name + ' was elected Sheriff.')); render(); } }));
     B.appendChild(c);
     bar([{ t: T('Ch\u01a1i kh\u00f4ng c\u1ea7n Tr\u01b0\u1edfng L\u00e0ng','Play without a Sheriff'), sec:true, wide:true, on:() => { snap(); G.sheriffDone = true;
-      log('The village declined to elect a Sheriff.'); render(); } }]);
+      log(T('D\u00e2n l\u00e0ng kh\u00f4ng b\u1ea7u Tr\u01b0\u1edfng L\u00e0ng.', 'The village declined to elect a Sheriff.')); render(); } }]);
     return;
   }
   const jd = liveWith('judge').filter(p => !powerGone(p));
@@ -2184,7 +2211,7 @@ function rDay(){
        and the moderator is the only person who sees the sign, so they record it. */
     const jb = el('button','btn sec sm', T('Anh ta \u0111\u00e3 ra d\u1ea5u \u2014 b\u1ea7u l\u1ea1i h\u00f4m nay','He gave the sign \u2014 second vote today'));
     jb.onclick = () => { snap(); G.judgeUsed = true; G.votes = {}; G.sheriffVote = null;
-      log('The Stuttering Judge demanded a second vote. The tally was cleared for it.'); render(); };
+      log(T('Quan To\u00e0 N\u00f3i L\u1eafp \u0111\u00f2i b\u1ea7u l\u1ea1i. S\u1ed1 phi\u1ebfu \u0111\u00e3 \u0111\u01b0\u1ee3c xo\u00e1.', 'The Stuttering Judge demanded a second vote. The tally was cleared for it.')); render(); };
     B.appendChild(jb);
   } else if (jd.length){
     B.appendChild(el('p','note','The Stuttering Judge has spent his second vote \u2014 once per game, and it is gone.'));
@@ -2388,8 +2415,8 @@ function rDay(){
                             : T('Kh\u00f4ng ai b\u1ecb treo','Nobody was voted out'), sec:true, on:() => {
       if (best > 0){ G.votes = {}; G.sheriffVote = null; refresh(); return; }
       snap(); log(voteNeedsMajority()
-        ? 'The vote did not clear half. Nobody was hanged.'
-        : 'No name was voted out. Nobody was hanged.');
+        ? T('Phi\u1ebfu kh\u00f4ng qu\u00e1 b\u00e1n. Kh\u00f4ng ai b\u1ecb treo.', 'The vote did not clear half. Nobody was hanged.')
+        : T('Kh\u00f4ng ai b\u1ecb b\u1ecf phi\u1ebfu ra. Kh\u00f4ng ai b\u1ecb treo.', 'No name was voted out. Nobody was hanged.'));
       G.votes = {}; G.sheriffVote = null; G.resume = 'night'; proceed(); } });
     bar(opts);
     // Pinned last: bar() clears the note, so this has to follow it.
@@ -2411,18 +2438,21 @@ function resolveVote(p, tie){
      that he is hanged like anybody else. */
   if (p.role === 'idiot' && !p.revealed && !powerGone(p)){
     p.revealed = true; p.voteless = true;
-    log(p.name + ' is the Village Idiot \u2014 revealed, spared, silenced for good. The vote is spent.');
+    log(T(p.name + ' l\u00e0 Th\u1eb1ng Ng\u1ed1c \u2014 l\u1eadt b\u00e0i, tha m\u1ea1ng, m\u1ea5t quy\u1ec1n b\u1ecf phi\u1ebfu v\u0129nh vi\u1ec5n. V\u00f2ng b\u1ecf phi\u1ebfu coi nh\u01b0 xong.',
+      p.name + ' is the Village Idiot \u2014 revealed, spared, silenced for good. The vote is spent.'));
     toNight(); return;
   }
   if (p.role === 'idiot' && !p.revealed && powerGone(p))
-    log(p.name + ' is the Village Idiot, but the village killed the Elder \u2014 nothing saves him now.');
+    log(T(p.name + ' l\u00e0 Th\u1eb1ng Ng\u1ed1c, nh\u01b0ng d\u00e2n l\u00e0ng \u0111\u00e3 gi\u1ebft Tr\u01b0\u1edfng L\u00e3o \u2014 gi\u1edd kh\u00f4ng g\u00ec c\u1ee9u \u0111\u01b0\u1ee3c anh ta.',
+      p.name + ' is the Village Idiot, but the village killed the Elder \u2014 nothing saves him now.'));
   if (p.role === 'angel' && G.day === 1){
     kill(p, 'vote');
-    return finish({ who:'The Angel', why: p.name + ' wanted exactly this and got it on day one.' });
+    return finish({ who: T('Thi\u00ean Th\u1ea7n', 'The Angel'),
+      why: p.name + T(' mu\u1ed1n \u0111\u00fang \u0111i\u1ec1u n\u00e0y v\u00e0 \u0111\u1ea1t \u0111\u01b0\u1ee3c ngay ng\u00e0y \u0111\u1ea7u.', ' wanted exactly this and got it on day one.') });
   }
   // kill() applies the Elder's consequence now, for every village-caused death.
   if (tie){
-    log('The vote tied. The Scapegoat ' + p.name + ' was sacrificed.');
+    log(T('Phi\u1ebfu ho\u00e0. V\u1eadt T\u1ebf Th\u1ea7n ' + p.name + ' b\u1ecb hi\u1ebfn t\u1ebf.', 'The vote tied. The Scapegoat ' + p.name + ' was sacrificed.'));
     registerDeaths(kill(p, 'tie'));
     G.resume = 'night';
     G.phase = 'scapegoat'; render(); return;
@@ -2495,7 +2525,8 @@ function renderHunter(){
       G.nightShotTaken = true;
       if (!G.dawn.some(d => d.id === p.id)) G.dawn.push({ id:p.id, cause:'shot', on:true });
       G.dawnWhy = (G.dawnWhy || []).concat('The Hunter fired as he died. Announce both, explain neither.');
-      log('The Hunter was taken in the night and shot ' + p.name + ' before dawn.');
+      log(T('Th\u1ee3 S\u0103n b\u1ecb \u0103n \u0111\u00eam v\u00e0 \u0111\u00e3 b\u1eafn ' + p.name + ' tr\u01b0\u1edbc khi tr\u1eddi s\u00e1ng.',
+        'The Hunter was taken in the night and shot ' + p.name + ' before dawn.'));
       G.phase = 'dawn'; render(); return;
     }
     G.pending.hunterId = null; G.pending.hunterCause = null;
@@ -2508,7 +2539,7 @@ function renderHunter(){
   const esc = el('button','btn sec sm', T('Lu\u1eadt nh\u00e0: anh ta b\u1eafn tr\u01b0\u1ee3t, kh\u00f4ng tr\u00fang ai','House rule: he fired wide and hit nobody'));
   esc.onclick = () => { snap();
     G.pending.hunterId = null; G.pending.hunterCause = null;
-    log('By house rule the Hunter\u2019s shot hit nobody.');
+    log(T('Theo lu\u1eadt nh\u00e0, ph\u00e1t s\u00fang c\u1ee7a Th\u1ee3 S\u0103n kh\u00f4ng tr\u00fang ai.', 'By house rule the Hunter\u2019s shot hit nobody.'));
     if (priv){ G.pending.nightShot = null; G.nightShotTaken = true; G.phase = 'dawn'; render(); }
     else proceed(); };
   B.appendChild(esc);
@@ -2524,11 +2555,11 @@ function renderSheriff(){
   const c = el('div','chips');
   for (const p of alive()) c.appendChild(chip(p, { on:() => {
     snap(); G.pending.badge = false; p.sheriff = true;
-    log(p.name + ' takes the badge.'); proceed(); } }));
+    log(T(p.name + ' nh\u1eadn ph\u00f9 hi\u1ec7u.', p.name + ' takes the badge.')); proceed(); } }));
   B.appendChild(c);
   bar([{ t: T('H\u1ecd hu\u1ef7 ph\u00f9 hi\u1ec7u','They destroyed the badge'), sec:true, wide:true,
          on:() => { snap(); G.pending.badge = false;
-           log('The badge was destroyed — nobody carries it now.'); proceed(); } }]);
+           log(T('Ph\u00f9 hi\u1ec7u \u0111\u00e3 b\u1ecb hu\u1ef7 \u2014 gi\u1edd kh\u00f4ng ai gi\u1eef n\u1eefa.', 'The badge was destroyed \u2014 nobody carries it now.')); proceed(); } }]);
 }
 function renderScapegoat(){
   show('sDay');
@@ -2546,14 +2577,16 @@ function renderScapegoat(){
          G.scapegoatVoters=null; G.scapegoatDay=null; G.pending.sg=null; proceed(); } },
        { t: T('X\u00e1c nh\u1eadn \u2192','Confirm \u2192'), off:!pick.length, on:() => { snap();
          G.scapegoatVoters=pick.slice(); G.scapegoatDay=G.day + 1; G.pending.sg=null;
-         log('The Scapegoat allows only ' + pick.map(i=>byId(i).name).join(', ') +
-             ' to vote on day ' + (G.day + 1) + '. The day after, everyone speaks again.');
+         log(T('V\u1eadt T\u1ebf Th\u1ea7n ch\u1ec9 cho ' + pick.map(i=>byId(i).name).join(', ') +
+               ' b\u1ecf phi\u1ebfu ng\u00e0y ' + (G.day + 1) + '. H\u00f4m sau c\u1ea3 l\u00e0ng l\u1ea1i \u0111\u01b0\u1ee3c n\u00f3i.',
+               'The Scapegoat allows only ' + pick.map(i=>byId(i).name).join(', ') +
+               ' to vote on day ' + (G.day + 1) + '. The day after, everyone speaks again.'));
          proceed(); } }]);
 }
 function toNight(){
   const w = checkWin(); if (w) return finish(w);
   G.night++; G.phase = 'night'; G.nightShotTaken = false; buildNight();
-  log('Night falls again.','Night ' + G.night);
+  log(T('\u0110\u00eam l\u1ea1i bu\u00f4ng xu\u1ed1ng.', 'Night falls again.'), T('\u0110\u00eam ','Night ') + G.night);
   render();
 }
 
@@ -2631,7 +2664,8 @@ function openRoster(){
         '<span class="ic">' + icOf(r.id) + '</span>' + rName(r) +
         '<span class="bd">' + (inDeck ? placed + '/' + G.counts[r.id] : 'off-deck') + '</span>');
       if (!full) b.onclick = () => { snap(); p.role = r.id; G.assignTo = null;
-        log(p.name + ' is the ' + r.name + '.'); autoFillLastCard(); openRoster(); };
+        log(T(p.name + ' l\u00e0 ' + rName(r) + '.', p.name + ' is the ' + r.name + '.'));
+        autoFillLastCard(); openRoster(); };
       c.appendChild(b);
     }
     B.appendChild(c);
