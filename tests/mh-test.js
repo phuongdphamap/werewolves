@@ -5,7 +5,10 @@ const fs = require('fs');
 const src = ['../index.html','../css/app.css','../js/app.js'].map(f => fs.readFileSync(f,'utf8')).join('\n');
 /* causeLabel() and unplacedWolfCards() speak the interface language now, so the harness
    supplies the two helpers they reach for. English, so the assertions below stay readable. */
-globalThis.T = (vi, en) => vi;      // the Vietnamese-first default, as shipped
+/* Switchable: most assertions below read the English so they stay legible, but the
+   card-naming one checks the Vietnamese-first default the app actually ships with. */
+globalThis.LANG = 'en';
+globalThis.T = (vi, en) => LANG === 'vi' ? vi : en;
 globalThis.rName = r => T(r.vi, r.name);
 
 function grab(name){
@@ -356,8 +359,11 @@ t('an unknown card is never treated as a werewolf', () => {
 t('and with a card loose the app names it rather than guessing', () => {
   mk(['fox','wolf','wolf']);
   G.players[2].role = null;
-  return (!wolfSideKnown() && /Ma Sói/.test(unplacedWolfCards()))
-    ? true : 'wolfSideKnown=' + wolfSideKnown() + ' names=' + unplacedWolfCards();
+  globalThis.LANG = 'vi';                       // the shipped default
+  const named = unplacedWolfCards();
+  globalThis.LANG = 'en';
+  return (!wolfSideKnown() && /Ma Sói/.test(named))
+    ? true : 'wolfSideKnown=' + wolfSideKnown() + ' names=' + named;
 });
 t('the Fox answer honours the moderator over the app', () => {
   mk(['fox','villager','villager']);
@@ -577,7 +583,8 @@ t('an unanswered card is recorded separately from a skipped action', () => {
 t('skipping the Bodyguard stops dawn calling itself certain', () => {
   mk(['guard','villager','wolf','wolf']);
   G.n.wolf = 'p1'; noteSkip('guard'); computeDawn();
-  return (G.dawnSure === false && /Bảo Vệ/.test(G.dawnGaps.join(' ')))
+  // the gap list names the card in the interface language
+  return (G.dawnSure === false && /Bodyguard|Bảo Vệ/.test(G.dawnGaps.join(' ')))
     ? true : 'sure=' + G.dawnSure + ' gaps=' + JSON.stringify(G.dawnGaps);
 });
 t('so does a card nobody would answer for', () => {

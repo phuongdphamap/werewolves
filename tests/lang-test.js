@@ -282,6 +282,48 @@ t('every bar button label is a T() pair, not a bare string', () => {
     ? true : bare.length + ' untranslated bar label(s): ' + bare.join(' // ');
 });
 
+/* The chronicle. Entries are rendered to a string at the moment they happen and never
+   re-rendered — which is only safe because a game cannot change language midway. */
+console.log('\nTHE CHRONICLE SPEAKS THE TABLE\u2019S LANGUAGE');
+t('every log entry goes through T()', () => {
+  const bad = [];
+  for (const m of code.matchAll(/(?<!function )\blog\(([\s\S]*?)\);/g)){
+    const arg = m[1];
+    if (/\bT\(/.test(arg)) continue;
+    if (/^\s*v\.why\s*$/.test(arg)) continue;      // already a T() pair where it is built
+    bad.push(code.slice(0, m.index).split('\n').length + ': ' + arg.trim().slice(0, 46));
+  }
+  return bad.length === 0
+    ? true : bad.length + ' untranslated log site(s) — ' + bad.slice(0, 3).join(' | ');
+});
+t('...and there are enough of them for that to mean something', () => {
+  const n = (code.match(/(?<!function )\blog\(/g) || []).length;
+  return n >= 40 ? true : 'only ' + n + ' log sites; the scan may have stopped matching';
+});
+t('the "when" column is translated too', () => {
+  const fn = (js.match(/function label\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  return /T\('[^']*', 'Night '\)/.test(fn) && /T\('[^']*', 'Setup'\)/.test(fn)
+    ? true : 'the chronicle\u2019s left column is English-only: ' + fn;
+});
+t('the win reason is a pair, since it is shown on the end screen as well', () => {
+  const fn = (js.match(/function checkWin\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  const returns = [...fn.matchAll(/return \{ who:([\s\S]{0,40})/g)].map(m => m[1]);
+  const bare = returns.filter(r => !/T\(/.test(r));
+  return returns.length >= 5 && bare.length === 0
+    ? true : bare.length + ' win condition(s) still English-only';
+});
+/* THIS is what licenses rendering at write time. The language chip lives on the deck
+   screen, which cannot be reached once the first night starts, so a chronicle can never
+   end up half in each language. Put a language control in the Roster and that stops being
+   true — so the placement is pinned, not assumed. */
+t('the language cannot be changed once a game is under way', () => {
+  const setters = [...js.matchAll(/setPref\('lang'/g)].length;
+  if (setters !== 1) return setters + ' places set the language; only the deck screen may';
+  const roles = (js.match(/function rRoles\(\)\{[\s\S]*?\n\}\n/) || [''])[0];
+  return /setPref\('lang'/.test(roles)
+    ? true : 'the language chooser moved off the setup screen, so the chronicle can now mix';
+});
+
 console.log('\nTHE TEACHING LAYER RETIRES ITSELF');
 t('the device counts games it has finished', () =>
   /const GAMES_KEY = 'mh\.games';/.test(js) && /function countGame\(\)\{/.test(js)
