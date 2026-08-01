@@ -166,7 +166,13 @@
      advice ended up with no spacing at all. */
   .stack > * + *{margin-top:var(--s4)}
   .stack > *{margin-bottom:0}
-  .stack:not(:empty) + .stack:not(:empty){margin-top:var(--s4)}
+  /* A stack that follows ANYTHING, not just another stack. The old rule paired stack with
+     stack, so #dealAlt — which sits after a plain <p> — was given nothing at all, and the
+     collapsible inside it rendered flush against the deal note while every other gap on
+     that screen was 20px. Its first child gets no `* + *` either, so there was nothing to
+     fall back on. Margins collapse, so a sibling that already carries a bottom margin
+     (.sub at 28) still wins and nothing compounds. */
+  * + .stack:not(:empty){margin-top:var(--s4)}
   section.on{display:block}
 
   /* THREE SURFACES, one job each.

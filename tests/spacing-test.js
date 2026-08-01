@@ -21,9 +21,34 @@ t('no id-based spacing selector survives', () =>
   !/#\w+ > \* \+ \*/.test(src) ? true : (src.match(/#\w+ > \* \+ \*/g)||[]).join(', '));
 t('children give up their own bottom margin, so gaps cannot double', () =>
   /\.stack > \*\{margin-bottom:0\}/.test(src) ? true : 'margins would compound to 34px');
-t('two adjacent stacks are spaced from each other', () =>
-  /\.stack:not\(:empty\) \+ \.stack:not\(:empty\)\{margin-top:var\(--s4\)\}/.test(src)
-    ? true : 'recBox would sit flush against advice');
+/* The pairing rule used to require BOTH siblings to be stacks, so #dealAlt — which
+   follows a plain <p> — was given nothing, and the collapsible inside it rendered flush
+   against the deal note while every other gap on that screen was 20px. Its first child
+   gets no `* + *` either, so there was nothing to fall back on. Reported from a
+   screenshot; measured at 0px before the fix. */
+t('a stack is spaced from whatever precedes it, not only from another stack', () => {
+  if (/\.stack:not\(:empty\) \+ \.stack:not\(:empty\)\{/.test(src))
+    return 'the rule still pairs stack with stack, so a stack after a <p> gets nothing';
+  return /\* \+ \.stack:not\(:empty\)\{margin-top:var\(--s4\)\}/.test(src)
+    ? true : 'nothing gives a following stack a top margin';
+});
+t('and an empty one still adds no stray gap', () =>
+  /\* \+ \.stack:not\(:empty\)\{/.test(src)
+    ? true : 'an empty #advice would push the page down');
+/* Every stack in the static markup, checked against what precedes it. The rule only helps
+   if the containers it is written for actually have a preceding sibling to be spaced from. */
+t('every stack in the markup either leads its section or has something to be spaced from', () => {
+  const ids = [...src.matchAll(/<div class="[^"]*\bstack\b[^"]*" id="(\w+)"/g)].map(m => m[1]);
+  if (ids.length < 8) return 'only found ' + ids.length + ' stacks in the markup';
+  // a stack whose previous sibling is a <p> or a <div> is exactly the case that was broken
+  const afterProse = ids.filter(id => {
+    const i = src.indexOf('id="' + id + '"');
+    const before = src.slice(Math.max(0, i - 400), i);
+    return /<p[^>]*>[\s\S]*?<\/p>\s*<div[^>]*$/.test(before);
+  });
+  return afterProse.length > 0
+    ? true : 'no stack follows prose any more; re-check whether this rule is still needed';
+});
 t('an empty container adds no stray gap', () =>
   /:not\(:empty\)/.test(src) ? true : 'an empty #advice would still push the page down');
 
@@ -31,6 +56,41 @@ t('an empty container adds no stray gap', () =>
    render functions so they could follow the interface language, and `$('pTtl').textContent
    = …` throws on a typo — taking the whole screen down, not just the label. The suites
    never execute a render, so nothing else here would notice. */
+/* The rhythm rules specifically — the gaps that decide how blocks sit relative to each
+   other. Component padding (a button's 11px 14px, an icon's 8px gap) is deliberately NOT
+   in scope: the scale governs the page, not every pixel inside a control. A mutation that
+   set the stack gap to 7px sailed past every other suite. */
+console.log('\nTHE BLOCK RHYTHM COMES FROM THE SPACING SCALE');
+const SCALE = ['s1','s2','s3','s4','s5','s6'];
+const rhythmRules = [
+  ['\\.stack > \\* \\+ \\*', 'the gap between siblings in a stack'],
+  ['\\* \\+ \\.stack:not\\(:empty\\)', 'the gap above a stack'],
+  ['\\.roles > \\.grp', 'the gap above a role-list heading'],
+  ['\\n  \\.grp', 'the group heading'],
+  ['\\n  \\.card', 'a card'],
+  ['\\.expBody', 'a collapsible body'],
+];
+for (const [sel, what] of rhythmRules){
+  t(what + ' is measured in scale steps', () => {
+    const r = (src.match(new RegExp(sel + '\\{[^}]*\\}')) || [''])[0];
+    if (!r) return 'rule missing for ' + sel;
+    const spacing = [...r.matchAll(/(?:margin|padding|gap)[a-z-]*:([^;}]+)/g)].map(m => m[1].trim());
+    if (!spacing.length) return true;                       // declares no spacing at all
+    const bare = spacing.filter(v => /\d+px/.test(v) && !/var\(--s\d\)/.test(v));
+    return bare.length === 0
+      ? true : 'off the scale: ' + bare.join(' | ') + '   in ' + r.replace(/\s+/g, ' ');
+  });
+}
+t('and every step the rhythm uses is one that exists', () => {
+  const used = new Set();
+  for (const [sel] of rhythmRules){
+    const r = (src.match(new RegExp(sel + '\\{[^}]*\\}')) || [''])[0];
+    for (const m of r.matchAll(/var\(--(s\d)\)/g)) used.add(m[1]);
+  }
+  const unknown = [...used].filter(k => !SCALE.includes(k));
+  return unknown.length === 0 ? true : 'undeclared step(s): ' + unknown.join(', ');
+});
+
 console.log('\nEVERY ELEMENT THE APP ADDRESSES EXISTS');
 t('no $() lookup is missing from the markup', () => {
   const ids = [...new Set([...js.matchAll(/\$\('(\w+)'\)/g)].map(m => m[1]))];

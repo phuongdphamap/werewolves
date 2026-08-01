@@ -444,8 +444,18 @@ Any container that renders a stack of blocks carries `class="stack"`:
 ```css
 .stack > * + *{margin-top:var(--s4)}
 .stack > *{margin-bottom:0}                 /* so gaps cannot compound */
-.stack:not(:empty) + .stack:not(:empty){margin-top:var(--s4)}
+* + .stack:not(:empty){margin-top:var(--s4)}
+.stack > .card,.stack > .alert,.stack > .exp{margin-bottom:0}   /* see B-71 */
 ```
+
+The third rule used to pair stack with stack, which left any stack following a plain
+paragraph with no gap at all (B-76). The fourth exists because `.stack > *` and `.card`
+are both a single class, so the reset was losing on source order (B-71). Both were
+invisible in the diff and found by measuring.
+
+The scale governs **block rhythm**, not every pixel: a button's `11px 14px` padding and an
+icon's `8px` gap are deliberately outside it. `spacing-test.js` checks the rhythm rules
+specifically — a mutation that set the stack gap to `7px` passed every other suite.
 
 There are **no id-based spacing selectors**. Three separate spacing bugs came from a
 hand-maintained id list I kept forgetting to extend (B-16). `#lRoles` is deliberately
@@ -616,6 +626,7 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-64 | The private night shot was **offered twice** on the empty path | Found by mutation testing, not by playing: the "nobody left to hit" route out of the private screen did not set `nightShotTaken`, so `registerDeaths` would queue the same shot again at dawn. The test that should have caught it asserted the flag was set *somewhere* in the function, which passed while a mutation deleted the main one and left the escape hatch. It now requires every `if (priv)` route to mark it. |
 | B-60 | The app never said whether to **open a dead player's card** | Asked at a table: "when the Hunter is bitten by werewolves or voted, when will he open the card or not?" The app was silent on the cards at every death — dawn announced a name and a cause, the vote moved straight on, and the Hunter screen went to the target list. Meanwhile the Devoted Servant shipped with a description defining her window as "before an eliminated player's card is revealed", presupposing a step that did not exist anywhere. Miller's Hollow reveals every elimination, night or day, with no exception; Vietnamese tables commonly do not. So: a fourth house rule, and the instruction stated at all three moments a death becomes public — the dawn announcement, the vote verdict (before the button, since tapping it moves the screen on), and the Hunter screen. The Village Idiot overrides the setting: being shown is HOW the village learns to spare him. |
 | B-74 | The long prose ignored the language switch entirely | Reported from screenshots: an English interface serving Vietnamese essays. The `.tell` sweep in v6 covered the short blocks but not the four collapsible bodies, the ruleset gloss (`Miller’s Hollow (bản gốc)` in both directions), or **role descriptions** — which the night call puts under every heading and the deck list puts in every row, so a Vietnamese moderator read an English paragraph on every single step. The `order` explainer was the worst shape: it chose its text by *ruleset*, so the language you got depended on which rules you were playing. Content per ruleset, language per `T()` — four texts, not two. All 26 cards now carry a `dVi`, reached through one `rDesc()` accessor that falls back to the English rather than to nothing. |
+| B-76 | A stack that followed prose got **no gap at all** | Reported from a screenshot: the "Which route should I take?" collapsible sat flush against the deal note. The structural rule paired stack with stack — `.stack:not(:empty) + .stack:not(:empty)` — so `#dealAlt`, whose previous sibling is a plain `<p>`, was given nothing, and its first child gets no `* + *` either. Measured at **0px** where every other gap on that screen was 20. Generalised to `* + .stack:not(:empty)`; margins collapse, so a neighbour with its own bottom margin (`.sub` at 28) still wins and nothing compounds. |
 | B-75 | A collapsible body was **padded unevenly** | `14px 20px 20px`, so the prose sat visibly nearer the divider above it than the border below. Spotted in a screenshot, confirmed by measuring. The summary keeps its own 14/20 because it is a row; a body is a panel, and a panel is padded like `.card`. |
 | B-73 | The vote tallies could **sum past the electorate** | Reported from a game: nine players, five votes recorded on one name and nine on another — fourteen hands from nine people, and a leader the table never produced. Each box was clamped to `voters.length` **on its own**, with nothing bounding the total. The over-count warning fired but only warned; the vote still carried on impossible arithmetic. The cap is now what is *left*: `voters.length` minus the hands already on other names. It never falls below what a name already holds, so a tally that is somehow over — a resumed save, an electorate that shrank mid-count — can still be corrected downwards instead of every box locking to zero. |
 | B-72 | The day vote required an **absolute majority**, which neither rulebook prints | Asked at a table: should the most votes hang, or must it clear half? Both boxes say the most votes — *"the player with the most fingers pointing at them is convicted"* — with a re-vote on a tie and nobody hanged if it holds. Vietnamese play agrees: người nhiều phiếu nhất bị treo. The app demanded `best > TP/2`, and that is not a harmless stricter reading: on eight voters a decisive **4/3/1** split offered the moderator no Hang button at all, while the bar asked for a fifth vote that did not exist. The bigger the table the more the votes spread, so it got worse exactly as it mattered more — and it applied to every day phase of every game. Now plurality by default, with the majority available as a house rule. |
@@ -709,7 +720,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   885 assertions across 30 suites, 0 failing
+#   894 assertions across 30 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -741,7 +752,7 @@ The suites read `../index.html`, so they test the **deployable file** — not a 
 | `tips-test.js` | 14 | the teaching predicate, **executed** at 0/1/2/10 games |
 | `shuffle-test.js` | — | **57,000 shuffles**, asserting every deck is legal |
 
-**885 assertions plus 57,000 generated decks.**
+**894 assertions plus 57,000 generated decks.**
 
 ### Tests worth keeping
 
