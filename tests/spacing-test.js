@@ -238,33 +238,36 @@ t('inside a stack that margin is zeroed, so it is 20px not 34px', () =>
 /* Two mechanisms for one gap. .card, .alert and .exp each declare a margin-bottom that
    only ever applies OUTSIDE a stack, which is how nineteen type sizes started: a value
    that is right half the time and invisible the other half. The stack owns the gap. */
-t('components inside a stack surrender their own bottom margin', () => {
-  const r = (src.match(/\.stack > \.card,\.stack > \.alert,\.stack > \.exp\{[^}]*\}/) || [''])[0];
-  return /margin-bottom:0/.test(r)
-    ? true : 'a container gap and a component margin both apply: ' + (r || 'rule missing');
+t('the stack out-specifies any single component class', () => {
+  const generic = (src.match(/\n  (\.stack[\w.]*) > \* \+ \*\{margin-top:var\(--s4\)\}/) || [])[1];
+  if (!generic) return 'the uniform-gap rule is gone';
+  const classes = (generic.match(/\.[\w-]+/g) || []).length;
+  return classes >= 2
+    ? true : generic + ' is one class, so any later component class beats it on source order';
 });
-t('and every component the app appends is covered by that reset', () => {
-  /* Only classes the app CONSTRUCTS can end up as a stack child; .tally, .barnote and the
-     reveal's parts are static markup that never lives in one, so they keep their own gap
-     legitimately. */
-  const own = [...src.matchAll(/\n  \.(\w+)\{[^}]*margin-bottom:var\(--s\d\)[^}]*\}/g)].map(m => m[1]);
-  const built = own.filter(c =>
-    new RegExp("el\\('div','" + c + "\\b").test(js) || new RegExp("className = '" + c + "'").test(js));
-  const reset = (src.match(/\.stack > \.card,\.stack > \.alert,\.stack > \.exp\{[^}]*\}/) || [''])[0];
-  const missing = built.filter(c => !reset.includes('.' + c));
-  return built.length > 0 && missing.length === 0
-    ? true : 'appended into stacks but not reset: ' + (missing.join(', ') || '(found none to check)');
+t('and so does the bottom-margin reset', () => {
+  const r = (src.match(/\n  (\.stack[\w.]*) > \*\{margin-bottom:0\}/) || [])[1];
+  return r && (r.match(/\.[\w-]+/g) || []).length >= 2
+    ? true : 'the reset is back to a single class: ' + (r || 'missing');
 });
-/* Why the higher-specificity reset is needed at all: `.stack > *` and `.card` are both a
-   single class, so the cascade falls through to source order — and .card is declared
-   later. The generic rule has been losing this fight since it was written. */
-t('the generic rule alone would lose to the component', () => {
-  const iGeneric = src.indexOf('.stack > *{margin-bottom:0}');
-  const iCard = src.search(/\n  \.card\{/);
-  const iReset = src.indexOf('.stack > .card,.stack > .alert,.stack > .exp');
-  if (iGeneric < 0 || iCard < 0) return 'one of the two rules is missing';
-  return iCard > iGeneric && iReset > -1
-    ? true : 'the reset is gone, and .card would out-order the generic rule';
+/* The point of the specificity bump: no per-component list can go stale, because there is
+   no list. Any class the app appends into a stack is covered by the generic rule. */
+t('no component needs naming individually any more', () => {
+  const named = src.match(/\.stack[\w.]* > \.\w+(,\.stack[\w.]* > \.\w+)+\{margin-bottom:0\}/);
+  return !named
+    ? true : 'a hand-maintained list of components is back: ' + named[0];
+});
+/* The one gap in a stack that is deliberately not --s4, stated as a rule instead of won
+   by source order. A section label opens a section and hugs what it labels. */
+t('the section label keeps its own rhythm, declared explicitly', () => {
+  const r = (src.match(/\.stack[\w.]* > \.grp\{[^}]*\}/) || [''])[0];
+  if (!/margin-top:var\(--s6\)/.test(r))
+    return 'the .grp rhythm is back to whatever the cascade decides: ' + (r || 'missing');
+  /* And no bottom margin, which would be dead: the next child carries margin-top 20 and
+     adjacent margins collapse to the larger. Measured, a .grp declaring 14 under it still
+     rendered a 20px gap. */
+  return !/margin-bottom/.test(r)
+    ? true : 'a bottom margin here is collapsed away by the next child: ' + r;
 });
 
 /* A collapsible's body holds one of two things: prose, which it spaces itself, or a
