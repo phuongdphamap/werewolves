@@ -706,6 +706,12 @@ Every bug found, with its root cause. Grouped by class, because the classes repe
 | B-85 | The button that hangs a player **truncated the player** | Same review. `Treo cổ {name} →` needed 208px of the 116 the bar offers at 320, so `.bar .in .btn`'s ellipsis cut the identity off the control that commits the elimination — worse in Vietnamese than in English, which is how it survived a review in English. The name moved to the bar note directly above, which is full width. |
 | B-86 | Every button in the bar truncated at 320, including the primary | Found while verifying B-85: with the name off it, the day's two buttons still needed 291px of a 276px row, so `Treo cổ →` lost six pixels and `Xoá phiếu, bầu lại` nine. `.bar .in` was `nowrap` by an explicit early decision — "a long label must never break the row: it truncates instead" — which answers a one-button overflow and not a crowded row. It wraps now; truncation is the last resort for a single label too long for a whole line. `measureBar()` reads `offsetHeight`, so the clearance followed for free. |
 | B-87 | The Roster header sat **28px from its subtitle** where every page header sits 10 | Asked after a deploy: is the Roster header the same size as the main page? It was — 21px/600/Lora from the shared `h2` rule, no override, and the subtitle matched too. The difference was spacing. The Roster h2 is the one heading that cannot use the `h2` margin: it shares a flex row with the sound, haptic and close buttons, so it carries `margin:0` and the row spaces it. The row had picked `--s4`. It spends `--s2` now — the token the h2 gives up — and `heading-test` checks the two stay equal. A question about font size that turned out to be about the thing next to it. |
+| B-88 | One night screen set prose at **four different left edges**, three within five pixels | Design review v8, confirmed by measuring the x of each block's first glyph on the Witch's call at 390: `.sub` and `.grp` at 25.3, `.tell` (and the `.note` nested in it) at 43.3, `.exp` at 46.3, `.say` at 48.3. A five-pixel difference is too small to read as a deliberate indent and too large to read as alignment, so the column read as slightly out of true with nothing to point at. Two axes now: the gutter, and one container inset of "1px border + `--s4`" which `.exp` already used. `.tell` hangs its dot in the margin; `.say` trades its 3px left border for an inset bar. Measured after: two edges, 25 and 46, at all five widths. |
+| B-89 | `.stack`'s uniform gap was **overridden by four of the components it spaces** | Same review. `.stack > * + *` and `.stack > *` are both (0,1,0), every component class is (0,1,0), and four are declared later in the file, so they won on source order alone — `.say` kept `margin:0 0 28`, `.tell`/`.note`/`.why` kept `margin-top:10`, `.grp` kept 38/14. Measured down the dawn screen the gaps were 14, 28, 20, 38, 38, 20 where the comment promises one value. Doubling the class (`.stack.stack`) puts layout above components outright. Same failure as the `.group` separators (B-70), one layer up. |
+| B-90 | Six row heights, **three of them inside a five-pixel band** | Same review: 44, 47, 49, 51, 52, 60, 72 as painted, each reached by a different route — padding plus line-height here, a `min-height` there — so no two lists shared a vertical rhythm. Three named tokens now (`--row-sm` 44, `--row` 52, `--row-lg` 72) with padding derived from them. Note `.btn.sec` carries a 1px border the primary does not, so 15px padding made it 53 against the primary's 52; the padding is `--s3` so both land on 52. |
+| B-91 | The type scale got named steps; **the leading never did** | Same review. Nine line-heights, four of them (1.5, 1.55, 1.6, 1.65) inside a 0.15 spread carrying almost all the prose — at 13px that is 19.5 against 20.15 against 20.8 against 21.45, half-pixel differences that are invisible one at a time and collectively mean no two prose blocks share a baseline. Four tokens now, and the no-bare-font-size rule extended to leading. A mutation showed the first version of the test could not see a *fifth* token being added, which is exactly how the prose would re-split; the count is asserted. |
+| B-92 | The read-aloud block was **rounded like a text input** | Same review. `.say` is 238px tall with 20px padding and sits above an `.exp` panel of the same width rounded at 16 — but carried `--r-ctl`, filing the one element the whole design privileges with the fields. `--r-grp` now. The 3px left rule fought the 16px curve, which is what made the accent an inset bar, which in turn settled its text inset in B-88. |
+| B-93 | The gutter landed on a **fraction of a pixel at four widths out of five** | Same review. `clamp(22px, 6.5vw, 34px)` resolves to 22, 23.4, 25.35, 26.91, 27.95 at 320/360/390/414/430 — only the clamped floor is whole. Every left edge in the app is built off this one value, so all of them sat on fractional coordinates and every vertical hairline and letter stem was laid across two device pixels. `round(6.5vw, 1px)` behind an `@supports`, since round() is Baseline only since May 2024 and the plain clamp is the correct fallback. |
 
 ### Security
 
@@ -747,7 +753,7 @@ icons/                  favicon, touch icon, PWA icons
 fonts/                  Be Vietnam Pro + Lora, latin & vietnamese woff2 subsets
 tests/
   run-all.sh            tests/run-all.sh
-  *-test.js             30 suites, no dependencies beyond node
+  *-test.js             31 suites, no dependencies beyond node
 docs/
   KNOWLEDGE.md          this file
   CONTRIBUTING.md       how to work on it
@@ -757,7 +763,7 @@ README.md  LICENSE      kept at the root: GitHub reads both from there
 
 ```bash
 bash tests/run-all.sh
-#   916 assertions across 30 suites, 0 failing
+#   960 assertions across 31 suites, 0 failing
 ```
 
 The suites read `../index.html`, so they test the **deployable file** — not a copy.
@@ -1074,6 +1080,29 @@ Earned the hard way. Each of these prevented or would have prevented a real bug.
     and it silently became the answer to *two* labels crowding each other, which it answers
     badly: it truncated both instead of one. When a constraint has a stated reason, check the
     case in front of you is actually that reason before letting it decide.
+
+44. **A declared system is a claim about the source; only a measurement is a claim about
+    the screen.** Every one of B-88 to B-93 was invisible in the stylesheet and obvious in
+    the render, and in each case the rule that should have won was beaten by a later rule
+    of equal weight. Reading a file in order does not reveal source order, because source
+    order is not a thing you can see — it is the absence of a thing. When a comment states
+    an invariant ("children surrender their own bottom margins"), the comment is a
+    hypothesis until something measures it.
+
+45. **A flat single-class architecture makes source order the tie-breaker for everything.**
+    That is the root cause under B-70, B-79, B-83 and now B-89: three separate bugs, one
+    shape. The targeted fix is to double the class on the rule that must win; the lasting
+    fix is a layer (`@layer components, layout`) or a naming convention that puts layout
+    structurally above components so the tie stops being a tie. Not done here — it touches
+    every rule in the file — but it is the direction, and each new instance is a reason to
+    take it seriously rather than double another class.
+
+46. **A test that pins a workaround will outlive the reason for it.** Three assertions
+    required a hand-maintained list of components to be reset inside a stack. The list
+    existed only because the generic rule lost on specificity; once the generic rule won,
+    the assertions were still green and still demanding the workaround. Re-pointed to the
+    stronger invariant — not "every component we listed is reset" but "no component can
+    need listing".
 
 ---
 

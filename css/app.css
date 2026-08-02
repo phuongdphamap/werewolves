@@ -77,11 +77,29 @@
        out from under the moderator's thumb. maximum-scale would silence that by taking
        pinch-zoom from everyone; this costs one pixel on two controls instead. */
     --t-field:16px;   /* any input the user can focus. Never lower this. */
+    /* FOUR LEADINGS, same argument as the type scale one step down. There were nine
+       values — 1, 1.1, 1.25, 1.35, 1.4, 1.5, 1.55, 1.6, 1.65 — and four of them sat
+       inside a 0.15 spread while carrying almost all the prose. At 13px that is 19.5
+       against 20.15 against 20.8 against 21.45: differences of half a pixel, invisible
+       one at a time, and collectively the reason no two blocks of prose on a screen
+       shared a baseline. Nothing may declare a bare line-height either. */
+    --lh-flat:1;      /* a glyph centred in a control, where the box sets the height */
+    --lh-tight:1.25;  /* display sizes, and a name allowed to wrap */
+    --lh-ui:1.4;      /* headings and single-line controls */
+    --lh-read:1.6;    /* every block of prose */
     /* THREE RADII, tied to what they round. There were seven (5, 9, 10, 11, 12, 14, 999)
        with no rule connecting a radius to the size of the thing it wrapped. */
     --r-ctl:10px;     /* rows, controls, fields */
     --r-grp:16px;     /* grouped containers */
     --r-full:999px;   /* chips and tags */
+    /* THREE ROW HEIGHTS, for the same reason as the radii above. Measured as painted the
+       app had 44, 47, 49, 51, 52, 60 and 72 — three of them inside a five-pixel band, each
+       arrived at by a different route (padding plus line-height here, a min-height there),
+       so no two lists shared a vertical rhythm. These are the heights; padding derives
+       from them rather than the height emerging from whatever padding looked right. */
+    --row-sm:44px;    /* a control: chip, icon button. Also the touch-target floor. */
+    --row:52px;       /* a list row */
+    --row-lg:72px;    /* a row that contains a control */
     /* One horizontal gutter for the whole app: comfortable on a phone, generous
        on anything wider. Everything that spans the width uses this, so the
        header, the content and the button bar all line up exactly. */
@@ -93,8 +111,17 @@
        env(safe-area-inset-bottom) since the inset fix, up to 34px on a notched iPhone, and
        a flat 152px left the first paint short by exactly that much. */
     --barh-guess:calc(152px + env(safe-area-inset-bottom));
+    /* Rounded, because 6.5vw resolves to 23.4, 25.35, 26.91 and 27.95 at the four common
+       widths above the clamp floor — and every left edge in the app is built off this one
+       value, so all of them landed on a fractional coordinate and every vertical hairline
+       and letter stem was laid down across two device pixels. round() is Baseline since
+       May 2024; the plain clamp stays as the fallback for anything older, which is exactly
+       today's behaviour. */
     --pad:clamp(22px, 6.5vw, 34px);
     --col:500px;
+  }
+  @supports (width: round(1px, 1px)){
+    :root{ --pad:clamp(22px, round(6.5vw, 1px), 34px) }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* The UA stylesheet's [hidden]{display:none} is in the user-agent origin, so ANY author
@@ -104,7 +131,7 @@
      bordered box with nothing in it. Reported from a phone. */
   [hidden]{display:none !important}
   html,body{margin:0;min-height:100%}
-  body{background:var(--bg);color:var(--txt);font-family:var(--ui);font-size:var(--t-body);line-height:1.55;
+  body{background:var(--bg);color:var(--txt);font-family:var(--ui);font-size:var(--t-body);line-height:var(--lh-read);
     -webkit-text-size-adjust:100%;overscroll-behavior-y:contain}
   body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
     background:radial-gradient(90% 55% at 50% -8%, rgba(232,223,200,.09), transparent 62%),
@@ -140,7 +167,7 @@
      both the smallest control on the screen and the quietest. */
   .ico{background:none;border:1px solid var(--line);color:var(--txt70);border-radius:var(--r-ctl);
     font:inherit;font-size:var(--t-cap);font-weight:600;padding:9px 13px;cursor:pointer;white-space:nowrap;
-    min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+    min-height:var(--row-sm);display:inline-flex;align-items:center;justify-content:center}
   .ico:hover{border-color:var(--line2);color:var(--txt)}
   /* Same gap as .chip had, found by the test that went looking for the others: .ico had
      only :hover. The Sheriff's badge in a vote row is one of these, and it is tapped
@@ -152,12 +179,12 @@
   .ico.quiet:hover,.ico.quiet:focus-visible{border-color:var(--line2);color:var(--txt)}
   .ico.on{color:var(--moon);border-color:var(--moon);background:rgba(232,223,200,.10)}
 
-  h2{font-family:var(--disp);font-weight:600;font-size:var(--t-say);line-height:1.35;
+  h2{font-family:var(--disp);font-weight:600;font-size:var(--t-say);line-height:var(--lh-ui);
     margin:var(--s2) 0 var(--s2);letter-spacing:0}
   /* On a night call the role name is what the moderator already knows; the sentence
      below it is what they have to say. The heading yields so the line can lead. */
   #nTitle{font-size:var(--t-lg)}
-  .sub{color:var(--txt2);font-size:var(--t-small);margin:0 0 var(--s5);line-height:1.6}
+  .sub{color:var(--txt2);font-size:var(--t-small);margin:0 0 var(--s5);line-height:var(--lh-read)}
   section{display:none;flex:1;padding-top:var(--s2)}
   /* Every screen change used to be a cut: phases swap by toggling display, so nothing
      told the moderator whether they had moved forward or into something temporary.
@@ -171,8 +198,24 @@
      bottom margins so the two mechanisms cannot compound. Adding a new container
      no longer means remembering to extend a selector, which is how recBox and
      advice ended up with no spacing at all. */
-  .stack > * + *{margin-top:var(--s4)}
-  .stack > *{margin-bottom:0}
+  /* .stack.stack, not .stack — and the doubled class is the whole fix. Both rules were
+     (0,1,0), every component class is (0,1,0), and four components are declared later in
+     the file, so they won on source order alone: .say kept margin 0 0 28, .tell and .note
+     and .why kept margin-top 10, .grp kept 38 and 14. Measured down the dawn screen the
+     gaps were 14, 28, 20, 38, 38, 20 where the comment above promises one value. Reading
+     the file in order does not reveal this, because order is not something you can see —
+     it is the same failure the .group separators had, one layer up.
+     Doubling the class costs nothing and puts layout above components for good. */
+  .stack.stack > * + *{margin-top:var(--s4)}
+  .stack.stack > *{margin-bottom:0}
+  /* The one deliberate exception, now stated instead of won by accident. .grp is a section
+     label, so it opens a section and takes more air above it than a sibling block gets.
+     Only the top margin: a bottom margin here is dead, because the next child carries
+     margin-top:20 and adjacent margins collapse to the larger of the two. The bond to what
+     it labels is carried by the contrast, 38 above against 20 below. Everything else in a
+     stack is 20. */
+  .stack.stack > .grp{margin-top:var(--s6)}
+  .stack.stack > .grp:first-child{margin-top:0}
   /* A stack that follows ANYTHING, not just another stack. The old rule paired stack with
      stack, so #dealAlt — which sits after a plain <p> — was given nothing at all, and the
      collapsible inside it rendered flush against the deal note while every other gap on
@@ -193,9 +236,6 @@
      no reason to start anywhere. .card survives only for a genuine panel of controls. */
   .card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r-grp);
     padding:var(--s4);margin-bottom:var(--s3)}
-  /* Inside a stack the container owns the gap, so these give theirs up rather than
-     declaring a second one that only applies half the time. */
-  .stack > .card,.stack > .alert,.stack > .exp{margin-bottom:0}
   .card.tight{padding:var(--s3) var(--s3)}
   .group{background:var(--surf);border:1px solid var(--line);border-radius:var(--r-grp);
     overflow:hidden}
@@ -215,18 +255,30 @@
   .group > .p:not(:first-child),
   .group > .r:not(:first-child),
   .group > .dl:not(:first-child){border-top:1px solid var(--line)}
-  .say{background:linear-gradient(160deg,#241E37,#1A1628);border:1px solid var(--line2);
-    border-left:3px solid var(--moon);border-radius:var(--r-ctl);
-    padding:var(--s4);margin:0 0 var(--s5)}
+  /* --r-grp, because .say is a container: 238px tall with 20px of padding, and on the
+     Witch's step it sits four blocks above an .exp panel of the same width rounded at 16.
+     It had --r-ctl, which files the one block the whole design privileges with the text
+     inputs.
+     The accent is an inset bar rather than a left border for two reasons. A 3px straight
+     rule meeting a 16px curve is the one place this geometry fights; and as a border it
+     pushed the text to 48.3 while the .exp beside it sat at 46.3 — a two-pixel difference,
+     which is too small to read as an indent and too large to read as alignment. With a
+     uniform 1px border the text lands on 46.3 with everything else set inside a
+     container. overflow:hidden lets the radius clip the bar to the corner. */
+  .say{position:relative;overflow:hidden;
+    background:linear-gradient(160deg,#241E37,#1A1628);border:1px solid var(--line2);
+    border-radius:var(--r-grp);padding:var(--s4);margin:0 0 var(--s5)}
+  .say::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--moon)}
   .say .lbl{font-size:var(--t-micro);font-weight:700;letter-spacing:.17em;text-transform:uppercase;
     color:var(--micro);margin-bottom:var(--s1)}
   /* The sentence being spoken is the largest thing on the screen. It used to be third,
      behind a heading the moderator already knows — read in the dark at arm's length,
      that is the wrong order. */
-  .say p{margin:0;font-family:var(--disp);font-weight:500;font-size:var(--t-say);line-height:1.6;color:var(--moon)}
+  .say p{margin:0;font-family:var(--disp);font-weight:500;font-size:var(--t-say);line-height:var(--lh-read);color:var(--moon)}
   /* One language at a time during a night call. The other is one tap away. */
   .say .alt{display:none;margin-top:var(--s2);font-family:var(--ui);font-size:var(--t-small);
-    line-height:1.55;color:var(--txt2)}
+    line-height:var(--lh-read);color:var(--txt2)}
   .say .alt.on{display:block}
   /* A block that leads INTO the read-aloud line rather than following it. A .stack like
      every other container the app appends into \u2014 so a second block cannot ship unspaced \u2014
@@ -240,7 +292,7 @@
      the border away from the word it underlines, which is the whole affordance. */
   .altBtn::after{content:"";position:absolute;left:-8px;right:-8px;top:50%;height:44px;
     transform:translateY(-50%)}
-  .note{font-size:var(--t-small);color:var(--txt2);line-height:1.6;margin:var(--s2) 0 0}
+  .note{font-size:var(--t-small);color:var(--txt2);line-height:var(--lh-read);margin:var(--s2) 0 0}
   .note b{color:var(--txt70)}
   /* Ordinary prose with a small leading mark, for the twenty-odd things that used to be
      tinted alerts. .alert is the highest-contrast object in the design and it was carrying
@@ -250,9 +302,13 @@
      the moderator and everything else is set as text and trusted to be read.
      The dot is the only tinted part of .ok: it keeps the at-a-glance "this is fine"
      without giving a whole block the loudest treatment in the app. */
-  .tell{font-size:var(--t-small);color:var(--txt2);line-height:1.6;margin:var(--s2) 0 0;
-    padding-left:18px;position:relative}
-  .tell::before{content:"";position:absolute;left:2px;top:.6em;width:5px;height:5px;
+  /* The dot hangs in the gutter so the prose starts at the gutter, level with .sub and
+     .grp above it. It used to inset the text 18px, which put .tell at 43.3 against .exp at
+     46.3 and .say at 48.3 — three prose blocks in one column, three left edges, all within
+     five pixels of each other. A hanging mark is what a margin is for. */
+  .tell{font-size:var(--t-small);color:var(--txt2);line-height:var(--lh-read);margin:var(--s2) 0 0;
+    position:relative}
+  .tell::before{content:"";position:absolute;left:-13px;top:.6em;width:5px;height:5px;
     border-radius:50%;background:var(--micro)}
   .tell.ok::before{background:var(--vil)}
   .tell b{color:var(--txt70)}
@@ -266,7 +322,7 @@
   .why{margin:var(--s2) 0 0}
   .why .k{font-size:var(--t-micro);font-weight:700;letter-spacing:.16em;text-transform:uppercase;
     color:var(--micro);margin-bottom:var(--s2)}
-  .why > p{font-size:var(--t-small);line-height:1.6;color:var(--txt70);margin:5px 0 0}
+  .why > p{font-size:var(--t-small);line-height:var(--lh-read);color:var(--txt70);margin:5px 0 0}
 
   .row{display:flex;gap:var(--s2);align-items:center}
   /* Two buttons side by side need a ROW, not two stack children. A bare .btn is
@@ -289,7 +345,7 @@
   input[type=text]:focus{outline:none;border-color:var(--line2)}
   .btn{background:var(--moon);color:#171320;border:0;border-radius:var(--r-ctl);font-family:var(--ui);
     font-size:var(--ctl-size);font-weight:var(--ctl-weight);letter-spacing:var(--ctl-track);
-    padding:15px 18px;cursor:pointer}
+    line-height:var(--lh-ui);padding:var(--s3) 18px;min-height:var(--row);cursor:pointer}
   .btn{transition:filter .15s, background .15s, border-color .15s, transform .06s}
   .btn:hover:not(:disabled){filter:brightness(1.06)}
   .btn:active:not(:disabled){filter:brightness(.95);transform:translateY(1px)}
@@ -299,7 +355,7 @@
   .btn:disabled{opacity:.3;cursor:default}
   .btn.sec{background:none;border:1px solid var(--line2);color:var(--txt)}
   .btn.wide{width:100%}
-  .btn.sm{padding:11px 14px;font-size:var(--t-small);border-radius:var(--r-ctl)}
+  .btn.sm{padding:10px 14px;font-size:var(--t-small);border-radius:var(--r-ctl);min-height:var(--row-sm)}
   .btn.sec.on{border-color:var(--moon);color:var(--moon);background:rgba(232,223,200,.10)}
 
   .chips{display:flex;flex-wrap:wrap;gap:var(--s2)}
@@ -309,10 +365,14 @@
      House rules highlight looking darker than Rules order; the backgrounds were always the
      same, it was the text. Same shape as the .expBody p bug: a container's prose styling
      reaching into a component nested inside it. */
+  /* Padding derived from --row-sm rather than the other way round: 10 + 21 (15px at
+     --lh-ui) + 10 + 2 borders is 43, so the min-height is what sets the box and every chip
+     is exactly 44. It used to compute to 47.3 and sit three pixels off every icon button
+     beside it. */
   .chip{display:flex;align-items:center;gap:8px;background:var(--surf2);border:1px solid var(--line);
-    border-radius:var(--r-full);padding:11px 16px;font-size:var(--t-body);font-weight:500;
-    color:var(--txt);cursor:pointer;
-    min-height:44px;transition:border-color .15s,background .15s;touch-action:manipulation}
+    border-radius:var(--r-full);padding:10px 16px;font-size:var(--t-body);font-weight:500;
+    line-height:var(--lh-ui);color:var(--txt);cursor:pointer;
+    min-height:var(--row-sm);transition:border-color .15s,background .15s;touch-action:manipulation}
   .chip:hover{border-color:var(--line2)}
   /* The most-tapped control in the app — every night target, every card set, every house
      rule — and it had only :hover, which a phone never fires. So nothing acknowledged the
@@ -359,7 +419,7 @@
      flex column for the cases that still want one. */
   .ros{display:flex;flex-direction:column}
   .p{display:flex;align-items:center;gap:var(--s2);background:var(--surf);border:1px solid var(--line);
-    border-radius:var(--r-ctl);padding:13px var(--s3);min-height:52px}
+    border-radius:var(--r-ctl);padding:13px var(--s3);min-height:var(--row)}
   .p.dead{opacity:.44}
   .p .nm{flex:1;min-width:0;font-weight:600;font-size:var(--t-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .p.dead .nm{text-decoration:line-through}
@@ -382,7 +442,7 @@
 
   .roles{display:flex;flex-direction:column;gap:var(--s3)}
   .r{display:flex;align-items:center;gap:var(--s2);background:var(--surf);border:1px solid var(--line);
-    border-radius:var(--r-ctl);padding:var(--s3) var(--s3);min-height:60px}
+    border-radius:var(--r-ctl);padding:var(--s3) var(--s3);min-height:var(--row)}
   .r.act{border-color:var(--line2);background:var(--surf2)}
   /* which box a card comes from, readable without reading the heading */
   .r.off{opacity:.48}
@@ -407,7 +467,7 @@
   .r .rn{font-weight:600;font-size:var(--t-body);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   /* Vietnamese needs room for stacked diacritics — ả ệ ườ lose them below 13px. */
   .r .rn .vi{font-weight:500;font-size:var(--t-small);color:var(--txt2)}
-  .r .rd{font-size:var(--t-small);color:var(--txt2);margin-top:4px;line-height:1.5;
+  .r .rd{font-size:var(--t-small);color:var(--txt2);margin-top:4px;line-height:var(--lh-read);
     display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .r.open .rd{-webkit-line-clamp:unset}
   /* Counting the vote. Nine identical rows of "− [ ] +" gave the moderator no answer
@@ -439,7 +499,7 @@
      read out loud. So here the name wraps instead of yielding. It costs height only when it
      needs it: the stepper already makes the row 72px, which is two lines free. */
   .p.vote .nm{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;
-    line-height:1.25}
+    line-height:var(--lh-tight)}
   /* The word "carries" used to live here, 54px of nowrap on a row whose whole content box
      is 246px at 320. With .stp at 142, the seat at 22 and three gaps at 30, that was the
      entire budget before the name was considered — and .nm is the only child that can
@@ -455,7 +515,7 @@
   /* The threshold used to sit in a card above the list and scroll away exactly when
      the count got interesting. It lives in the bar now, so it cannot leave. */
   .barnote{font-size:var(--t-small);color:var(--txt2);text-align:center;margin-bottom:var(--s2);
-    line-height:1.4}
+    line-height:var(--lh-ui)}
   .barnote b{color:var(--txt);font-variant-numeric:tabular-nums}
   .barnote .hit{color:var(--wolf)}
   /* 2px of gap, not 6. The buttons went from 36 to 44 to clear the touch minimum and the
@@ -464,7 +524,7 @@
   /* 44, not 36. This is the vote stepper: tapped dozens of times per day phase, while
      counting aloud, in the dark. The row does not grow — .p is already 52px tall. */
   .stp button{width:44px;height:44px;border-radius:var(--r-ctl);background:var(--surf2);border:1px solid var(--line);
-    color:var(--txt);font:inherit;font-size:var(--t-lg);font-weight:600;cursor:pointer;line-height:1}
+    color:var(--txt);font:inherit;font-size:var(--t-lg);font-weight:600;cursor:pointer;line-height:var(--lh-flat)}
   .stp button{transition:background .15s, border-color .15s, color .15s}
   .stp button:hover:not(:disabled){background:rgba(232,223,200,.12);border-color:var(--moon);color:var(--moon)}
   .stp button:active:not(:disabled){background:rgba(232,223,200,.2)}
@@ -484,14 +544,14 @@
   .tally{display:flex;gap:var(--s2);margin-bottom:var(--s4)}
   .tl{flex:1;background:var(--surf);border:1px solid var(--line);border-radius:var(--r-ctl);
     padding:var(--s3) var(--s2);text-align:center}
-  .tl .v{font-family:var(--disp);font-size:var(--t-say);font-weight:600;line-height:1.1}
+  .tl .v{font-family:var(--disp);font-size:var(--t-say);font-weight:600;line-height:var(--lh-flat)}
   .tl .k{font-size:var(--t-micro);font-weight:700;letter-spacing:.13em;text-transform:uppercase;
     color:var(--micro);margin-top:5px}
   .tl.bad .v{color:var(--wolf)}
 
   /* Reserved. Only what genuinely stops the moderator gets a tint: .no for a rule that
      blocks the next action, and the Bear Tamer's growl. Everything else is .tell. */
-  .alert{border-radius:var(--r-ctl);padding:var(--s3) var(--s3);font-size:var(--t-small);line-height:1.55;
+  .alert{border-radius:var(--r-ctl);padding:var(--s3) var(--s3);font-size:var(--t-small);line-height:var(--lh-read);
     margin-bottom:var(--s2);border:1px solid;
     background:rgba(224,169,76,.09);border-color:rgba(224,169,76,.42);color:#F0CE93}
   .alert.ok{background:rgba(111,179,166,.09);border-color:rgba(111,179,166,.38);color:#A8D8CE}
@@ -511,7 +571,7 @@
      visibly closer to the divider above it than to the border below — reported from a
      screenshot. The summary keeps its own 14/20 because it is a row; a body is a panel,
      and a panel is padded like .card. */
-  .expBody{padding:var(--s4);font-size:var(--t-small);color:var(--txt2);line-height:1.65}
+  .expBody{padding:var(--s4);font-size:var(--t-small);color:var(--txt2);line-height:var(--lh-read)}
   .expBody b{color:var(--txt70)}
   /* Direct children only. A collapsible's body is either prose — a string of <p>, which
      this spaces — or a component that brings its own spacing tokens, like the house-rules
@@ -530,7 +590,7 @@
 
   .log{display:flex;flex-direction:column}
   .le{display:flex;gap:var(--s3);padding:var(--s3) 0;border-bottom:1px solid rgba(237,233,224,.08);
-    font-size:var(--t-small);line-height:1.55}
+    font-size:var(--t-small);line-height:var(--lh-read);min-height:var(--row);align-items:center}
   /* A tracked uppercase label, so --micro carries it — but at 9px it was the one
      place --txt25 was still colouring text, at 2.1:1. */
   .le .w{font-size:var(--t-micro);font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--micro);
@@ -606,7 +666,7 @@
   .skick{font-size:var(--t-micro);font-weight:700;letter-spacing:.19em;text-transform:uppercase;
     color:var(--micro);margin-bottom:var(--s5)}
   .swho{font-size:var(--t-small);color:var(--txt2);margin-bottom:var(--s1)}
-  .sname{font-family:var(--disp);font-size:var(--t-max);line-height:1.25;margin-bottom:var(--s2)}
+  .sname{font-family:var(--disp);font-size:var(--t-max);line-height:var(--lh-tight);margin-bottom:var(--s2)}
   .steam{font-size:var(--t-cap);font-weight:700;letter-spacing:.17em;text-transform:uppercase;
     margin-bottom:var(--s6)}
   /* The answer is not on screen when the overlay opens — a mis-tap would otherwise
@@ -634,8 +694,8 @@
   .veil > *{max-width:calc(var(--col) - 2 * var(--pad));margin:0 auto}
   .veil .kicker{font-size:var(--t-micro);font-weight:700;letter-spacing:.19em;text-transform:uppercase;
     color:var(--micro);margin-bottom:var(--s4)}
-  .veil h1{font-family:var(--disp);font-weight:600;font-size:var(--t-h);line-height:1.25;margin:0 0 var(--s3)}
-  .veil p{margin:0 0 var(--s3);font-size:var(--t-body);color:var(--txt70);line-height:1.6}
+  .veil h1{font-family:var(--disp);font-weight:600;font-size:var(--t-h);line-height:var(--lh-tight);margin:0 0 var(--s3)}
+  .veil p{margin:0 0 var(--s3);font-size:var(--t-body);color:var(--txt70);line-height:var(--lh-read)}
   .veil p.dim{font-size:var(--t-small);color:var(--txt2)}
   .veil .go{display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s5)}
   .btn.ghost{background:none;border:1px solid var(--line2);color:var(--txt70)}

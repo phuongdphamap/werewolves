@@ -15,6 +15,18 @@ const t = (name, fn) => { let r; try { r = fn(); } catch (e){ r = 'threw ' + e.m
   if (r === true){ pass++; console.log('  ok   ' + name); }
   else { fail++; console.log('  FAIL ' + name + '  -> ' + r); } };
 const rule = re => (css.match(re) || [''])[0].replace(/\s+/g, ' ');
+/* The touch floors are --row-sm / --row now rather than literal pixels, so a test that
+   reads a number out of a declaration has to resolve the token first. Reading the value
+   from :root is the point: if someone lowers --row-sm below 44, every one of these fails
+   at once, which a literal 44px in each rule could never do. */
+const TOK = {};
+for (const m of css.matchAll(/--(row[\w-]*|s\d):\s*(\d+)px/g)) TOK['--' + m[1]] = +m[2];
+const px = v => {
+  if (v == null) return NaN;
+  const t = String(v).match(/var\((--[\w-]+)\)/);
+  return t ? TOK[t[1]] : parseFloat(v);
+};
+const minH = r => px((r.match(/min-height:\s*([^;}]+)/) || [])[1]);
 
 console.log('THE APP OPTS INTO THE UNSAFE AREA, SO IT MUST INSET');
 t('it still draws edge to edge — otherwise none of this is needed', () =>
@@ -60,14 +72,19 @@ t('and the box between them matches, so the row is level', () => {
   return /height:44px/.test(r) ? true : r;
 });
 t('the row did not grow to pay for it', () => {
-  // .p is 52px tall already, so a 44px control fits without changing anything
-  const p = rule(/\n  \.p\{[^}]*\}/);
-  const h = parseFloat((p.match(/min-height:(\d+)px/) || [])[1]);
+  // .p is --row (52) already, so a 44px control fits without changing anything
+  const h = minH(rule(/\n  \.p\{[^}]*\}/));
   return h >= 44 ? true : 'the player row is ' + h + 'px, so 44px controls stretch it';
+});
+t('the row-height tokens themselves respect the floor', () => {
+  const bad = ['--row-sm','--row','--row-lg'].filter(k => !(TOK[k] >= 44));
+  return bad.length === 0
+    ? true : 'a named row height is under the touch minimum: ' +
+      bad.map(k => k + '=' + TOK[k]).join(', ');
 });
 t('.ico clears 44 — Undo is one of these', () => {
   const r = rule(/\n  \.ico\{[^}]*\}/);
-  return /min-height:44px/.test(r) && /align-items:center/.test(r)
+  return minH(r) >= 44 && /align-items:center/.test(r)
     ? true : 'the app’s safety net is still the smallest control on the screen: ' + r;
 });
 t('.altBtn gets its 44 without moving the underline off the word', () => {
@@ -76,9 +93,10 @@ t('.altBtn gets its 44 without moving the underline off the word', () => {
   return /position:absolute/.test(r)
     ? true : 'padding would push the border away from the text it underlines';
 });
-t('the chip floor is still there', () =>
-  /\.chip\{[^}]*min-height:44px/.test(css.replace(/\s+/g, ' '))
-    ? true : 'the most-tapped control lost its floor');
+t('the chip floor is still there', () => {
+  const h = minH(rule(/\.chip\{[^}]*\}/));
+  return h >= 44 ? true : 'the most-tapped control is ' + h + 'px';
+});
 
 console.log('\nHAPTICS: THE ONE CHANNEL THE APP WAS MISSING');
 t('there is a two-tier vocabulary, not one buzz for everything', () => {
