@@ -169,7 +169,11 @@
 </div></div>
 
 <div class="modal" id="mRoster"><div class="in">
-  <div class="row" style="margin-bottom:var(--s4)"><h2 style="flex:1;margin:0" id="rosTtl"></h2>
+  <!-- --s2, because that is the bottom margin the h2 gives up to sit in this row. Every
+       page header is 10px from its subtitle; this one was 28 and read as a different
+       heading. The row is 44px tall for the touch targets, so the text gap lands at 18 —
+       the extra 8 is the buttons overhanging the text, not spacing. -->
+  <div class="row" style="margin-bottom:var(--s2)"><h2 style="flex:1;margin:0" id="rosTtl"></h2>
     <!-- Night sounds live here, not the header: used once a night, and the header's
          strip is worth more than a control that rarely moves. Haptics sit beside them —
          same kind of setting, and hidden entirely where the browser has no vibrator. -->
