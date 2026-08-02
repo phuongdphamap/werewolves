@@ -101,5 +101,23 @@ for (const en of ['In your deck', 'Base game', 'Characters expansion']){
   });
 }
 
+/* The Roster is the one heading that does not get its margin from the h2 rule: it sits in a
+   flex row with the sound, haptic and close buttons, so it carries margin:0 and the ROW
+   spaces it. That is fine until the row picks a different token, which it did -- --s4 --
+   and the header read as a different kind of heading from every page header in the app. */
+console.log('\nTHE ROSTER HEADER KEEPS THE PAGE RHYTHM');
+const H2_BOTTOM = tokenOf(/h2\{[^}]*margin:var\(--s\d\) 0 var\(--s(\d)\)/, 1);
+t('the h2 rule still states the gap every page header uses', () =>
+  H2_BOTTOM != null ? true : 'no bottom margin on h2, so there is nothing to match');
+t('the Roster header row spends the same token the h2 gives up', () => {
+  const row = (src.match(/<div class="row" style="margin-bottom:var\(--s(\d)\)"><h2[^>]*id="rosTtl"/) || [])[1];
+  if (row == null) return 'the Roster header row no longer declares its own bottom margin';
+  return varPx('s' + row) === H2_BOTTOM
+    ? true : 'row spends ' + varPx('s' + row) + 'px where every page header spends ' + H2_BOTTOM;
+});
+t('and it still zeroes the h2 margin, or the row would space it twice', () =>
+  /<h2 style="flex:1;margin:0" id="rosTtl">/.test(src)
+    ? true : 'the h2 margin is back and adds to the row margin');
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
